@@ -1,0 +1,14 @@
+Communication job: By the end, internal reviewers or publishing stakeholders should understand what makes Mahjong x Block distinct, what is already designed, and which product decisions remain because it combines intentional placement puzzle play with a complete content and support loop.
+
+Slide narrative:
+1. Title — Mahjong x Block at a glance.
+2. Hook — placing a polyomino is the primary strategic action.
+3. Core rule — hidden/revealed two-layer system creates timing choices.
+4. Loop — read, place, reveal, cascade.
+5. Content — 50-level curriculum and four goal types.
+6. Challenge — deliberate difficulty levers and tutorial flow.
+7. Support — boosters help without changing victory rules.
+8. Retention — daily quest and 30-day check-in.
+9. Economy — cosmetics and booster packs, bounded by the core loop.
+10. Readiness — deterministic content, self-test coverage, technical risks.
+11. Next decisions — human playtest, generative mode, booster upgrade priority.

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Chọn Màn — Mahjong × Block</title>
+<style>
+:root{
+  --wood:#2b1d16; --wood2:#3d2a20; --felt:#14342b; --felt2:#0d241d;
+  --cream:#f6ecd8; --cream2:#e6d7ba; --ink:#2a2018;
+  --gold:#e8b64c; --jade:#4ec98a; --danger:#ff5d51;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  background:radial-gradient(120% 80% at 50% -10%, #5a3d2c 0%, var(--wood) 55%, #1b120d 100%);
+  color:var(--cream); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  overscroll-behavior:none; touch-action:manipulation; user-select:none;
+  min-height:100%; padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+}
+#app{width:100%; max-width:440px; margin:0 auto; padding:14px 10px 30px; display:flex; flex-direction:column; gap:4px;}
+
+/* ---------- HEADER: cổng vào — mái ngói + đèn lồng, phong Trung Hoa cổ ---- */
+#header{position:relative; text-align:center; padding:18px 10px 22px; margin-bottom:6px;}
+#header::before{content:''; position:absolute; left:50%; top:0; width:86%; height:10px; transform:translateX(-50%);
+  background:linear-gradient(160deg,#6b4a2e,#4a3220); border-radius:0 0 40% 40%/0 0 60% 60%;
+  box-shadow:0 3px 6px rgba(0,0,0,.4);}
+.lantern{position:absolute; top:2px; width:16px; height:20px; border-radius:50% 50% 40% 40%;
+  background:radial-gradient(circle at 40% 30%, #ff8a6b, var(--danger)); box-shadow:0 0 10px rgba(255,93,81,.55);}
+.lantern::before,.lantern::after{content:''; position:absolute; left:50%; width:1px; height:8px; background:rgba(232,182,76,.6); transform:translateX(-50%);}
+.lantern::before{top:-8px;} .lantern::after{top:20px;}
+.lantern.l{left:12%;} .lantern.r{right:12%;}
+#header h1{margin:14px 0 2px; font-size:22px; letter-spacing:.04em; color:var(--gold); text-shadow:0 2px 6px rgba(0,0,0,.5);}
+#header p{margin:0; font-size:11px; opacity:.7; letter-spacing:.06em;}
+
+/* ---------- CON ĐƯỜNG MÀN CHƠI ---------- */
+#path{position:relative; display:flex; flex-direction:column; gap:30px; padding:14px 4px 20px;}
+#path::before{content:''; position:absolute; left:50%; top:0; bottom:0; width:2px; transform:translateX(-50%); z-index:0;
+  background:repeating-linear-gradient(to bottom, rgba(232,182,76,.4) 0 8px, transparent 8px 17px);}
+.gate-row{position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; width:168px;}
+.gate-row:nth-child(odd){align-self:flex-start; margin-left:4%;}
+.gate-row:nth-child(even){align-self:flex-end; margin-right:4%;}
+.gate-num{width:24px; height:24px; border-radius:50%; background:linear-gradient(180deg,var(--gold),#c8912e);
+  color:#2a1d0b; font-weight:900; font-size:12px; display:flex; align-items:center; justify-content:center;
+  margin-bottom:5px; box-shadow:0 2px 6px rgba(0,0,0,.45); font-variant-numeric:tabular-nums;}
+
+/* ---------- CỔNG TRE (gate) ---------- */
+.gate{width:150px; cursor:pointer;}
+.gate.locked{cursor:default;}
+.gate-roof{height:13px; margin:0 -5px -4px; position:relative; z-index:2; border-radius:9px 9px 2px 2px;
+  background:linear-gradient(160deg,#6b4a2e,#4a3220); box-shadow:0 2px 5px rgba(0,0,0,.45);}
+.gate-inner{position:relative; aspect-ratio:.82; perspective:820px; border-radius:6px; overflow:hidden;
+  background:linear-gradient(160deg,var(--felt),var(--felt2)); border:1px solid rgba(232,182,76,.3);
+  box-shadow:inset 0 3px 10px rgba(0,0,0,.5), 0 6px 14px rgba(0,0,0,.4); transition:filter .25s;}
+.gate.locked .gate-inner{filter:grayscale(.55) brightness(.72);}
+.door{position:absolute; top:0; bottom:0; width:50%;
+  background:repeating-linear-gradient(90deg,#8a6d3f 0 7px,#74582e 7px 8px,#96794a 8px 15px);
+  box-shadow:inset 0 0 14px rgba(0,0,0,.45); backface-visibility:hidden;
+  transition:transform .55s cubic-bezier(.4,0,.2,1); z-index:3;}
+.door::before,.door::after{content:''; position:absolute; left:10%; right:10%; height:7%;
+  background:rgba(35,22,14,.62); border-radius:2px;}
+.door::before{top:16%;} .door::after{bottom:16%;}
+.door-left{left:0; transform-origin:0% 50%; border-radius:5px 0 0 5px;}
+.door-right{left:50%; transform-origin:100% 50%; border-radius:0 5px 5px 0;}
+.gate.open .door-left{transform:rotateY(-82deg);}
+.gate.open .door-right{transform:rotateY(82deg);}
+.gate-reveal{position:absolute; inset:0; z-index:2; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; gap:5px; padding:10px; text-align:center; opacity:0; transition:opacity .3s .22s;}
+.gate.open .gate-reveal{opacity:1;}
+.reveal-title{font-weight:800; color:var(--gold); font-size:12.5px; line-height:1.3;}
+.reveal-goal{font-size:10.5px; opacity:.82;}
+.reveal-play{margin-top:3px; padding:7px 16px; border:0; border-radius:9px; font-size:11.5px; font-weight:800;
+  background:linear-gradient(180deg,var(--gold),#c8912e); color:#2a1d0b;}
+.lock-badge{position:absolute; inset:0; z-index:4; display:flex; align-items:center; justify-content:center; font-size:22px;}
+.gate-label{margin-top:6px; font-size:10.5px; text-align:center; max-width:150px; opacity:.82; line-height:1.35;}
+.gate.locked .gate-label{opacity:.5;}
+
+#toast{position:fixed; left:50%; bottom:22px; transform:translateX(-50%); z-index:90; background:rgba(20,14,10,.95);
+  border:1px solid rgba(232,182,76,.4); color:var(--cream); padding:9px 14px; border-radius:10px; font-size:12.5px;
+  width:max-content; max-width:88%; text-align:center; opacity:0; transition:opacity .25s, transform .25s; pointer-events:none;}
+#toast.on{opacity:1; transform:translateX(-50%) translateY(-4px);}
+.foot{text-align:center; font-size:9.5px; opacity:.32; letter-spacing:.05em; margin-top:6px;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div class="lantern l"></div><div class="lantern r"></div>
+    <h1>MAHJONG × BLOCK</h1>
+    <p>CHỌN MÀN · CHẠM CỔNG ĐỂ MỞ</p>
+  </div>
+  <div id="path"></div>
+  <div class="foot">FINAL CORE 24K · FLOOR-ONLY QUEUE × GRAVITY CASCADE</div>
+</div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* =========================================================================
+   MÀN CHỌN — lấy cảm hứng Trung Hoa cổ: mỗi màn là 1 cổng tre 2 cánh, chạm
+   vào để cổng mở ra rồi mới hiện nút CHƠI (không nhảy thẳng vào game ngay
+   khi chạm, để có khoảnh khắc "hé cổng xem trước" đúng như yêu cầu).
+
+   Dữ liệu LEVEL_META ở đây là bản SAO NGẮN (chỉ tên màn + mục tiêu) của
+   P24K_LEVELS bên trong 24K-lower-layer-gravity.html — 2 file không dùng
+   chung 1 nguồn dữ liệu (mỗi prototype vẫn tự chứa 1 file HTML độc lập),
+   nên nếu sau này đổi tên/mục tiêu màn ở file game, PHẢI sửa lại đúng ở
+   đây theo tay. Không đụng gì tới nội dung/độ khó từng màn — đúng yêu cầu
+   "không cần quan tâm level design hiện tại".
+
+   Tiến trình mở khoá đọc/ghi qua localStorage khoá "mxb_level_unlocked" —
+   cùng khoá mà 24K-lower-layer-gravity.html ghi vào khi thắng 1 màn. Nếu
+   mở trực tiếp bằng file:// (không qua server), một số trình duyệt tách
+   localStorage theo từng file riêng — chạy qua 1 server tĩnh (http://) sẽ
+   hết vấn đề này.
+   ========================================================================= */
+const LEVEL_META = [
+  {title:'Ba Mặt Đầu Tiên',      goal:3},
+  {title:'Hai Trạm Rơi',          goal:4},
+  {title:'Chain Dài · Chain Ngắn', goal:5},
+  {title:'Hai Chain Ba Nhịp',     goal:6},
+  {title:'Một Khối · Hai Trigger', goal:6},
+  {title:'Giữ Chỗ Cho Domino',    goal:7},
+  {title:'Domino Kép Bốn Nhịp',   goal:8},
+  {title:'Hai Shape Liên Tiếp',   goal:9},
+  {title:'Hai Chain Năm Nhịp',    goal:10},
+  {title:'Ba Hướng Gravity',      goal:12},
+];
+const GAME_URL = '24K-lower-layer-gravity.html';
+
+function soundOn(){ try{ return localStorage.getItem('mxb_sound')!=='off'; }catch(e){ return true; } }
+let AC=null;
+function ac(){ if(!AC){ try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){AC=false;} } return AC; }
+function beep(f,d,type,vol,slide){
+  if(!soundOn()) return;
+  const a=ac(); if(!a) return;
+  try{
+    const o=a.createOscillator(), g=a.createGain();
+    o.type=type||'sine'; o.frequency.setValueAtTime(f,a.currentTime);
+    if(slide) o.frequency.exponentialRampToValueAtTime(slide,a.currentTime+d);
+    g.gain.setValueAtTime(0,a.currentTime);
+    g.gain.linearRampToValueAtTime(vol||.12,a.currentTime+.012);
+    g.gain.exponentialRampToValueAtTime(.0008,a.currentTime+d);
+    o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime+d+.02);
+  }catch(e){}
+}
+const sfx={
+  open:()=>{beep(180,.14,'square',.07,120); setTimeout(()=>beep(220,.1,'square',.06,150),70);},
+  locked:()=>beep(140,.14,'square',.08,110),
+};
+
+function unlockedIndex(){
+  try{ return parseInt(localStorage.getItem('mxb_level_unlocked')||'0',10)||0; }
+  catch(e){ return 0; }
+}
+function toast(msg,ms){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('on');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('on'), ms||1700);
+}
+
+function gateHTML(lv,i,locked){
+  return `<div class="gate-row">
+    <div class="gate-num">${i+1}</div>
+    <div class="gate${locked?' locked':''}" data-idx="${i}">
+      <div class="gate-roof"></div>
+      <div class="gate-inner">
+        <div class="door door-left"></div>
+        <div class="door door-right"></div>
+        <div class="gate-reveal">
+          <div class="reveal-title">${lv.title}</div>
+          <div class="reveal-goal">Mục tiêu: ghép ${lv.goal} cặp</div>
+          <button class="reveal-play" data-play="${i}">CHƠI</button>
+        </div>
+        ${locked?'<div class="lock-badge">🔒</div>':''}
+      </div>
+    </div>
+    <div class="gate-label">Màn ${i+1} · ${lv.title}</div>
+  </div>`;
+}
+function render(){
+  const unlocked=unlockedIndex();
+  document.getElementById('path').innerHTML=LEVEL_META.map((lv,i)=>gateHTML(lv,i,i>unlocked)).join('');
+}
+document.getElementById('path').addEventListener('click',e=>{
+  const playBtn=e.target.closest('[data-play]');
+  if(playBtn){ location.href=GAME_URL+'?level='+playBtn.dataset.play; return; }
+  const gate=e.target.closest('.gate'); if(!gate) return;
+  if(gate.classList.contains('locked')){ toast('Hoàn thành màn trước để mở khoá cổng này'); sfx.locked(); return; }
+  if(gate.classList.contains('open')) return;
+  document.querySelectorAll('.gate.open').forEach(g=>{ if(g!==gate) g.classList.remove('open'); });
+  gate.classList.add('open');
+  sfx.open();
+});
+render();
+
+/* ------------------------------ TEST HOOK / SELFTEST ------------------------ */
+window.__digest={ LEVEL_META, unlockedIndex, render, GAME_URL };
+(function selftest(){
+  const out=[];
+  out.push(['ten-levels-in-meta', LEVEL_META.length===10]);
+  out.push(['goals-non-decreasing', LEVEL_META.every((l,i)=>i===0||l.goal>=LEVEL_META[i-1].goal)]);
+  try{ localStorage.setItem('mxb_level_unlocked','0'); }catch(e){}
+  out.push(['level-0-unlocked-by-default', unlockedIndex()>=0]);
+  try{ localStorage.setItem('mxb_level_unlocked','3'); }catch(e){}
+  out.push(['unlocked-index-reads-back', unlockedIndex()===3]);
+  const bad=out.filter(x=>!x[1]);
+  console.log('[selftest]', bad.length? 'FAIL '+JSON.stringify(bad) : 'OK ('+out.length+' checks)');
+})();
+</script>
+</body>
+</html>

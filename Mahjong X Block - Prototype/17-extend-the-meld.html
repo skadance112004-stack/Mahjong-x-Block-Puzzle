@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Nối Dài Bộ — Mahjong × Block (prototype 17)</title>
+<style>
+:root{
+  --wood:#2b1d16; --wood2:#3d2a20; --felt:#14342b; --felt2:#0d241d;
+  --cream:#f6ecd8; --cream2:#e6d7ba; --ink:#2a2018;
+  --gold:#e8b64c; --jade:#4ec98a; --danger:#ff5d51; --blue:#4a9fe0; --red:#e0553f; --green:#3fae6a;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  background:
+    radial-gradient(120% 80% at 50% -10%, #5a3d2c 0%, var(--wood) 55%, #1b120d 100%);
+  color:var(--cream); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  overscroll-behavior:none; touch-action:manipulation; user-select:none;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-height:100%; padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+}
+#app{width:100%; max-width:440px; display:flex; flex-direction:column; gap:10px; padding:8px 10px 12px;}
+
+#hud{display:flex; align-items:center; gap:8px;}
+.hud-box{flex:1; background:rgba(0,0,0,.28); border:1px solid rgba(232,182,76,.22); border-radius:10px; padding:5px 8px;}
+.hud-lab{font-size:9px; letter-spacing:.12em; text-transform:uppercase; opacity:.55;}
+.hud-val{font-size:16px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1.15;}
+#btn-help{width:34px;height:34px;flex:none;border-radius:10px;background:rgba(0,0,0,.28);border:1px solid rgba(232,182,76,.22);color:var(--cream);font-size:15px;font-weight:700;}
+
+#board-wrap{position:relative; width:100%; display:flex; justify-content:center;}
+#board{
+  width:min(100%, 62vh); flex:none; position:relative;
+  display:grid; gap:3px; padding:6px; border-radius:14px;
+  background:linear-gradient(160deg,var(--felt),var(--felt2));
+  border:1px solid rgba(232,182,76,.22);
+  box-shadow:inset 0 2px 10px rgba(0,0,0,.5), 0 6px 18px rgba(0,0,0,.35);
+}
+.cell{aspect-ratio:1; border-radius:6px; background:rgba(0,0,0,.22); box-shadow:inset 0 0 0 1px rgba(255,255,255,.035); position:relative;}
+.cell .tile{position:absolute; inset:0;}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}50%{transform:translateX(4px)}75%{transform:translateX(-3px)}}
+.cell.shakebad{animation:shake .3s;}
+
+/* ---------- TILE ART (copy nguyên quy ước từ prototype 11/14/16) ---------- */
+.tile{border-radius:6px; background:linear-gradient(170deg,#fdf6e6 0%,var(--cream) 40%,var(--cream2) 100%);
+  box-shadow:inset 0 -2px 0 rgba(0,0,0,.16), inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.35);
+  display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative;}
+.tile svg{width:88%; height:88%; display:block;}
+.tile .rk{position:absolute; top:1px; left:2.5px; font-size:8px; font-weight:800; line-height:1; opacity:.62;}
+.tile.s .rk{color:var(--green)} .tile.c .rk{color:var(--blue)} .tile.w .rk{color:#b3862a}
+.tile.banked{box-shadow:inset 0 -2px 0 rgba(0,0,0,.16), inset 0 1px 0 #fff, 0 0 0 2.5px var(--gold), 0 2px 8px rgba(232,182,76,.55);}
+.tile.pop{animation:pop .22s ease-out forwards;}
+@keyframes pop{0%{transform:scale(1); opacity:1}50%{transform:scale(1.3); filter:brightness(2)}100%{transform:scale(0); opacity:0}}
+.tile.pulse{animation:pulse .3s ease-out;}
+@keyframes pulse{0%{transform:scale(1)}45%{transform:scale(1.14); filter:brightness(1.4)}100%{transform:scale(1)}}
+
+#queue-wrap{display:flex; flex-direction:column; align-items:center; gap:5px;}
+.qlabel{font-size:9px; letter-spacing:.12em; text-transform:uppercase; opacity:.5;}
+#queue{display:flex; gap:10px;}
+#queue .qslot{width:46px; position:relative; transition:transform .15s;}
+#queue .qslot .tile{aspect-ratio:1; position:relative;}
+#queue .qslot.selQ{transform:translateY(-5px);}
+#queue .qslot.selQ .tile{box-shadow:inset 0 -2px 0 rgba(0,0,0,.16), inset 0 1px 0 #fff, 0 0 0 3px var(--gold), 0 4px 12px rgba(0,0,0,.45);}
+
+.float{position:fixed; z-index:80; pointer-events:none; font-weight:900; font-size:16px; color:var(--gold);
+  text-shadow:0 2px 6px rgba(0,0,0,.8); animation:floatup 1s ease-out forwards;}
+@keyframes floatup{0%{transform:translate(-50%,0) scale(.7); opacity:0}25%{transform:translate(-50%,-12px) scale(1.15); opacity:1}100%{transform:translate(-50%,-46px) scale(1); opacity:0}}
+.spark{position:fixed; z-index:75; width:6px; height:6px; border-radius:50%; pointer-events:none;}
+
+#ov{position:fixed; inset:0; z-index:100; background:rgba(12,8,6,.86); backdrop-filter:blur(3px);
+  display:none; align-items:center; justify-content:center; padding:18px;}
+#ov.on{display:flex;}
+#ovcard{width:100%; max-width:360px; background:linear-gradient(170deg,#3d2a20,#241812); border:1px solid rgba(232,182,76,.35);
+  border-radius:16px; padding:18px; box-shadow:0 20px 50px rgba(0,0,0,.6); max-height:86vh; overflow:auto;}
+#ovcard h2{margin:0 0 4px; font-size:20px; color:var(--gold);}
+#ovcard .sub{font-size:12px; opacity:.7; margin-bottom:12px;}
+#ovcard p{font-size:13px; line-height:1.55; margin:0 0 9px;}
+#ovcard ul{font-size:12.5px; line-height:1.6; padding-left:17px; margin:0 0 10px;}
+#ovcard .hl{color:var(--gold); font-weight:700;}
+#ovcard .dg{color:var(--danger); font-weight:700;}
+.btn{width:100%; padding:12px; border-radius:11px; border:0; font-size:14px; font-weight:800;
+  background:linear-gradient(180deg,var(--gold),#c8912e); color:#2a1d0b; margin-top:6px;}
+.demo{display:flex; gap:4px; justify-content:center; align-items:center; margin:8px 0 12px;}
+.demo .tile{width:30px;height:38px;}
+.demo .arw{opacity:.6; font-size:15px; padding:0 3px;}
+#toast{position:absolute; left:50%; bottom:10px; transform:translateX(-50%); z-index:90; background:rgba(20,14,10,.95);
+  border:1px solid rgba(232,182,76,.4); color:var(--cream); padding:9px 14px; border-radius:10px; font-size:12.5px;
+  width:max-content; max-width:90%; text-align:center; opacity:0; transition:opacity .25s, transform .25s; pointer-events:none;}
+#toast.on{opacity:1; transform:translateX(-50%) translateY(-4px);}
+.foot{text-align:center; font-size:9.5px; opacity:.32; letter-spacing:.05em;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div class="hud-box"><div class="hud-lab">Điểm</div><div class="hud-val" id="h-score">0</div></div>
+    <div class="hud-box"><div class="hud-lab">Bung nổ</div><div class="hud-val" id="h-pops">0</div></div>
+    <div class="hud-box"><div class="hud-lab">Chuỗi</div><div class="hud-val" id="h-combo">0</div></div>
+    <button id="btn-help">?</button>
+  </div>
+
+  <div id="board-wrap"><div id="board"></div><div id="toast"></div></div>
+
+  <div id="queue-wrap">
+    <div class="qlabel">Chạm quân, rồi chạm ô trống để đặt</div>
+    <div id="queue"></div>
+  </div>
+
+  <div class="foot">PROTOTYPE 17 · NỐI DÀI BỘ (EXTEND THE MELD) · hook test</div>
+</div>
+
+<div id="ov"><div id="ovcard"></div></div>
+
+<script>
+"use strict";
+/* =========================================================================
+   NỐI DÀI BỘ (Extend The Meld) — Mahjong × Block hybrid, hook prototype
+   HOOK (mượn từ Rummikub): bộ đã ghép trên bàn KHÔNG biến mất ngay như các
+   prototype khác — nó ở lại, và có thể được nối dài thêm bằng quân mới đặt
+   sát đầu mở. Nối dài liên tục để nhân điểm theo Chuỗi, tới khi bộ đạt độ
+   dài tối đa thì tự bung nổ, dọn sạch ô và cộng điểm lớn. Không lấy nguyên
+   luật tay bài / rút bài của Rummikub — chỉ lấy đúng hook "bộ trên bàn có
+   thể mở rộng dần" đó.
+   ========================================================================= */
+
+/* ------------------------------ CONFIG ---------------------------------- */
+const SIZE = 6;
+const SUITS = ['s','c','w'];
+const MAX_RANK = 6;
+const MIN_MELD_LEN = 3;
+const MAX_MELD_LEN = 5;
+const NEW_MELD_PER_TILE = 40;
+const EXTEND_BONUS = 60;
+const POP_BASE = 200;
+const POP_PER_TILE = 25;
+
+/* ------------------------------ STATE ------------------------------------ */
+const S = { board:[], queue:[], score:0, pops:0, combo:0, selQ:null, busy:false, over:false, sound:true, fast:false };
+
+/* ------------------------------ AUDIO (copy quy ước từ prototype 11/14/16) */
+let AC=null;
+function ac(){ if(!AC){ try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){AC=false;} } return AC; }
+function beep(f,d,type,vol,slide){
+  if(!S.sound||S.fast) return; const a=ac(); if(!a) return;
+  try{
+    const o=a.createOscillator(), g=a.createGain();
+    o.type=type||'sine'; o.frequency.setValueAtTime(f,a.currentTime);
+    if(slide) o.frequency.exponentialRampToValueAtTime(slide,a.currentTime+d);
+    g.gain.setValueAtTime(0,a.currentTime);
+    g.gain.linearRampToValueAtTime(vol||.12,a.currentTime+.012);
+    g.gain.exponentialRampToValueAtTime(.0008,a.currentTime+d);
+    o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime+d+.02);
+  }catch(e){}
+}
+const sfx={
+  bank:    ()=>beep(340,.13,'triangle',.11,620),
+  extend:  combo=>beep(360+combo*40,.15,'triangle',.12,780+combo*90),
+  burst:   ()=>{[420,560,700].forEach((f,i)=>setTimeout(()=>beep(f,.18,'sine',.1),i*70));},
+  bad:     ()=>beep(140,.12,'square',.08,110),
+  lose:    ()=>{[330,262,196,147].forEach((f,i)=>setTimeout(()=>beep(f,.3,'sawtooth',.1),i*130));}
+};
+
+/* ------------------------------ TILE ART (copy nguyên từ prototype 11/14/16) */
+const ROWS = {1:[1],2:[2],3:[3],4:[2,2],5:[2,1,2],6:[3,3]};
+function dotsSVG(n,color,round){
+  const rows=ROWS[n]||[n]; const H=rows.length; let out='';
+  const cellH=100/H;
+  rows.forEach((cnt,ri)=>{
+    const cy=cellH*ri+cellH/2;
+    for(let i=0;i<cnt;i++){
+      const cx=100/(cnt+1)*(i+1);
+      const r=Math.min(cellH*.30, 100/(cnt+1)*.42);
+      if(round) out+=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" opacity=".92"/><circle cx="${cx}" cy="${cy}" r="${r*.45}" fill="#fdf6e6" opacity=".55"/>`;
+      else out+=`<rect x="${cx-r*.42}" y="${cy-r*1.05}" width="${r*.84}" height="${r*2.1}" rx="${r*.42}" fill="${color}" opacity=".92"/><rect x="${cx-r*.16}" y="${cy-r*.75}" width="${r*.32}" height="${r*1.5}" fill="#fdf6e6" opacity=".45"/>`;
+    }
+  });
+  return out;
+}
+function tileHTML(t, extraCls){
+  if(!t) return '';
+  let inner='', cls='tile '+t.suit+(extraCls?' '+extraCls:''), lab=t.rank;
+  if(t.suit==='c') inner=dotsSVG(t.rank,'#3d7fbf',true);
+  else if(t.suit==='s') inner=dotsSVG(t.rank,'#2f9e5c',false);
+  else inner=`<text x="50" y="63" font-size="60" font-weight="800" text-anchor="middle" fill="#d33b2c" font-family="Georgia,serif">${t.rank}</text><rect x="24" y="76" width="52" height="6" rx="3" fill="#d33b2c" opacity=".8"/><rect x="30" y="15" width="40" height="5" rx="2.5" fill="#d33b2c" opacity=".55"/>`;
+  return `<div class="${cls}"><span class="rk">${lab}</span><svg viewBox="0 0 100 100">${inner}</svg></div>`;
+}
+const T = id => ({id, suit:id[0], rank:+id.slice(1)});
+function randTile(){ const su=SUITS[(Math.random()*SUITS.length)|0]; const rk=1+((Math.random()*MAX_RANK)|0); return T(su+rk); }
+
+/* ------------------------------ BOARD OPS -------------------------------- */
+function emptyBoard(n){ return Array.from({length:n},()=>Array(n).fill(null)); }
+function inBounds(r,c){ return r>=0&&c>=0&&r<SIZE&&c<SIZE; }
+function hasEmptyCell(){ for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++) if(!S.board[r][c]) return true; return false; }
+
+/* --------------------- MELD RESOLUTION (hook lõi) ------------------------- */
+function isConsecutiveAscending(ranks){
+  for(let i=1;i<ranks.length;i++) if(ranks[i]!==ranks[i-1]+1) return false;
+  return true;
+}
+/** Chuỗi liên tục các ô có quân, đi qua (r,c), theo 1 trục (dr,dc)/(-dr,-dc). */
+function lineRun(board,r,c,dr,dc){
+  const cells=[[r,c]];
+  let rr=r-dr, cc=c-dc;
+  while(inBounds(rr,cc)&&board[rr][cc]){ cells.unshift([rr,cc]); rr-=dr; cc-=dc; }
+  rr=r+dr; cc=c+dc;
+  while(inBounds(rr,cc)&&board[rr][cc]){ cells.push([rr,cc]); rr+=dr; cc+=dc; }
+  return cells;
+}
+/** 'group' = toàn bộ cùng 1 id (Bộ/Pung); 'run' = cùng chất, hạng tăng liền 1 (Sảnh/Chow). */
+function meldKind(board,cells){
+  const tiles=cells.map(([r,c])=>board[r][c]);
+  if(tiles.some(t=>!t)) return null;
+  if(tiles.every(t=>t.id===tiles[0].id)) return 'group';
+  if(tiles.every(t=>t.suit===tiles[0].suit) && isConsecutiveAscending(tiles.map(t=>t.rank))) return 'run';
+  return null;
+}
+/** Xét 1 trục qua (r,c) vừa đặt: null (không có gì), {type:'new',cells}, hoặc {type:'extend',cells}. */
+function resolveAxis(board,r,c,dr,dc){
+  const cells=lineRun(board,r,c,dr,dc);
+  if(cells.length<2) return null;
+  const kind=meldKind(board,cells);
+  if(!kind) return null;
+  const restCells=cells.filter(([rr,cc])=>!(rr===r&&cc===c));
+  const wasBanked = restCells.length>=MIN_MELD_LEN && restCells.every(([rr,cc])=>board[rr][cc].banked);
+  if(wasBanked) return {type:'extend', cells};
+  if(cells.length>=MIN_MELD_LEN) return {type:'new', cells};
+  return null;
+}
+/** Gọi ngay sau khi đặt quân mới (chưa banked) tại (r,c). Bank các ô hợp lệ,
+ *  trả về events đã áp dụng + danh sách các bộ đã đạt độ dài tối đa (cần bung nổ). */
+function resolvePlacement(r,c){
+  const events=[];
+  for(const [dr,dc] of [[0,1],[1,0]]){
+    const res=resolveAxis(S.board,r,c,dr,dc);
+    if(res) events.push(res);
+  }
+  const popped=[];
+  for(const ev of events){
+    for(const [rr,cc] of ev.cells) S.board[rr][cc].banked=true;
+    if(ev.cells.length>=MAX_MELD_LEN) popped.push(ev.cells);
+  }
+  return {events, popped};
+}
+
+/* ------------------------------ RENDER ------------------------------------ */
+const $=id=>document.getElementById(id);
+const boardEl=$('board');
+function cellEl(r,c){ return boardEl.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`); }
+function cellRect(r,c){ const el=cellEl(r,c); return el ? el.getBoundingClientRect() : {left:0,top:0,width:40,height:40}; }
+
+function renderBoard(){
+  boardEl.style.gridTemplateColumns=`repeat(${SIZE},1fr)`;
+  let h='';
+  for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++){
+    const t=S.board[r][c];
+    h+=`<div class="cell" data-r="${r}" data-c="${c}">${t?tileHTML(t, t.banked?'banked':''):''}</div>`;
+  }
+  boardEl.innerHTML=h;
+}
+function renderQueue(){
+  let h='';
+  S.queue.forEach((t,i)=>{ h+=`<div class="qslot${S.selQ===i?' selQ':''}" data-i="${i}">${tileHTML(t)}</div>`; });
+  $('queue').innerHTML=h;
+}
+function renderHUD(){ $('h-score').textContent=S.score; $('h-pops').textContent=S.pops; $('h-combo').textContent=S.combo; }
+function renderAll(){ renderBoard(); renderQueue(); renderHUD(); }
+
+function floatTxt(x,y,txt,color){
+  if(S.fast) return;
+  const d=document.createElement('div'); d.className='float'; d.textContent=txt;
+  if(color) d.style.color=color;
+  d.style.left=x+'px'; d.style.top=y+'px'; document.body.appendChild(d);
+  setTimeout(()=>d.remove(),1000);
+}
+function sparks(x,y,color,n){
+  if(S.fast) return;
+  for(let i=0;i<(n||8);i++){
+    const s=document.createElement('div'); s.className='spark';
+    s.style.left=x+'px'; s.style.top=y+'px'; s.style.background=color||'#e8b64c';
+    document.body.appendChild(s);
+    const a=Math.random()*Math.PI*2, d=20+Math.random()*26;
+    s.animate([{transform:'translate(-50%,-50%) scale(1)',opacity:1},
+               {transform:`translate(${Math.cos(a)*d-4}px,${Math.sin(a)*d-4}px) scale(0)`,opacity:0}],
+              {duration:400+Math.random()*240, easing:'cubic-bezier(.2,.8,.3,1)'});
+    setTimeout(()=>s.remove(),700);
+  }
+}
+function flashBad(el){ if(!el) return; el.classList.add('shakebad'); setTimeout(()=>el.classList.remove('shakebad'),320); }
+function toast(msg,ms){
+  const t=$('toast'); t.innerHTML=msg; t.classList.add('on');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('on'), ms||1600);
+}
+
+/* ------------------------------ INPUT -------------------------------------- */
+function handleQueueTap(i){
+  if(S.busy||S.over) return;
+  S.selQ = (S.selQ===i) ? null : i;
+  renderQueue();
+}
+function handleBoardTap(r,c){
+  if(S.busy||S.over) return;
+  if(S.selQ==null){ toast('Chọn quân ở khay dưới trước'); return; }
+  if(S.board[r][c]){ flashBad(cellEl(r,c)); return; }
+
+  const tile=S.queue[S.selQ];
+  S.board[r][c]={id:tile.id, suit:tile.suit, rank:tile.rank, banked:false};
+  S.queue.splice(S.selQ,1,randTile());
+  S.selQ=null;
+  renderBoard(); renderQueue();
+
+  const {events,popped}=resolvePlacement(r,c);
+  applyEvents(r,c,events,popped);
+}
+boardEl.addEventListener('click',e=>{
+  const ce=e.target.closest('.cell'); if(!ce) return;
+  handleBoardTap(+ce.dataset.r, +ce.dataset.c);
+});
+$('queue').addEventListener('click',e=>{
+  const qe=e.target.closest('.qslot'); if(!qe) return;
+  handleQueueTap(+qe.dataset.i);
+});
+
+/* ------------------------------ APPLY EVENTS ------------------------------- */
+function applyEvents(r,c,events,popped){
+  let extendCount=0, newTiles=0;
+  for(const ev of events){
+    if(ev.type==='extend'){ extendCount++; S.combo++; S.score+=EXTEND_BONUS*S.combo; }
+    else if(ev.type==='new'){ newTiles+=ev.cells.length; S.score+=NEW_MELD_PER_TILE*ev.cells.length; }
+  }
+  if(extendCount===0) S.combo=0;
+
+  const rect=cellRect(r,c);
+  if(extendCount>0){
+    toast('Nối dài! Chuỗi x'+S.combo);
+    floatTxt(rect.left+rect.width/2, rect.top, '+'+(EXTEND_BONUS*S.combo), '#e8b64c');
+    sparks(rect.left+rect.width/2, rect.top+rect.height/2, '#e8b64c', 10);
+    sfx.extend(S.combo);
+  } else if(newTiles>0){
+    toast('Ghép bộ mới, đã khoá!');
+    floatTxt(rect.left+rect.width/2, rect.top, '+'+NEW_MELD_PER_TILE*3, '#4ec98a');
+    sfx.bank();
+  }
+  renderBoard(); renderHUD();
+
+  if(popped.length){
+    S.busy=true;
+    for(const cells of popped) for(const [rr,cc] of cells){
+      const el=cellEl(rr,cc), tl=el&&el.querySelector('.tile');
+      if(tl) tl.classList.add('pulse');
+    }
+    setTimeout(()=>{
+      for(const cells of popped) for(const [rr,cc] of cells){
+        const el=cellEl(rr,cc), tl=el&&el.querySelector('.tile');
+        if(tl) tl.classList.add('pop');
+      }
+      setTimeout(()=>{
+        for(const cells of popped){
+          S.pops++; S.score += POP_BASE + POP_PER_TILE*cells.length;
+          for(const [rr,cc] of cells) S.board[rr][cc]=null;
+        }
+        renderBoard(); renderHUD(); sfx.burst();
+        S.busy=false;
+        checkLose();
+      }, 220);
+    }, 320);
+  } else {
+    checkLose();
+  }
+}
+function checkLose(){ if(!hasEmptyCell()) lose(); }
+
+/* ------------------------------ FLOW / OVERLAY ---------------------------- */
+function overlay(html){ $('ovcard').innerHTML=html; $('ov').classList.add('on'); }
+function closeOv(){ $('ov').classList.remove('on'); }
+
+const HOOK_INTRO='Bộ đã ghép trên bàn <b class="hl">không biến mất ngay</b> — nó ở lại và có thể được nối dài thêm bằng quân mới đặt sát đầu mở. Nối dài liên tục để nhân điểm theo Chuỗi, tới khi bộ đạt độ dài tối đa sẽ <b class="dg">tự bung nổ</b>, dọn sạch ô và cộng điểm lớn.';
+
+function introOverlay(){
+  overlay(`<h2>Nối Dài Bộ</h2>
+   <div class="sub">Mahjong × Block Puzzle · prototype kiểm chứng hook</div>
+   <p>${HOOK_INTRO}</p>
+   <div class="demo">${tileHTML(T('s3'))}${tileHTML(T('s4'))}${tileHTML(T('s5'))}<span class="arw">→</span><b style="color:var(--gold)">KHOÁ</b></div>
+   <ul>
+    <li>Chạm 1 quân ở khay dưới, rồi chạm 1 ô trống trên bàn để đặt.</li>
+    <li>3 quân liên tiếp cùng hàng/cột, cùng mặt (Bộ) hoặc cùng chất tăng liền số (Sảnh) sẽ tự ghép và khoá lại (viền vàng).</li>
+    <li>Đặt quân mới sát đầu mở của 1 Bộ/Sảnh đã khoá để <b class="hl">nối dài</b> — điểm nhân theo Chuỗi đang tăng dần.</li>
+    <li>Bộ/Sảnh dài tới ${MAX_MELD_LEN} quân sẽ tự bung nổ, dọn sạch ô, cộng điểm lớn.</li>
+    <li><b class="dg">Thua</b> khi bàn đầy kín, không còn ô trống để đặt quân kế tiếp.</li>
+   </ul>
+   <button class="btn" onclick="__go()">CHƠI</button>`);
+}
+window.__go=()=>{ closeOv(); ac(); };
+
+const HELP=`<h2>Nối Dài Bộ</h2>
+ <div class="sub">Mahjong × Block Puzzle · prototype kiểm chứng hook</div>
+ <p>${HOOK_INTRO}</p>
+ <ul>
+  <li>Đặt sai chỗ (không hợp lệ) không sao — quân vẫn nằm đó, chỉ đơn giản chưa ghép được gì.</li>
+  <li>Chuỗi chỉ tăng khi nối dài thành công liên tiếp; đặt 1 quân không nối dài gì sẽ làm rơi Chuỗi về 0.</li>
+  <li>Một lượt đặt có thể vừa khoá bộ mới theo hàng, vừa nối dài bộ khác theo cột.</li>
+  <li><b class="dg">Thua</b>: bàn đầy kín (không còn ô trống nào) sau một lượt đặt.</li>
+ </ul>
+ <button class="btn" onclick="__closehelp()">ĐÓNG</button>`;
+window.__closehelp=()=>{ closeOv(); };
+$('btn-help').addEventListener('click',()=>overlay(HELP));
+
+function lose(){
+  S.over=true; sfx.lose();
+  overlay(`<h2 style="color:var(--danger)">BÀN ĐÃ ĐẦY KÍN</h2>
+   <div class="sub">Điểm: <b class="hl">${S.score}</b> · ${S.pops} bộ đã bung nổ</div>
+   <p>Không còn ô trống nào để đặt quân kế tiếp.</p>
+   <button class="btn" onclick="__restart()">CHƠI LẠI</button>`);
+}
+window.__restart=()=>{ closeOv(); startGame(); };
+
+function startGame(){
+  S.board=emptyBoard(SIZE); S.score=0; S.pops=0; S.combo=0; S.selQ=null; S.busy=false; S.over=false;
+  S.queue=[randTile(),randTile(),randTile()];
+  let seeded=0, guard=0;
+  while(seeded<6 && guard<200){
+    guard++;
+    const r=(Math.random()*SIZE)|0, c=(Math.random()*SIZE)|0;
+    if(!S.board[r][c]){ const t=randTile(); S.board[r][c]={id:t.id,suit:t.suit,rank:t.rank,banked:false}; seeded++; }
+  }
+  renderAll();
+}
+document.addEventListener('contextmenu',e=>{ if(e.target.closest('#app')) e.preventDefault(); });
+
+/* ------------------------------ TEST HOOK / SELFTEST ---------------------- */
+window.__digest={ S, T, resolvePlacement, hasEmptyCell, startGame,
+  state:()=>({score:S.score,pops:S.pops,combo:S.combo,over:S.over}) };
+(function selftest(){
+  const out=[];
+
+  S.board=emptyBoard(SIZE);
+  S.board[2][0]={id:'s3',suit:'s',rank:3,banked:false};
+  S.board[2][1]={id:'s4',suit:'s',rank:4,banked:false};
+  S.board[2][2]={id:'s5',suit:'s',rank:5,banked:false};
+  let r1=resolvePlacement(2,2);
+  out.push(['new-run-of-3-banks', r1.events.some(e=>e.type==='new'&&e.cells.length===3)
+    && S.board[2][0].banked && S.board[2][1].banked && S.board[2][2].banked]);
+
+  S.board=emptyBoard(SIZE);
+  S.board[3][0]={id:'s2',suit:'s',rank:2,banked:true};
+  S.board[3][1]={id:'s3',suit:'s',rank:3,banked:true};
+  S.board[3][2]={id:'s4',suit:'s',rank:4,banked:true};
+  S.board[3][3]={id:'s5',suit:'s',rank:5,banked:false};
+  let r2=resolvePlacement(3,3);
+  out.push(['extend-existing-run', r2.events.some(e=>e.type==='extend'&&e.cells.length===4) && S.board[3][3].banked]);
+
+  S.board=emptyBoard(SIZE);
+  S.board[4][0]={id:'w2',suit:'w',rank:2,banked:true};
+  S.board[4][1]={id:'w3',suit:'w',rank:3,banked:true};
+  S.board[4][2]={id:'w4',suit:'w',rank:4,banked:true};
+  S.board[4][3]={id:'w5',suit:'w',rank:5,banked:true};
+  S.board[4][4]={id:'w6',suit:'w',rank:6,banked:false};
+  let r3=resolvePlacement(4,4);
+  out.push(['extend-to-max-pops', r3.popped.length===1 && r3.popped[0].length===MAX_MELD_LEN]);
+
+  S.board=emptyBoard(SIZE);
+  S.board[0][0]={id:'s1',suit:'s',rank:1,banked:false};
+  S.board[0][1]={id:'c9',suit:'c',rank:9,banked:false};
+  let r4=resolvePlacement(0,1);
+  out.push(['invalid-line-no-event', r4.events.length===0 && !S.board[0][0].banked && !S.board[0][1].banked]);
+
+  S.board=emptyBoard(SIZE);
+  S.board[1][3]={id:'c2',suit:'c',rank:2,banked:false};
+  S.board[2][3]={id:'c2',suit:'c',rank:2,banked:false};
+  S.board[3][3]={id:'c2',suit:'c',rank:2,banked:false};
+  let r5=resolvePlacement(3,3);
+  out.push(['group-of-3-same-id-banks', r5.events.some(e=>e.type==='new')
+    && S.board[1][3].banked && S.board[2][3].banked && S.board[3][3].banked]);
+
+  S.board = Array.from({length:SIZE},()=>Array.from({length:SIZE},()=>({id:'s1',suit:'s',rank:1,banked:true})));
+  out.push(['board-full-detected', !hasEmptyCell()]);
+
+  startGame();
+
+  const bad=out.filter(x=>!x[1]);
+  console.log('[selftest]', bad.length? 'FAIL '+JSON.stringify(bad) : 'OK ('+out.length+' checks)');
+})();
+
+introOverlay();
+</script>
+</body>
+</html>

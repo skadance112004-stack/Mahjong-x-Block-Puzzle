@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Ghép Đôi Hai Tầng — Mahjong × Block (prototype 24)</title>
+<style>
+:root{
+  --wood:#2b1d16; --wood2:#3d2a20; --felt:#14342b; --felt2:#0d241d;
+  --cream:#f6ecd8; --cream2:#e6d7ba; --ink:#2a2018;
+  --gold:#e8b64c; --jade:#4ec98a; --danger:#ff5d51; --blue:#4a9fe0; --green:#3fae6a;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  background:radial-gradient(120% 80% at 50% -10%, #5a3d2c 0%, var(--wood) 55%, #1b120d 100%);
+  color:var(--cream); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  overscroll-behavior:none; touch-action:manipulation; user-select:none;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-height:100%; padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+}
+#app{width:100%; max-width:440px; display:flex; flex-direction:column; gap:9px; padding:8px 10px 12px;}
+
+#hud{display:flex; align-items:center; gap:8px;}
+.hud-box{flex:1; background:rgba(0,0,0,.28); border:1px solid rgba(232,182,76,.22); border-radius:10px; padding:5px 8px;}
+.hud-lab{font-size:9px; letter-spacing:.12em; text-transform:uppercase; opacity:.55;}
+.hud-val{font-size:16px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1.15;}
+#btn-help{width:34px;height:34px;flex:none;border-radius:10px;background:rgba(0,0,0,.28);border:1px solid rgba(232,182,76,.22);color:var(--cream);font-size:15px;font-weight:700;}
+
+#board-wrap{position:relative; width:100%; display:flex; justify-content:center;}
+#board{
+  width:min(100%, 50vh); flex:none; position:relative;
+  display:grid; gap:5px; padding:8px; border-radius:14px;
+  background:linear-gradient(160deg,var(--felt),var(--felt2));
+  border:1px solid rgba(232,182,76,.22);
+  box-shadow:inset 0 2px 10px rgba(0,0,0,.5), 0 6px 18px rgba(0,0,0,.35);
+}
+.cell{aspect-ratio:1; border-radius:6px; background:rgba(0,0,0,.16); position:relative;}
+.cell .tile{position:absolute; inset:0;}
+.cell.sel .tile{box-shadow:inset 0 -2px 0 rgba(0,0,0,.16), inset 0 1px 0 #fff, 0 0 0 3px var(--gold), 0 4px 10px rgba(0,0,0,.4); transform:translateY(-3px);}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}50%{transform:translateX(4px)}75%{transform:translateX(-3px)}}
+.cell.shakebad{animation:shake .3s;}
+
+/* ---------- TILE ART ---------- */
+.tile{border-radius:6px; background:linear-gradient(170deg,#fdf6e6 0%,var(--cream) 40%,var(--cream2) 100%);
+  box-shadow:inset 0 -2px 0 rgba(0,0,0,.16), inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.35);
+  display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; transition:transform .12s;}
+.tile svg{width:88%; height:88%; display:block;}
+.tile .rk{position:absolute; top:1px; left:2.5px; font-size:8px; font-weight:800; line-height:1; opacity:.62;}
+.tile.s .rk{color:var(--green)} .tile.c .rk{color:var(--blue)}
+/* Gợi ý camera đã chọn cho bản này: KHÔNG dùng góc nghiêng 3D — chỉ dùng viền
+ * vàng quanh quân TRÊN để báo "còn 1 quân nằm dưới nó". An toàn nhất để đọc
+ * trên màn hình nhỏ; xem phần mã phía dưới để biết 2 hướng camera khác. */
+.tile.covered{box-shadow: inset 0 -2px 0 rgba(0,0,0,.16), inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.35), 0 0 0 2px rgba(232,182,76,.75);}
+.tile.covered::after{content:''; position:absolute; right:2px; bottom:2px; width:6px; height:6px; border-radius:50%; background:var(--gold); box-shadow:0 0 0 1px rgba(0,0,0,.3);}
+.tile.pop{animation:pop .22s ease-out forwards;}
+@keyframes pop{0%{transform:scale(1); opacity:1}50%{transform:scale(1.3); filter:brightness(2)}100%{transform:scale(0); opacity:0}}
+.tile.reveal{animation:reveal .2s ease-out;}
+@keyframes reveal{0%{transform:scale(.7); opacity:.3}100%{transform:scale(1); opacity:1}}
+
+#tools{display:flex; gap:8px;}
+.tool{flex:1; padding:10px 6px; border-radius:10px; border:1px solid rgba(232,182,76,.28); background:rgba(0,0,0,.3);
+  color:var(--cream); font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px;}
+.tool:disabled{opacity:.3;}
+.tool b{color:var(--gold); font-variant-numeric:tabular-nums;}
+
+.float{position:fixed; z-index:80; pointer-events:none; font-weight:900; font-size:16px; color:var(--gold);
+  text-shadow:0 2px 6px rgba(0,0,0,.8); animation:floatup 1s ease-out forwards;}
+@keyframes floatup{0%{transform:translate(-50%,0) scale(.7); opacity:0}25%{transform:translate(-50%,-12px) scale(1.15); opacity:1}100%{transform:translate(-50%,-46px) scale(1); opacity:0}}
+.spark{position:fixed; z-index:75; width:6px; height:6px; border-radius:50%; pointer-events:none;}
+
+#ov{position:fixed; inset:0; z-index:100; background:rgba(12,8,6,.86); backdrop-filter:blur(3px);
+  display:none; align-items:center; justify-content:center; padding:18px;}
+#ov.on{display:flex;}
+#ovcard{width:100%; max-width:360px; background:linear-gradient(170deg,#3d2a20,#241812); border:1px solid rgba(232,182,76,.35);
+  border-radius:16px; padding:18px; box-shadow:0 20px 50px rgba(0,0,0,.6); max-height:86vh; overflow:auto;}
+#ovcard h2{margin:0 0 4px; font-size:20px; color:var(--gold);}
+#ovcard .sub{font-size:12px; opacity:.7; margin-bottom:12px;}
+#ovcard p{font-size:13px; line-height:1.55; margin:0 0 9px;}
+#ovcard ul{font-size:12.5px; line-height:1.6; padding-left:17px; margin:0 0 10px;}
+#ovcard .hl{color:var(--gold); font-weight:700;}
+#ovcard .dg{color:var(--danger); font-weight:700;}
+.btn{width:100%; padding:12px; border-radius:11px; border:0; font-size:14px; font-weight:800;
+  background:linear-gradient(180deg,var(--gold),#c8912e); color:#2a1d0b; margin-top:6px;}
+#toast{position:absolute; left:50%; bottom:10px; transform:translateX(-50%); z-index:90; background:rgba(20,14,10,.95);
+  border:1px solid rgba(232,182,76,.4); color:var(--cream); padding:9px 14px; border-radius:10px; font-size:12.5px;
+  width:max-content; max-width:90%; text-align:center; opacity:0; transition:opacity .25s, transform .25s; pointer-events:none;}
+#toast.on{opacity:1; transform:translateX(-50%) translateY(-4px);}
+.foot{text-align:center; font-size:9.5px; opacity:.32; letter-spacing:.05em;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div class="hud-box"><div class="hud-lab">Điểm</div><div class="hud-val" id="h-sc">0</div></div>
+    <div class="hud-box"><div class="hud-lab">Còn lại</div><div class="hud-val" id="h-left">0</div></div>
+    <div class="hud-box"><div class="hud-lab">Chuỗi</div><div class="hud-val" id="h-combo">0</div></div>
+    <button id="btn-help">?</button>
+  </div>
+
+  <div id="board-wrap"><div id="board"></div><div id="toast"></div></div>
+
+  <div id="tools">
+    <button class="tool" id="t-reshuffle">🔀 Xáo lại <b id="n-reshuffle">2</b></button>
+  </div>
+  <div class="foot">PROTOTYPE 24 · GHÉP ĐÔI HAI TẦNG · hook test</div>
+</div>
+
+<div id="ov"><div id="ovcard"></div></div>
+
+<script>
+"use strict";
+/* =========================================================================
+   GHÉP ĐÔI HAI TẦNG — Mahjong × Block hybrid, hook prototype
+   Quay lại đúng 2 cơ chế gốc từ bản brief đầu tiên của cả project:
+   - "Match 2": chạm 2 quân giống nhau (đang lộ ra) để phá — không cần bộ 3.
+   - "Layer": bàn có 2 TẦNG (trên/dưới) tại mỗi ô. Quân tầng trên che quân
+     tầng dưới; chỉ quân đang lộ ra (tầng trên nếu có, không thì tầng dưới)
+     mới chạm được. Phá quân tầng trên xong thì quân tầng dưới tự lộ ra.
+
+   CƠ CHẾ TRỌNG LỰC GIỮA 2 TẦNG (yêu cầu mới nhất): một ô KHÔNG được phép có
+   quân tầng trên mà tầng dưới lại trống — nếu sinh ra tình trạng đó (chỉ có
+   thể xảy ra lúc dựng bàn), quân đó phải rơi xuống tầng dưới ngay. Đây là
+   applyLayerGravity() — gọi 1 lần lúc dựng bàn, và có thể gọi lại an toàn ở
+   bất cứ đâu vì nó chỉ sửa đúng trạng thái sai, không đụng trạng thái đúng.
+
+   GÓC CAMERA cho bản test này: chọn phẳng (top-down) + viền vàng quanh quân
+   tầng trên để báo "còn 1 quân nằm dưới nó" — an toàn, dễ đọc trên màn hình
+   nhỏ, không cần dựng phối cảnh 3D. 2 hướng khác đã cân nhắc (xem phần chat):
+   nghiêng giả-isometric kiểu Mahjong Solitaire cổ điển, hoặc tách hẳn 2 khung
+   trên/dưới cạnh nhau. Có thể đổi sang 1 trong 2 hướng đó ở bản sau nếu cần.
+   ========================================================================= */
+
+/* ------------------------------ CONFIG ---------------------------------- */
+const SIZE = 6;
+const SUITS = ['s','c'];
+const MAX_RANK = 4;          // 2 chất x 4 hạng = 8 loại quân — giữ bảng màu gọn
+const FILL_RATIO = 0.65;     // % số ô-lớp (2*SIZE*SIZE) có quân; còn lại là lỗ hổng
+const RESHUFFLE_START = 2;
+
+/* ------------------------------ STATE ------------------------------------ */
+const S = { board:[], sel:null, score:0, combo:0, reshuffles:RESHUFFLE_START, busy:false, over:false, sound:true, fast:false };
+
+/* ------------------------------ AUDIO (copy quy ước từ các prototype trước) */
+let AC=null;
+function ac(){ if(!AC){ try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){AC=false;} } return AC; }
+function beep(f,d,type,vol,slide){
+  if(!S.sound||S.fast) return; const a=ac(); if(!a) return;
+  try{
+    const o=a.createOscillator(), g=a.createGain();
+    o.type=type||'sine'; o.frequency.setValueAtTime(f,a.currentTime);
+    if(slide) o.frequency.exponentialRampToValueAtTime(slide,a.currentTime+d);
+    g.gain.setValueAtTime(0,a.currentTime);
+    g.gain.linearRampToValueAtTime(vol||.12,a.currentTime+.012);
+    g.gain.exponentialRampToValueAtTime(.0008,a.currentTime+d);
+    o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime+d+.02);
+  }catch(e){}
+}
+const sfx={
+  pop:  combo=>beep(420+Math.min(combo,6)*60,.18,'triangle',.13,900+combo*70),
+  reveal:()=>beep(300,.08,'sine',.07,520),
+  bad:  ()=>beep(140,.12,'square',.08,110),
+  shuffle:()=>beep(600,.1,'triangle',.09,780),
+  win:  ()=>{[523,659,784,1047].forEach((f,i)=>setTimeout(()=>beep(f,.22,'triangle',.12),i*95));},
+  lose: ()=>{[330,262,196,147].forEach((f,i)=>setTimeout(()=>beep(f,.3,'sawtooth',.1),i*130));}
+};
+
+/* ------------------------------ TILE ART --------------------------------- */
+const ROWDOTS = {1:[1],2:[2],3:[3],4:[2,2]};
+function dotsSVG(n,color,round){
+  const rows=ROWDOTS[n]||[n]; const H=rows.length; let out='';
+  const cellH=100/H;
+  rows.forEach((cnt,ri)=>{
+    const cy=cellH*ri+cellH/2;
+    for(let i=0;i<cnt;i++){
+      const cx=100/(cnt+1)*(i+1);
+      const r=Math.min(cellH*.30, 100/(cnt+1)*.42);
+      if(round) out+=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" opacity=".92"/><circle cx="${cx}" cy="${cy}" r="${r*.45}" fill="#fdf6e6" opacity=".55"/>`;
+      else out+=`<rect x="${cx-r*.42}" y="${cy-r*1.05}" width="${r*.84}" height="${r*2.1}" rx="${r*.42}" fill="${color}" opacity=".92"/><rect x="${cx-r*.16}" y="${cy-r*.75}" width="${r*.32}" height="${r*1.5}" fill="#fdf6e6" opacity=".45"/>`;
+    }
+  });
+  return out;
+}
+function tileHTML(t, extraCls){
+  if(!t) return '';
+  const cls='tile '+t.suit+(extraCls?' '+extraCls:'');
+  const inner = t.suit==='c' ? dotsSVG(t.rank,'#3d7fbf',true) : dotsSVG(t.rank,'#2f9e5c',false);
+  return `<div class="${cls}"><span class="rk">${t.rank}</span><svg viewBox="0 0 100 100">${inner}</svg></div>`;
+}
+const T = id => ({id, suit:id[0], rank:+id.slice(1)});
+function randTile(){ const su=SUITS[(Math.random()*SUITS.length)|0]; const rk=1+((Math.random()*MAX_RANK)|0); return T(su+rk); }
+
+/* ------------------------------ BOARD / LAYER OPS ------------------------- */
+function emptyBoard(){ return Array.from({length:SIZE},()=>Array.from({length:SIZE},()=>({top:null,bottom:null}))); }
+function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
+/** Quân tầng trên mà không có gì bên dưới thì phải rơi xuống tầng dưới. */
+function applyLayerGravity(board){
+  for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++){
+    const cell=board[r][c];
+    if(cell.top && !cell.bottom){ cell.bottom=cell.top; cell.top=null; }
+  }
+}
+function exposedLayer(cell){ return cell.top ? 'top' : (cell.bottom ? 'bottom' : null); }
+function exposedTile(cell){ return cell.top || cell.bottom || null; }
+function clearExposed(board,r,c){
+  const cell=board[r][c], layer=exposedLayer(cell);
+  if(!layer) return null;
+  const t=cell[layer]; cell[layer]=null;
+  return t;
+}
+function listExposed(board){
+  const out=[];
+  for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++){ const t=exposedTile(board[r][c]); if(t) out.push({r,c,tile:t}); }
+  return out;
+}
+function hasAnyPair(board){
+  const seen=new Set();
+  for(const e of listExposed(board)){ if(seen.has(e.tile.id)) return true; seen.add(e.tile.id); }
+  return false;
+}
+function isBoardEmpty(board){ return listExposed(board).length===0; }
+
+function buildBoard(){
+  const board=emptyBoard();
+  const slots=[];
+  for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++){ slots.push([r,c,'top']); slots.push([r,c,'bottom']); }
+  shuffle(slots);
+  let count=Math.floor(slots.length*FILL_RATIO);
+  if(count%2!==0) count--;
+  const chosen=slots.slice(0,count);
+  const tiles=[];
+  for(let i=0;i<count/2;i++){ const t=randTile(); tiles.push(T(t.id),T(t.id)); }
+  shuffle(tiles);
+  chosen.forEach(([r,c,layer],i)=>{ board[r][c][layer]=tiles[i]; });
+  applyLayerGravity(board);
+  return board;
+}
+function reshuffleBoard(board){
+  const positions=[];
+  for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++){
+    if(board[r][c].top) positions.push([r,c,'top']);
+    if(board[r][c].bottom) positions.push([r,c,'bottom']);
+  }
+  const ids=positions.map(([r,c,layer])=>board[r][c][layer].id);
+  shuffle(ids);
+  positions.forEach(([r,c,layer],i)=>{ board[r][c][layer]=T(ids[i]); });
+}
+
+/* ------------------------------ RENDER ------------------------------------ */
+const $=id=>document.getElementById(id);
+const boardEl=$('board');
+function cellEl(r,c){ return boardEl.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`); }
+function cellRect(r,c){ const el=cellEl(r,c); return el ? el.getBoundingClientRect() : {left:0,top:0,width:40,height:40}; }
+
+function renderBoard(){
+  boardEl.style.gridTemplateColumns=`repeat(${SIZE},1fr)`;
+  let h='';
+  for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++){
+    const cell=S.board[r][c];
+    const layer=exposedLayer(cell), t=layer?cell[layer]:null;
+    const covered = layer==='top' && !!cell.bottom;
+    const isSel = S.sel && S.sel.r===r && S.sel.c===c;
+    h+=`<div class="cell${isSel?' sel':''}" data-r="${r}" data-c="${c}">${t?tileHTML(t, covered?'covered':''):''}</div>`;
+  }
+  boardEl.innerHTML=h;
+}
+function renderHUD(){
+  $('h-sc').textContent=S.score;
+  $('h-left').textContent=listExposed(S.board).length + countHidden();
+  $('h-combo').textContent=S.combo;
+  $('n-reshuffle').textContent=S.reshuffles;
+  $('t-reshuffle').disabled=S.reshuffles<=0||S.busy;
+}
+function countHidden(){
+  let n=0;
+  for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++){ const cell=S.board[r][c]; if(exposedLayer(cell)==='top' && cell.bottom) n++; }
+  return n;
+}
+function renderAll(){ renderBoard(); renderHUD(); }
+
+function floatTxt(x,y,txt,color){
+  if(S.fast) return;
+  const d=document.createElement('div'); d.className='float'; d.textContent=txt;
+  if(color) d.style.color=color;
+  d.style.left=x+'px'; d.style.top=y+'px'; document.body.appendChild(d);
+  setTimeout(()=>d.remove(),1000);
+}
+function sparks(x,y,color,n){
+  if(S.fast) return;
+  for(let i=0;i<(n||8);i++){
+    const s=document.createElement('div'); s.className='spark';
+    s.style.left=x+'px'; s.style.top=y+'px'; s.style.background=color||'#e8b64c';
+    document.body.appendChild(s);
+    const a=Math.random()*Math.PI*2, d=20+Math.random()*26;
+    s.animate([{transform:'translate(-50%,-50%) scale(1)',opacity:1},
+               {transform:`translate(${Math.cos(a)*d-4}px,${Math.sin(a)*d-4}px) scale(0)`,opacity:0}],
+              {duration:400+Math.random()*240, easing:'cubic-bezier(.2,.8,.3,1)'});
+    setTimeout(()=>s.remove(),700);
+  }
+}
+function flashBad(el){ if(!el) return; el.classList.add('shakebad'); setTimeout(()=>el.classList.remove('shakebad'),320); }
+function toast(msg,ms){
+  const t=$('toast'); t.innerHTML=msg; t.classList.add('on');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('on'), ms||1600);
+}
+const sleep=ms=>S.fast?Promise.resolve():new Promise(r=>setTimeout(r,ms));
+
+/* ------------------------------ TURN --------------------------------------- */
+async function doMatch(a,b){
+  S.busy=true;
+  const elA=cellEl(a.r,a.c), elB=cellEl(b.r,b.c);
+  elA?.querySelector('.tile')?.classList.add('pop');
+  elB?.querySelector('.tile')?.classList.add('pop');
+  S.combo++;
+  const gain=50*Math.min(S.combo,5);
+  S.score+=gain;
+  const rc=cellRect(b.r,b.c);
+  floatTxt(rc.left+rc.width/2, rc.top-4, '+'+gain+(S.combo>1?' ×'+Math.min(S.combo,5):''), '#4ec98a');
+  sparks(rc.left+rc.width/2, rc.top+rc.height/2, '#4ec98a', 10);
+  sfx.pop(S.combo);
+  renderHUD();
+  await sleep(220);
+
+  const revealedA = exposedLayer(S.board[a.r][a.c])==='top' && !!S.board[a.r][a.c].bottom;
+  const revealedB = exposedLayer(S.board[b.r][b.c])==='top' && !!S.board[b.r][b.c].bottom;
+  clearExposed(S.board,a.r,a.c);
+  clearExposed(S.board,b.r,b.c);
+  S.sel=null;
+  renderBoard(); renderHUD();
+  if(revealedA||revealedB) sfx.reveal();
+  (revealedA?cellEl(a.r,a.c):null)?.querySelector('.tile')?.classList.add('reveal');
+  (revealedB?cellEl(b.r,b.c):null)?.querySelector('.tile')?.classList.add('reveal');
+
+  S.busy=false;
+  if(isBoardEmpty(S.board)) return win();
+  if(!hasAnyPair(S.board)){
+    if(S.reshuffles>0) toast('Hết cặp khớp — dùng 🔀 Xáo lại');
+    else return lose();
+  }
+}
+function tapCell(r,c){
+  if(S.busy||S.over) return;
+  const t=exposedTile(S.board[r][c]);
+  if(!t){ return; }
+  if(!S.sel){ S.sel={r,c}; renderBoard(); return; }
+  if(S.sel.r===r && S.sel.c===c){ S.sel=null; renderBoard(); return; }
+  const t0=exposedTile(S.board[S.sel.r][S.sel.c]);
+  if(t0 && t0.id===t.id){ const a=S.sel; doMatch(a,{r,c}); }
+  else{
+    flashBad(cellEl(S.sel.r,S.sel.c)); sfx.bad();
+    S.combo=0; S.sel={r,c}; renderBoard(); renderHUD();
+  }
+}
+boardEl.addEventListener('click', e=>{
+  const ce=e.target.closest('.cell'); if(!ce) return;
+  tapCell(+ce.dataset.r, +ce.dataset.c);
+});
+$('t-reshuffle').addEventListener('click', ()=>{
+  if(S.reshuffles<=0||S.busy) return;
+  S.reshuffles--; reshuffleBoard(S.board); S.sel=null;
+  renderAll(); sfx.shuffle(); toast('Đã xáo lại vị trí các quân còn lại');
+});
+
+/* ------------------------------ FLOW / OVERLAY ----------------------------- */
+function overlay(html){ $('ovcard').innerHTML=html; $('ov').classList.add('on'); }
+function closeOv(){ $('ov').classList.remove('on'); }
+
+function win(){
+  S.over=true; sfx.win();
+  overlay(`<h2 style="color:var(--jade)">SẠCH BÀN!</h2>
+   <div class="sub">Điểm: <b class="hl">${S.score}</b></div>
+   <p>Đã ghép hết toàn bộ quân trên cả 2 tầng.</p>
+   <button class="btn" onclick="__restart()">CHƠI LẠI</button>`);
+}
+function lose(){
+  S.over=true; sfx.lose();
+  overlay(`<h2 style="color:var(--danger)">BÍ NƯỚC</h2>
+   <div class="sub">Điểm: <b class="hl">${S.score}</b></div>
+   <p>Không còn cặp quân giống nhau nào đang lộ ra, và bạn đã hết lượt Xáo lại.</p>
+   <button class="btn" onclick="__restart()">CHƠI LẠI</button>`);
+}
+window.__restart=()=>{ closeOv(); startGame(); };
+
+const HOOK_INTRO=`Bàn có <b class="hl">2 tầng</b> ở mỗi ô — quân tầng trên (viền vàng, có chấm nhỏ ở góc) che quân tầng dưới. Chạm <b class="hl">2 quân giống nhau</b> đang lộ ra (không cần bộ 3) để phá — phá xong quân tầng trên thì quân tầng dưới tự lộ ra. Một quân không bao giờ lơ lửng: lúc dựng bàn, quân tầng trên nào không có gì bên dưới sẽ tự rơi xuống tầng dưới.`;
+
+function introOverlay(){
+  overlay(`<h2>Ghép Đôi Hai Tầng</h2>
+   <div class="sub">Mahjong × Block Puzzle · prototype kiểm chứng hook</div>
+   <p>${HOOK_INTRO}</p>
+   <ul>
+    <li>Chạm 1 quân đang lộ ra, rồi chạm quân thứ 2 giống nó — khớp thì cả 2 biến mất.</li>
+    <li>Chạm sai (không khớp) không mất lượt, chỉ đổi sang chọn quân mới chạm — nhưng mất chuỗi combo.</li>
+    <li>Viền vàng + chấm nhỏ ở góc quân = dưới nó còn 1 quân nữa, phá xong sẽ lộ ra.</li>
+    <li>🔀 <b>Xáo lại</b>: xáo ngẫu nhiên các quân còn lại (giữ đúng số cặp), dùng khi bí nước.</li>
+    <li>Sạch bàn (2 tầng) là thắng; hết cặp khớp và hết lượt xáo là thua.</li>
+   </ul>
+   <button class="btn" onclick="__go()">CHƠI</button>`);
+}
+window.__go=()=>{ closeOv(); ac(); };
+
+const HELP=`<h2>Ghép Đôi Hai Tầng</h2>
+ <div class="sub">Mahjong × Block Puzzle · prototype kiểm chứng hook</div>
+ <p>${HOOK_INTRO}</p>
+ <p style="font-size:12px;opacity:.7">Góc camera bản này: phẳng từ trên xuống + viền vàng báo lớp dưới, để dễ đọc trên màn hình nhỏ — không dùng phối cảnh 3D nghiêng.</p>
+ <button class="btn" onclick="__closehelp()">ĐÓNG</button>`;
+window.__closehelp=()=>{ closeOv(); };
+$('btn-help').addEventListener('click',()=>overlay(HELP));
+
+function startGame(){
+  S.board=buildBoard(); S.sel=null; S.score=0; S.combo=0; S.reshuffles=RESHUFFLE_START; S.busy=false; S.over=false;
+  let guard=0;
+  while(!hasAnyPair(S.board) && guard<50){ S.board=buildBoard(); guard++; }
+  renderAll();
+}
+document.addEventListener('contextmenu',e=>{ if(e.target.closest('#app')) e.preventDefault(); });
+
+/* ------------------------------ TEST HOOK / SELFTEST ------------------------ */
+window.__digest={ S, T, applyLayerGravity, exposedLayer, exposedTile, clearExposed, hasAnyPair, isBoardEmpty, buildBoard, startGame,
+  state:()=>({score:S.score,combo:S.combo,reshuffles:S.reshuffles,over:S.over}) };
+(function selftest(){
+  const out=[];
+
+  let b1=emptyBoard();
+  b1[0][0]={top:T('s2'), bottom:null};
+  applyLayerGravity(b1);
+  out.push(['gravity-drops-floating-top-to-bottom', !b1[0][0].top && !!b1[0][0].bottom && b1[0][0].bottom.id==='s2']);
+
+  let b2=emptyBoard();
+  b2[1][1]={top:T('c3'), bottom:T('s1')};
+  out.push(['exposed-is-top-when-both-filled', exposedLayer(b2[1][1])==='top' && exposedTile(b2[1][1]).id==='c3']);
+
+  let b3=emptyBoard();
+  b3[2][2]={top:null, bottom:T('c2')};
+  out.push(['exposed-is-bottom-when-top-empty', exposedLayer(b3[2][2])==='bottom' && exposedTile(b3[2][2]).id==='c2']);
+
+  let b4=emptyBoard();
+  b4[0][0]={top:T('s2'), bottom:T('s3')};
+  const popped=clearExposed(b4,0,0);
+  out.push(['clear-exposed-reveals-layer-below', !!popped && popped.id==='s2' && exposedTile(b4[0][0]).id==='s3']);
+
+  let b5=emptyBoard();
+  b5[0][0]={top:T('s2'), bottom:null};
+  b5[0][1]={top:T('c4'), bottom:null};
+  out.push(['no-pair-when-all-ids-distinct', hasAnyPair(b5)===false]);
+
+  let b6=emptyBoard();
+  b6[0][0]={top:T('s2'), bottom:null};
+  b6[3][3]={top:T('s2'), bottom:null};
+  out.push(['finds-pair-across-board', hasAnyPair(b6)===true]);
+
+  let b7=emptyBoard();
+  out.push(['empty-board-is-win-state', isBoardEmpty(b7)===true]);
+
+  startGame();
+
+  const bad=out.filter(x=>!x[1]);
+  console.log('[selftest]', bad.length? 'FAIL '+JSON.stringify(bad) : 'OK ('+out.length+' checks)');
+})();
+
+introOverlay();
+</script>
+</body>
+</html>

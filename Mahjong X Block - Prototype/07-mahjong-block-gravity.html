@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>07 · Mahjong Block Gravity</title>
+  <link rel="stylesheet" href="./common.css" />
+  <style>
+    :root{--accent:#287aa0}.board{grid-template-columns:repeat(8,1fr);box-shadow:inset 0 -5px 0 rgba(75,180,220,.28),inset 0 0 0 1px rgba(255,255,255,.12),0 8px 22px rgba(22,33,29,.15)}.combo-pill{color:#287aa0}
+    .gravity-strip{width:min(100%,590px);margin:0 auto 6px;display:flex;align-items:center;justify-content:space-between;color:#5d777f;font-size:9px;font-weight:900;letter-spacing:.12em}.gravity-strip strong{color:var(--accent);font-size:11px}.cell.falling{animation:gravityDrop .26s cubic-bezier(.2,.8,.2,1)}
+    @keyframes gravityDrop{0%{transform:translateY(-34px);opacity:.25}72%{transform:translateY(3px);opacity:1}100%{transform:translateY(0)}}
+  </style>
+</head>
+<body>
+<div class="shell">
+  <nav class="game-nav">
+    <a class="back-link" href="./01-mahjong-block.html"><span>←</span> So sánh Prototype 01</a>
+    <div class="game-index">07 · BOTTOM GRAVITY</div>
+  </nav>
+  <main class="game-layout">
+    <aside class="info-panel">
+      <p class="kicker">ĐẶT KHỐI + TẠO BỘ</p>
+      <h1>Mahjong<br>Block Gravity</h1>
+      <p class="intro">Giữ luật của Mahjong Block Blast, nhưng tile không khóa tại vị trí chạm: chúng rơi xuống các ô trống thấp nhất trong từng cột.</p>
+      <div class="rules">
+        <h2>LUẬT THỬ NGHIỆM</h2>
+        <ol>
+          <li>Chọn một trong ba khối, sau đó chạm vào cột muốn thả.</li>
+          <li>Mỗi cột của khối rơi độc lập xuống vị trí thấp nhất còn trống.</li>
+          <li>Hàng/cột đầy sẽ bị phá. Ba quân giống nhau hoặc sảnh cùng chất cũng bị phá.</li>
+          <li>Sau clear, toàn bộ tile phía trên tiếp tục rơi xuống. Hết chỗ là thua.</li>
+        </ol>
+      </div>
+      <div class="legend"><span>Gravity ↓</span><span>Bộ ba +120</span><span>Sảnh +150</span><span>Đường +100</span></div>
+      <div class="feedback"><strong>Câu hỏi test:</strong> Việc block bị tách theo từng cột có tạo thêm chiến thuật hay làm kết quả khó dự đoán?</div>
+    </aside>
+
+    <section class="game-panel" aria-label="Prototype Mahjong Block Gravity">
+      <div class="stats">
+        <div class="stat"><small>ĐIỂM</small><strong id="score">0</strong></div>
+        <div class="stat"><small>COMBO</small><strong id="combo">×1</strong></div>
+        <div class="stat"><small>ĐÃ PHÁ</small><strong id="cleared">0</strong></div>
+      </div>
+      <div class="gravity-strip"><span>VỊ TRÍ PREVIEW = NƠI TILE ĐÁP</span><strong>GRAVITY ↓</strong></div>
+      <div class="board-wrap">
+        <div id="board" class="board" aria-label="Bàn cờ 8 nhân 8"></div>
+        <div id="overlay" class="overlay">
+          <div class="modal"><div class="modal-icon">中</div><h2 id="end-title">Hết chỗ rồi!</h2><p id="end-copy"></p><button id="again">Chơi lại</button></div>
+        </div>
+      </div>
+      <div id="message" class="message">Chọn một khối để bắt đầu</div>
+      <div class="offers-label">BA KHỐI CỦA LƯỢT NÀY</div>
+      <div id="offers" class="offers"></div>
+      <div class="action-row"><button class="action secondary" id="reroll">Đổi khối · 1</button><button class="action" id="restart">Ván mới</button></div>
+      <p class="mobile-hint">Mẹo: chỉ cần chọn cột; preview cho biết nơi từng tile sẽ rơi.</p>
+    </section>
+  </main>
+</div>
+<script src="./common.js"></script>
+<script>
+(() => {
+  const R=8,C=8;
+  let board, pieces, selected, score, combo, cleared, rerolls, busy, pendingPreview=[];
+  const $=s=>document.querySelector(s);
+  const boardEl=$("#board"), offersEl=$("#offers"), messageEl=$("#message");
+
+  function freshBoard(){
+    board=Array.from({length:R},()=>Array(C).fill(null));
+    const starter=[[1,1],[1,5],[2,3],[3,0],[3,6],[4,2],[4,5],[5,1],[5,4],[6,6]];
+    starter.forEach(([r,c])=>board[r][c]=MJ.randomTile());
+    applyGravity();
+  }
+  function newPieces(){ pieces=[MJ.piece(4),MJ.piece(4),MJ.piece(4)]; selected=0; }
+  function start(){ freshBoard(); newPieces(); score=0; combo=1; cleared=0; rerolls=1; busy=false; pendingPreview=[]; $("#overlay").classList.remove("show"); render(); }
+
+  function render(){
+    $("#score").textContent=score.toLocaleString("vi-VN"); $("#combo").textContent=`×${combo}`; $("#cleared").textContent=cleared;
+    $("#reroll").textContent=`Đổi khối · ${rerolls}`; $("#reroll").disabled=!rerolls||busy;
+    renderBoard(); renderOffers();
+  }
+  function renderBoard(){
+    boardEl.innerHTML="";
+    for(let r=0;r<R;r++) for(let c=0;c<C;c++){
+      const cell=document.createElement("button"); cell.className="cell"+(board[r][c]?" filled":""); cell.dataset.r=r;cell.dataset.c=c;
+      cell.setAttribute("aria-label",board[r][c]?MJ.label(board[r][c]):`Ô ${r+1}, ${c+1}`); cell.innerHTML=MJ.face(board[r][c]);
+      cell.addEventListener("mouseenter",()=>preview(r,c)); cell.addEventListener("mouseleave",clearPreview); cell.addEventListener("click",()=>place(r,c)); boardEl.append(cell);
+    }
+  }
+  function renderOffers(){
+    offersEl.innerHTML="";
+    pieces.forEach((p,i)=>{
+      const btn=document.createElement("button"); btn.className=`piece${selected===i?" selected":""}${p.used?" used":""}`; btn.innerHTML=MJ.renderMini(p); btn.setAttribute("aria-label",`Chọn khối ${i+1}`);
+      btn.onclick=()=>{if(!p.used&&!busy){selected=i;messageEl.textContent="Chạm lên bàn để đặt khối";renderOffers();}}; offersEl.append(btn);
+    });
+  }
+  function gravityTargets(piece,c){
+    if(!piece)return null;
+    const groups=new Map(),targets=Array(piece.cells.length);
+    for(let i=0;i<piece.cells.length;i++){
+      const [dr,dc]=piece.cells[i],cc=c+dc;if(cc<0||cc>=C)return null;
+      if(!groups.has(cc))groups.set(cc,[]);groups.get(cc).push({dr,index:i,tile:piece.tiles[i]});
+    }
+    for(const [cc,items] of groups){
+      const empty=[];for(let r=R-1;r>=0;r--)if(!board[r][cc])empty.push(r);
+      if(empty.length<items.length)return null;
+      items.sort((a,b)=>b.dr-a.dr||b.index-a.index).forEach((item,index)=>targets[item.index]={r:empty[index],c:cc,tile:item.tile});
+    }
+    return targets;
+  }
+  function anyGravityFit(piece){for(let c=0;c<C;c++)if(gravityTargets(piece,c))return true;return false;}
+  function cellsFor(r,c){return gravityTargets(pieces[selected],c)||[];}
+  function clearPreview(){ pendingPreview.forEach(el=>el.classList.remove("preview","invalid")); pendingPreview=[]; }
+  function preview(r,c){
+    clearPreview(); if(busy||selected==null||pieces[selected].used)return;
+    const targets=gravityTargets(pieces[selected],c);if(!targets){const cell=boardEl.querySelector(`[data-r="${r}"][data-c="${c}"]`);if(cell){cell.classList.add("invalid");pendingPreview.push(cell)}return;}
+    targets.forEach(pos=>{const el=boardEl.querySelector(`[data-r="${pos.r}"][data-c="${pos.c}"]`);if(el){el.classList.add("preview");pendingPreview.push(el);}});
+  }
+  function place(r,c){
+    if(busy||selected==null||pieces[selected].used)return;
+    const p=pieces[selected],targets=gravityTargets(p,c);if(!targets){MJ.toast("Không đủ chỗ trong các cột này");return;}
+    clearPreview();targets.forEach(pos=>board[pos.r][pos.c]=pos.tile);p.used=true;score+=p.cells.length*5;busy=true;messageEl.textContent=`${targets.length} tile đang rơi xuống đáy…`;render();markFalling(targets);
+    setTimeout(resolvePlacement,260);
+  }
+  function markFalling(cells){cells.forEach(pos=>boardEl.querySelector(`[data-r="${pos.r}"][data-c="${pos.c}"]`)?.classList.add("falling"));}
+  function resolvePlacement(){
+    const result=findClears();
+    if(result.cells.size){
+      const base=result.lines*100+result.pungs*120+result.chows*150+result.cells.size*8;
+      score+=base*combo; messageEl.textContent=`${result.label} · +${base*combo}`; combo=Math.min(8,combo+1);
+      render(); result.cells.forEach(key=>{const [rr,cc]=key.split(",");boardEl.querySelector(`[data-r="${rr}"][data-c="${cc}"]`)?.classList.add("clearing");});
+      setTimeout(()=>{result.cells.forEach(key=>{const [rr,cc]=key.split(",").map(Number);board[rr][cc]=null;});cleared+=result.cells.size;const moved=applyGravity();render();if(moved.length){messageEl.textContent=`${moved.length} tile rơi lấp khoảng trống`;markFalling(moved);setTimeout(finishTurn,260)}else finishTurn();},320);
+    }else{combo=1;messageEl.textContent="Đã rơi xuống đáy · không có clear";setTimeout(finishTurn,160);}
+  }
+  function applyGravity(){
+    const moved=[];
+    for(let c=0;c<C;c++){
+      let write=R-1;
+      for(let r=R-1;r>=0;r--)if(board[r][c]){const tile=board[r][c];if(r!==write){board[write][c]=tile;board[r][c]=null;moved.push({r:write,c,tile});}write--;}
+      for(let r=write;r>=0;r--)board[r][c]=null;
+    }
+    return moved;
+  }
+  function findClears(){
+    const cells=new Set(), labels=[]; let lines=0,pungs=0,chows=0;
+    for(let r=0;r<R;r++) if(board[r].every(Boolean)){lines++;labels.push("Hàng đầy");for(let c=0;c<C;c++)cells.add(`${r},${c}`);}
+    for(let c=0;c<C;c++) if(board.every(row=>row[c])){lines++;labels.push("Cột đầy");for(let r=0;r<R;r++)cells.add(`${r},${c}`);}
+    const scan=arr=>{
+      for(let i=0;i<=arr.length-3;i++){
+        const trio=arr.slice(i,i+3); if(trio.some(x=>!x.id))continue;
+        if(trio.every(x=>x.id===trio[0].id)){pungs++;trio.forEach(x=>cells.add(x.key));continue;}
+        const suit=trio[0].id[0], ranks=trio.map(x=>Number(x.id.slice(1))).sort((a,b)=>a-b);
+        if(suit!=="h"&&trio.every(x=>x.id[0]===suit)&&ranks[1]===ranks[0]+1&&ranks[2]===ranks[1]+1){chows++;trio.forEach(x=>cells.add(x.key));}
+      }
+    };
+    for(let r=0;r<R;r++)scan(board[r].map((id,c)=>({id,key:`${r},${c}`})));
+    for(let c=0;c<C;c++)scan(board.map((row,r)=>({id:row[c],key:`${r},${c}`})));
+    if(pungs)labels.push(`${pungs} bộ ba`);if(chows)labels.push(`${chows} sảnh`);
+    return{cells,lines,pungs,chows,label:labels.join(" + ")||"Clear"};
+  }
+  function finishTurn(){
+    if(pieces.every(p=>p.used))newPieces(); else selected=pieces.findIndex(p=>!p.used);
+    busy=false;render(); checkEnd();
+  }
+  function checkEnd(){
+    const playable=pieces.filter(p=>!p.used).some(anyGravityFit);
+    if(!playable){$("#end-title").textContent="Hết chỗ rồi!";$("#end-copy").textContent=`Bạn đạt ${score.toLocaleString("vi-VN")} điểm và phá ${cleared} quân. Thử ưu tiên khoảng trống cho khối lớn hơn.`;$("#overlay").classList.add("show");}
+  }
+  $("#reroll").onclick=()=>{if(!rerolls||busy)return;rerolls--;newPieces();messageEl.textContent="Đã đổi ba khối";render();};
+  $("#restart").onclick=start; $("#again").onclick=start;
+  window.__mahjongBottomGravity={getState:()=>({board:board.map(row=>[...row]),pieces,score,combo,cleared,busy}),gravityTargets,applyGravity,findClears,restart:start};
+  start();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Băng Chuyền — Mahjong × Block (prototype 16)</title>
+<style>
+:root{
+  --wood:#2b1d16; --wood2:#3d2a20; --felt:#14342b; --felt2:#0d241d;
+  --cream:#f6ecd8; --cream2:#e6d7ba; --ink:#2a2018;
+  --gold:#e8b64c; --jade:#4ec98a; --danger:#ff5d51; --blue:#4a9fe0; --red:#e0553f; --green:#3fae6a;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  background:
+    radial-gradient(120% 80% at 50% -10%, #5a3d2c 0%, var(--wood) 55%, #1b120d 100%);
+  color:var(--cream); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  overscroll-behavior:none; touch-action:manipulation; user-select:none;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-height:100%; padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+}
+#app{width:100%; max-width:440px; display:flex; flex-direction:column; gap:8px; padding:8px 10px 12px;}
+
+#hud{display:flex; align-items:center; gap:8px;}
+.hud-box{flex:1; background:rgba(0,0,0,.28); border:1px solid rgba(232,182,76,.22); border-radius:10px; padding:5px 8px;}
+.hud-lab{font-size:9px; letter-spacing:.12em; text-transform:uppercase; opacity:.55;}
+.hud-val{font-size:16px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1.15;}
+#btn-help{width:34px;height:34px;flex:none;border-radius:10px;background:rgba(0,0,0,.28);border:1px solid rgba(232,182,76,.22);color:var(--cream);font-size:15px;font-weight:700;}
+
+#tickbar-wrap{height:5px; background:rgba(255,255,255,.1); border-radius:3px; overflow:hidden;}
+#tickbar{height:100%; width:100%; background:linear-gradient(90deg,var(--jade),var(--gold)); transform-origin:left; }
+#tickbar.run{transition:transform linear; transform:scaleX(0);}
+
+#board-wrap{position:relative; width:100%; display:flex; justify-content:center;}
+#board{
+  width:min(100%, 62vh); flex:none; position:relative;
+  display:grid; gap:3px; padding:6px; border-radius:14px;
+  background:linear-gradient(160deg,var(--felt),var(--felt2));
+  border:1px solid rgba(232,182,76,.22);
+  box-shadow:inset 0 2px 10px rgba(0,0,0,.5), 0 6px 18px rgba(0,0,0,.35);
+}
+.cell{aspect-ratio:1; border-radius:6px; background:rgba(0,0,0,.22); box-shadow:inset 0 0 0 1px rgba(255,255,255,.035); position:relative;}
+.cell .tile{position:absolute; inset:0;}
+.cell.selA .tile{box-shadow:0 0 0 2.5px var(--gold);}
+.cell .tile.pop{animation:pop .22s ease-out forwards;}
+@keyframes pop{0%{transform:scale(1); opacity:1}50%{transform:scale(1.3); filter:brightness(2)}100%{transform:scale(0); opacity:0}}
+.cell .tile.slidein{animation:slidein .22s ease-out;}
+@keyframes slidein{0%{transform:translateX(40%); opacity:.3}100%{transform:translateX(0); opacity:1}}
+.cell .tile.jamify{animation:jamify .3s ease-out;}
+@keyframes jamify{0%{filter:grayscale(0) brightness(1)}100%{filter:grayscale(1) brightness(.7)}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}50%{transform:translateX(4px)}75%{transform:translateX(-3px)}}
+.cell.shakebad{animation:shake .3s;}
+.linefx{position:fixed; z-index:60; pointer-events:none; background:var(--jade); height:3px; opacity:.9; border-radius:2px;}
+
+/* ---------- TILE ART (copy nguyên quy ước từ prototype 11/14) ---------- */
+.tile{border-radius:6px; background:linear-gradient(170deg,#fdf6e6 0%,var(--cream) 40%,var(--cream2) 100%);
+  box-shadow:inset 0 -2px 0 rgba(0,0,0,.16), inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.35);
+  display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative;}
+.tile svg{width:88%; height:88%; display:block;}
+.tile .rk{position:absolute; top:1px; left:2.5px; font-size:8px; font-weight:800; line-height:1; opacity:.62;}
+.tile.s .rk{color:var(--green)} .tile.c .rk{color:var(--blue)} .tile.w .rk{color:var(--red)} .tile.h .rk{color:#b3862a}
+.tile.jam{background:linear-gradient(170deg,#5a5a5a,#3a3a3a); box-shadow:inset 0 -2px 0 rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.12);}
+
+.float{position:fixed; z-index:80; pointer-events:none; font-weight:900; font-size:16px; color:var(--gold);
+  text-shadow:0 2px 6px rgba(0,0,0,.8); animation:floatup 1s ease-out forwards;}
+@keyframes floatup{0%{transform:translate(-50%,0) scale(.7); opacity:0}25%{transform:translate(-50%,-12px) scale(1.15); opacity:1}100%{transform:translate(-50%,-46px) scale(1); opacity:0}}
+.spark{position:fixed; z-index:75; width:6px; height:6px; border-radius:50%; pointer-events:none;}
+
+#ov{position:fixed; inset:0; z-index:100; background:rgba(12,8,6,.86); backdrop-filter:blur(3px);
+  display:none; align-items:center; justify-content:center; padding:18px;}
+#ov.on{display:flex;}
+#ovcard{width:100%; max-width:360px; background:linear-gradient(170deg,#3d2a20,#241812); border:1px solid rgba(232,182,76,.35);
+  border-radius:16px; padding:18px; box-shadow:0 20px 50px rgba(0,0,0,.6); max-height:86vh; overflow:auto;}
+#ovcard h2{margin:0 0 4px; font-size:20px; color:var(--gold);}
+#ovcard .sub{font-size:12px; opacity:.7; margin-bottom:12px;}
+#ovcard p{font-size:13px; line-height:1.55; margin:0 0 9px;}
+#ovcard ul{font-size:12.5px; line-height:1.6; padding-left:17px; margin:0 0 10px;}
+#ovcard .hl{color:var(--gold); font-weight:700;}
+#ovcard .dg{color:var(--danger); font-weight:700;}
+.btn{width:100%; padding:12px; border-radius:11px; border:0; font-size:14px; font-weight:800;
+  background:linear-gradient(180deg,var(--gold),#c8912e); color:#2a1d0b; margin-top:6px;}
+.demo{display:flex; gap:4px; justify-content:center; align-items:center; margin:8px 0 12px;}
+.demo .tile{width:30px;height:38px;}
+.demo .arw{opacity:.6; font-size:15px; padding:0 3px;}
+#toast{position:absolute; left:50%; bottom:10px; transform:translateX(-50%); z-index:90; background:rgba(20,14,10,.95);
+  border:1px solid rgba(232,182,76,.4); color:var(--cream); padding:9px 14px; border-radius:10px; font-size:12.5px;
+  width:max-content; max-width:90%; text-align:center; opacity:0; transition:opacity .25s, transform .25s; pointer-events:none;}
+#toast.on{opacity:1; transform:translateX(-50%) translateY(-4px);}
+.foot{text-align:center; font-size:9.5px; opacity:.32; letter-spacing:.05em;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div class="hud-box"><div class="hud-lab">Điểm</div><div class="hud-val" id="h-score">0</div></div>
+    <div class="hud-box"><div class="hud-lab">Đã nối</div><div class="hud-val" id="h-pops">0</div></div>
+    <div class="hud-box"><div class="hud-lab">Khối kẹt</div><div class="hud-val" id="h-jams">0</div></div>
+    <button id="btn-help">?</button>
+  </div>
+  <div id="tickbar-wrap"><div id="tickbar"></div></div>
+
+  <div id="board-wrap"><div id="board"></div><div id="toast"></div></div>
+
+  <div class="foot">PROTOTYPE 16 · BĂNG CHUYỀN (CONVEYOR CONNECT) · hook test</div>
+</div>
+
+<div id="ov"><div id="ovcard"></div></div>
+
+<script>
+"use strict";
+/* =========================================================================
+   BĂNG CHUYỀN (Conveyor Connect) — Mahjong × Block hybrid, hook prototype
+   HOOK: Quân trôi liên tục (real-time), không đứng yên như mahjong thường.
+         Nối 2 quân giống nhau bằng đường đi tối đa 2 khúc rẽ, chỉ qua ô
+         trống (luật Mahjong Connect cổ điển) trước khi nó trôi mất. Trôi
+         mất mà chưa nối -> hoá "khối kẹt" (jam) vĩnh viễn, chặn đường
+         những quân phía sau -> kẹt cứng lan dần là thua.
+   ========================================================================= */
+
+/* ------------------------------ CONFIG ---------------------------------- */
+const SIZE = 8;
+const SUITS = ['s','c'];
+const MAX_RANK = 5;
+const TICK_MS = 5000;
+const SEED_DENSITY = 0.32;
+
+/* ------------------------------ STATE ------------------------------------ */
+const S = {
+  board: [], score:0, pops:0, jams:0, sel:null, busy:false, over:false, paused:true, sound:true, fast:false
+};
+const JAM = {suit:'jam', rank:0, id:'jam'};
+
+/* ------------------------------ AUDIO (copy quy ước từ prototype 11/14) -- */
+let AC=null;
+function ac(){ if(!AC){ try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){AC=false;} } return AC; }
+function beep(f,d,type,vol,slide){
+  if(!S.sound||S.fast) return; const a=ac(); if(!a) return;
+  try{
+    const o=a.createOscillator(), g=a.createGain();
+    o.type=type||'sine'; o.frequency.setValueAtTime(f,a.currentTime);
+    if(slide) o.frequency.exponentialRampToValueAtTime(slide,a.currentTime+d);
+    g.gain.setValueAtTime(0,a.currentTime);
+    g.gain.linearRampToValueAtTime(vol||.12,a.currentTime+.012);
+    g.gain.exponentialRampToValueAtTime(.0008,a.currentTime+d);
+    o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime+d+.02);
+  }catch(e){}
+}
+const sfx={
+  connect: tier=>beep(360+tier*80,.14,'triangle',.12,760+tier*120),
+  tick:    ()=>beep(200,.04,'sine',.04,180),
+  jam:     ()=>beep(120,.16,'square',.09,90),
+  bad:     ()=>beep(140,.12,'square',.08,110),
+  lose:    ()=>{[330,262,196,147].forEach((f,i)=>setTimeout(()=>beep(f,.3,'sawtooth',.1),i*130));}
+};
+
+/* ------------------------------ TILE ART (copy nguyên từ prototype 11/14) */
+const ROWS = {1:[1],2:[2],3:[3],4:[2,2],5:[2,1,2],6:[3,3],7:[2,3,2],8:[3,2,3],9:[3,3,3]};
+function dotsSVG(n,color,round){
+  const rows=ROWS[n]||[n]; const H=rows.length; let out='';
+  const cellH=100/H;
+  rows.forEach((cnt,ri)=>{
+    const cy=cellH*ri+cellH/2;
+    for(let i=0;i<cnt;i++){
+      const cx=100/(cnt+1)*(i+1);
+      const r=Math.min(cellH*.30, 100/(cnt+1)*.42);
+      if(round) out+=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" opacity=".92"/><circle cx="${cx}" cy="${cy}" r="${r*.45}" fill="#fdf6e6" opacity=".55"/>`;
+      else out+=`<rect x="${cx-r*.42}" y="${cy-r*1.05}" width="${r*.84}" height="${r*2.1}" rx="${r*.42}" fill="${color}" opacity=".92"/><rect x="${cx-r*.16}" y="${cy-r*.75}" width="${r*.32}" height="${r*1.5}" fill="#fdf6e6" opacity=".45"/>`;
+    }
+  });
+  return out;
+}
+function honorSVG(k){
+  if(k===1) return '<rect x="20" y="12" width="60" height="76" rx="8" fill="none" stroke="#d33b2c" stroke-width="9"/><rect x="38" y="34" width="24" height="32" rx="3" fill="#d33b2c"/>';
+  if(k===2) return '<path d="M50 10 L86 46 L68 46 L68 90 L32 90 L32 46 L14 46 Z" fill="#2f9e5c"/>';
+  return '<rect x="18" y="12" width="64" height="76" rx="8" fill="none" stroke="#3d7fbf" stroke-width="9"/>';
+}
+function jamSVG(){
+  return '<path d="M15 15 L45 15 L38 42 L60 30 L40 90 L48 55 L20 68 Z" fill="#8a8a8a" stroke="#2a2a2a" stroke-width="3"/>'
+       + '<path d="M55 12 L85 12 L78 40 L88 65 L58 90 L66 55 L48 60 Z" fill="#6f6f6f" stroke="#2a2a2a" stroke-width="3" opacity=".85"/>';
+}
+function tileHTML(t, extraCls){
+  if(!t) return '';
+  let inner='', cls='tile '+t.suit+(extraCls?' '+extraCls:''), lab=t.rank;
+  if(t.suit==='jam'){ inner=jamSVG(); lab=''; }
+  else if(t.suit==='c') inner=dotsSVG(t.rank,'#3d7fbf',true);
+  else if(t.suit==='s') inner=dotsSVG(t.rank,'#2f9e5c',false);
+  else if(t.suit==='w') inner=`<text x="50" y="63" font-size="60" font-weight="800" text-anchor="middle" fill="#d33b2c" font-family="Georgia,serif">${t.rank}</text><rect x="24" y="76" width="52" height="6" rx="3" fill="#d33b2c" opacity=".8"/><rect x="30" y="15" width="40" height="5" rx="2.5" fill="#d33b2c" opacity=".55"/>`;
+  else { inner=honorSVG(t.rank); lab=''; }
+  return `<div class="${cls}"><span class="rk">${lab}</span><svg viewBox="0 0 100 100">${inner}</svg></div>`;
+}
+const T = id => ({id, suit:id[0], rank:+id.slice(1)});
+function randTile(){ const su=SUITS[(Math.random()*SUITS.length)|0]; const rk=1+((Math.random()*MAX_RANK)|0); return T(su+rk); }
+
+/* ------------------------------ BOARD OPS -------------------------------- */
+function emptyBoard(n){ return Array.from({length:n},()=>Array(n).fill(null)); }
+function inBounds(r,c){ return r>=0&&c>=0&&r<SIZE&&c<SIZE; }
+function isEmptyCell(r,c){ return inBounds(r,c) && !S.board[r][c]; }
+function isNormalTile(t){ return t && t.suit!=='jam'; }
+
+/* --------------------- CONNECT PATH (luật Mahjong Connect: <=2 khúc rẽ) --- */
+/** Moi o giua A và B (khong tinh 2 dau mut) phai trong. */
+function clearRun(r1,c1,r2,c2){
+  if(r1===r2){
+    const lo=Math.min(c1,c2), hi=Math.max(c1,c2);
+    for(let c=lo+1;c<hi;c++) if(!isEmptyCell(r1,c)) return false;
+    return true;
+  }
+  if(c1===c2){
+    const lo=Math.min(r1,r2), hi=Math.max(r1,r2);
+    for(let r=lo+1;r<hi;r++) if(!isEmptyCell(r,c1)) return false;
+    return true;
+  }
+  return false;
+}
+const sameCell=(a,b)=>a[0]===b[0]&&a[1]===b[1];
+function pathStraight(A,B){ return (A[0]===B[0]||A[1]===B[1]) && clearRun(A[0],A[1],B[0],B[1]); }
+function pathOneTurn(A,B){
+  for(const C of [[A[0],B[1]],[B[0],A[1]]]){
+    if(sameCell(C,A)||sameCell(C,B)) continue;
+    if(!isEmptyCell(C[0],C[1])) continue;
+    if(clearRun(A[0],A[1],C[0],C[1]) && clearRun(C[0],C[1],B[0],B[1])) return true;
+  }
+  return false;
+}
+function pathTwoTurn(A,B){
+  for(let r=0;r<SIZE;r++){
+    const C1=[r,A[1]], C2=[r,B[1]];
+    if(sameCell(C1,A)||sameCell(C1,B)||sameCell(C2,A)||sameCell(C2,B)) continue;
+    if(!isEmptyCell(C1[0],C1[1])||!isEmptyCell(C2[0],C2[1])) continue;
+    if(clearRun(A[0],A[1],C1[0],C1[1]) && clearRun(C1[0],C1[1],C2[0],C2[1]) && clearRun(C2[0],C2[1],B[0],B[1])) return true;
+  }
+  for(let c=0;c<SIZE;c++){
+    const C1=[A[0],c], C2=[B[0],c];
+    if(sameCell(C1,A)||sameCell(C1,B)||sameCell(C2,A)||sameCell(C2,B)) continue;
+    if(!isEmptyCell(C1[0],C1[1])||!isEmptyCell(C2[0],C2[1])) continue;
+    if(clearRun(A[0],A[1],C1[0],C1[1]) && clearRun(C1[0],C1[1],C2[0],C2[1]) && clearRun(C2[0],C2[1],B[0],B[1])) return true;
+  }
+  return false;
+}
+/** Tra ve so khuc re can dung (0/1/2), hoac -1 neu khong noi duoc trong gioi han 2 khuc re. */
+function findPathTier(A,B){
+  if(pathStraight(A,B)) return 0;
+  if(pathOneTurn(A,B)) return 1;
+  if(pathTwoTurn(A,B)) return 2;
+  return -1;
+}
+
+/* ------------------------------ RENDER ------------------------------------ */
+const $=id=>document.getElementById(id);
+const boardEl=$('board');
+function cellEl(r,c){ return boardEl.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`); }
+function cellRect(r,c){ const el=cellEl(r,c); return el ? el.getBoundingClientRect() : {left:0,top:0,width:40,height:40}; }
+
+function renderBoard(){
+  boardEl.style.gridTemplateColumns=`repeat(${SIZE},1fr)`;
+  let h='';
+  for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++)
+    h+=`<div class="cell${S.sel&&S.sel[0]===r&&S.sel[1]===c?' selA':''}" data-r="${r}" data-c="${c}">${tileHTML(S.board[r][c])}</div>`;
+  boardEl.innerHTML=h;
+}
+function renderHUD(){ $('h-score').textContent=S.score; $('h-pops').textContent=S.pops; $('h-jams').textContent=S.jams; }
+function renderAll(){ renderBoard(); renderHUD(); }
+
+function floatTxt(x,y,txt,color){
+  if(S.fast) return;
+  const d=document.createElement('div'); d.className='float'; d.textContent=txt;
+  if(color) d.style.color=color;
+  d.style.left=x+'px'; d.style.top=y+'px'; document.body.appendChild(d);
+  setTimeout(()=>d.remove(),1000);
+}
+function sparks(x,y,color,n){
+  if(S.fast) return;
+  for(let i=0;i<(n||8);i++){
+    const s=document.createElement('div'); s.className='spark';
+    s.style.left=x+'px'; s.style.top=y+'px'; s.style.background=color||'#e8b64c';
+    document.body.appendChild(s);
+    const a=Math.random()*Math.PI*2, d=20+Math.random()*26;
+    s.animate([{transform:'translate(-50%,-50%) scale(1)',opacity:1},
+               {transform:`translate(${Math.cos(a)*d-4}px,${Math.sin(a)*d-4}px) scale(0)`,opacity:0}],
+              {duration:400+Math.random()*240, easing:'cubic-bezier(.2,.8,.3,1)'});
+    setTimeout(()=>s.remove(),700);
+  }
+}
+function drawLine(A,B){
+  if(S.fast) return;
+  const ra=cellRect(A[0],A[1]), rb=cellRect(B[0],B[1]);
+  const x1=ra.left+ra.width/2, y1=ra.top+ra.height/2, x2=rb.left+rb.width/2, y2=rb.top+rb.height/2;
+  const len=Math.hypot(x2-x1,y2-y1), ang=Math.atan2(y2-y1,x2-x1)*180/Math.PI;
+  const d=document.createElement('div'); d.className='linefx';
+  d.style.width=len+'px'; d.style.left=x1+'px'; d.style.top=y1+'px';
+  d.style.transform=`rotate(${ang}deg)`;
+  document.body.appendChild(d);
+  setTimeout(()=>d.remove(),260);
+}
+function flashBad(el){ if(!el) return; el.classList.add('shakebad'); setTimeout(()=>el.classList.remove('shakebad'),320); }
+function toast(msg,ms){
+  const t=$('toast'); t.innerHTML=msg; t.classList.add('on');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('on'), ms||1600);
+}
+
+/* ------------------------------ SELECTION / MATCH -------------------------- */
+function clearSelection(){ S.sel=null; boardEl.querySelectorAll('.cell.selA').forEach(e=>e.classList.remove('selA')); }
+function handleTap(r,c){
+  if(S.busy||S.over) return;
+  const t=S.board[r][c];
+  if(!isNormalTile(t)){ if(t&&t.suit==='jam') toast('Khối kẹt — không thể nối'); return; }
+  if(!S.sel){ S.sel=[r,c]; cellEl(r,c).classList.add('selA'); return; }
+  if(sameCell(S.sel,[r,c])){ clearSelection(); return; }
+
+  const A=S.sel, B=[r,c];
+  const a=S.board[A[0]][A[1]], b=S.board[B[0]][B[1]];
+  clearSelection();
+  if(!a || a.id!==b.id){ flashBad(cellEl(r,c)); sfx.bad(); toast('Không cùng mặt hoặc không có đường nối'); return; }
+  const tier=findPathTier(A,B);
+  if(tier<0){ flashBad(cellEl(r,c)); sfx.bad(); toast('Không có đường nối ≤2 khúc rẽ'); return; }
+
+  drawLine(A,B);
+  const gain=[25,35,50][tier];
+  S.score+=gain; S.pops++;
+  sfx.connect(tier);
+  const elA=cellEl(A[0],A[1]), elB=cellEl(B[0],B[1]);
+  const tlA=elA&&elA.querySelector('.tile'), tlB=elB&&elB.querySelector('.tile');
+  if(tlA) tlA.classList.add('pop'); if(tlB) tlB.classList.add('pop');
+  const rb=cellRect(B[0],B[1]);
+  floatTxt(rb.left+rb.width/2, rb.top, '+'+gain, '#4ec98a');
+  sparks(rb.left+rb.width/2, rb.top+rb.height/2, '#4ec98a', 10);
+  setTimeout(()=>{
+    S.board[A[0]][A[1]]=null; S.board[B[0]][B[1]]=null;
+    renderBoard(); renderHUD();
+  }, S.fast?0:200);
+}
+boardEl.addEventListener('click',e=>{
+  const ce=e.target.closest('.cell'); if(!ce) return;
+  handleTap(+ce.dataset.r, +ce.dataset.c);
+});
+
+/* ------------------------------ CONVEYOR TICK ------------------------------ */
+/** 1 nhịp băng chuyền: quân ở cột 0 chưa match -> hoá jam; sau đó dịch trái
+ *  từng hàng, jam là vật cản CỐ ĐỊNH (quân phía sau kẹt lại phía sau nó,
+ *  đúng tinh thần "traffic jam"); cuối cùng cố sinh 1 quân mới ở cột phải
+ *  cùng cho mỗi hàng — hàng nào không còn chỗ sinh thì đánh dấu kẹt. */
+function runTick(){
+  if(S.busy||S.over) return;
+  clearSelection();
+  let blockedSpawn=false;
+  let newJamCount=0;
+
+  for(let r=0;r<SIZE;r++){
+    const edge=S.board[r][0];
+    if(isNormalTile(edge)){ S.board[r][0]=JAM; S.jams++; newJamCount++; }
+
+    for(let c=1;c<SIZE;c++){
+      const t=S.board[r][c];
+      if(!isNormalTile(t)) continue;
+      if(!S.board[r][c-1]){ S.board[r][c-1]=t; S.board[r][c]=null; }
+    }
+
+    if(!S.board[r][SIZE-1]) S.board[r][SIZE-1]=randTile();
+    else blockedSpawn=true;
+  }
+
+  renderBoard(); renderHUD();
+  if(newJamCount>0) sfx.jam();
+  sfx.tick();
+
+  if(blockedSpawn){ lose(); return; }
+  scheduleTick();
+}
+let tickTimeout=null;
+function scheduleTick(){
+  clearTimeout(tickTimeout);
+  const bar=$('tickbar');
+  bar.classList.remove('run'); bar.style.transition='none'; bar.style.transform='scaleX(1)';
+  void bar.offsetWidth;
+  if(S.paused||S.over) return;
+  bar.classList.add('run'); bar.style.transition=`transform ${TICK_MS}ms linear`; bar.style.transform='scaleX(0)';
+  tickTimeout=setTimeout(runTick, TICK_MS);
+}
+function pauseConveyor(){ S.paused=true; clearTimeout(tickTimeout); }
+function resumeConveyor(){ if(S.over) return; S.paused=false; scheduleTick(); }
+
+/* ------------------------------ FLOW / OVERLAY ---------------------------- */
+function overlay(html){ pauseConveyor(); $('ovcard').innerHTML=html; $('ov').classList.add('on'); }
+function closeOv(){ $('ov').classList.remove('on'); }
+
+const HOOK_INTRO='Quân trôi liên tục, không đứng yên như mahjong thường. Nối 2 quân giống nhau (đường đi tối đa <b class="hl">2 khúc rẽ</b>, chỉ qua ô trống) trước khi nó trôi mất — trôi mất mà chưa nối sẽ hoá <b class="dg">đá kẹt</b> vĩnh viễn, chặn đường quân phía sau.';
+
+function introOverlay(){
+  overlay(`<h2>Băng Chuyền</h2>
+   <div class="sub">Mahjong × Block Puzzle · prototype kiểm chứng hook</div>
+   <p>${HOOK_INTRO}</p>
+   <div class="demo">${tileHTML(T('s3'))}<span class="arw">┄┄</span>${tileHTML(T('s3'))}<span class="arw">=</span><b style="color:var(--jade)">NỐI</b></div>
+   <ul>
+    <li>Bấm 2 quân cùng mặt, có đường đi ≤2 khúc rẽ qua ô trống để nối và xoá cả 2.</li>
+    <li>Mỗi ${TICK_MS/1000} giây (xem thanh nhịp), toàn bàn trôi 1 cột sang trái, quân mới mọc bên phải.</li>
+    <li>Quân trôi tới cột trái cùng mà chưa nối được -> hoá <b class="dg">khối kẹt</b>, đứng yên vĩnh viễn, chặn quân phía sau dồn ứ lại.</li>
+    <li><b class="dg">Thua</b> khi có hàng không còn chỗ sinh quân mới (bị khối kẹt dồn ứ tới tận cột phải).</li>
+   </ul>
+   <button class="btn" onclick="__go()">CHƠI</button>`);
+}
+window.__go=()=>{ closeOv(); ac(); resumeConveyor(); };
+
+const HELP=`<h2>Băng Chuyền</h2>
+ <div class="sub">Mahjong × Block Puzzle · prototype kiểm chứng hook</div>
+ <p>${HOOK_INTRO}</p>
+ <ul>
+  <li>Nối càng nhiều khúc rẽ (0/1/2) điểm càng cao (25/35/50) — nhưng đường càng dài càng dễ bị chặn bởi quân khác.</li>
+  <li>Khối kẹt (màu xám) không thể chọn hay nối được nữa, chỉ chặn đường.</li>
+  <li>Nhịp băng chuyền tạm dừng khi overlay đang mở (như lúc xem hướng dẫn này).</li>
+  <li><b class="dg">Thua</b>: 1 hàng bất kỳ bị khối kẹt dồn ứ hết chỗ, không sinh được quân mới ở cột phải.</li>
+ </ul>
+ <button class="btn" onclick="__closehelp()">ĐÓNG</button>`;
+window.__closehelp=()=>{ closeOv(); resumeConveyor(); };
+$('btn-help').addEventListener('click',()=>overlay(HELP));
+
+function lose(){
+  S.over=true; pauseConveyor(); sfx.lose();
+  overlay(`<h2 style="color:var(--danger)">BĂNG CHUYỀN KẸT CỨNG</h2>
+   <div class="sub">Điểm: <b class="hl">${S.score}</b> · đã nối ${S.pops} cặp · ${S.jams} khối kẹt</div>
+   <p>Một hàng đã bị khối kẹt dồn ứ hết chỗ, không còn sinh được quân mới.</p>
+   <button class="btn" onclick="__restart()">CHƠI LẠI</button>`);
+}
+window.__restart=()=>{ closeOv(); startGame(); introOverlay(); };
+
+function startGame(){
+  S.board=emptyBoard(SIZE); S.score=0; S.pops=0; S.jams=0; S.sel=null; S.busy=false; S.over=false; S.paused=true;
+  clearTimeout(tickTimeout);
+  for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++) if(Math.random()<SEED_DENSITY) S.board[r][c]=randTile();
+  renderAll();
+  const bar=$('tickbar'); bar.classList.remove('run'); bar.style.transition='none'; bar.style.transform='scaleX(1)';
+}
+document.addEventListener('contextmenu',e=>{ if(e.target.closest('#app')) e.preventDefault(); });
+
+/* ------------------------------ TEST HOOK / SELFTEST ---------------------- */
+window.__digest={ S, T, findPathTier, runTick, startGame,
+  state:()=>({score:S.score,pops:S.pops,jams:S.jams,over:S.over}) };
+(function selftest(){
+  const out=[];
+  const saved=S.board;
+  S.board=emptyBoard(SIZE);
+  S.board[2][2]=T('s3'); S.board[2][5]=T('s3');
+  out.push(['straight-line-open', findPathTier([2,2],[2,5])===0]);
+  S.board[2][3]=T('c1');
+  // Cung hang bi chan -> khong the re 1 khuc (2 goc deu suy bien ve chinh A/B),
+  // buoc phai vong qua hang khac = 2 khuc re. Day la hanh vi dung cua thuat toan connect co dien.
+  out.push(['same-row-blocked-needs-2-turns', findPathTier([2,2],[2,5])===2]);
+  S.board=emptyBoard(SIZE);
+  S.board[1][1]=T('s2'); S.board[4][4]=T('s2');
+  out.push(['one-turn-via-corner', findPathTier([1,1],[4,4])===1]);
+  S.board=emptyBoard(SIZE);
+  S.board[0][0]=T('s1'); S.board[0][1]=T('c9'); S.board[1][0]=T('c9');
+  S.board[SIZE-1][SIZE-1]=T('s1');
+  for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++){
+    if((r===0&&c===0)||(r===SIZE-1&&c===SIZE-1)) continue;
+    if(!S.board[r][c]) S.board[r][c]=T('c2');
+  }
+  S.board[0][1]=T('c2'); S.board[1][0]=T('c2');
+  out.push(['fully-blocked-returns-negative', findPathTier([0,0],[SIZE-1,SIZE-1])===-1]);
+  S.board=saved;
+
+  S.board=emptyBoard(SIZE);
+  S.board[3][0]=T('s2'); S.board[3][1]=T('s4');
+  runTick();
+  out.push(['tick-jams-unmatched-edge-tile', S.board[3][0] && S.board[3][0].suit==='jam']);
+  out.push(['tick-blocks-tile-behind-fresh-jam', S.board[3][1] && S.board[3][1].id==='s4']);
+  startGame();
+
+  const bad=out.filter(x=>!x[1]);
+  console.log('[selftest]', bad.length? 'FAIL '+JSON.stringify(bad) : 'OK ('+out.length+' checks)');
+})();
+
+introOverlay();
+</script>
+</body>
+</html>

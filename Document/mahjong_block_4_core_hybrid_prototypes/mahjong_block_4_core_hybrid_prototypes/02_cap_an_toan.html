@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Prototype B — Cặp An Toàn</title>
+<style>
+:root{
+  --wood:#241711;--wood2:#3b271c;--felt:#12362d;--felt2:#0a241d;
+  --cream:#f5ead2;--gold:#e7b957;--jade:#55d59b;--danger:#ff6258;
+  --blue:#3b8ed8;--green:#39a66a;--red:#d84a43;--violet:#8c68d8;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%;background:radial-gradient(100% 70% at 50% 0,#5a3b2a 0,var(--wood) 55%,#140d09 100%);color:var(--cream);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;overscroll-behavior:none}
+body{display:flex;justify-content:center;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);user-select:none;touch-action:manipulation}
+button{font:inherit}
+#app{width:100%;max-width:460px;min-height:100vh;padding:9px 10px 14px;display:flex;flex-direction:column;gap:8px}
+.top{display:flex;gap:7px;align-items:stretch}
+.brand,.stat,.iconbtn{background:rgba(0,0,0,.28);border:1px solid rgba(231,185,87,.25);border-radius:12px;box-shadow:inset 0 1px rgba(255,255,255,.04)}
+.brand{flex:1;padding:7px 9px}.brand small{display:block;font-size:9px;letter-spacing:.12em;text-transform:uppercase;opacity:.55}.brand b{display:block;font-size:15px;line-height:1.15;color:var(--gold)}
+.stat{min-width:76px;padding:7px 9px;text-align:center}.stat small{display:block;font-size:9px;text-transform:uppercase;letter-spacing:.09em;opacity:.55}.stat b{font-size:15px}
+.iconbtn{width:38px;border-color:rgba(231,185,87,.25);color:var(--cream);font-weight:900;background:rgba(0,0,0,.28)}
+#goal{background:rgba(0,0,0,.24);border:1px solid rgba(231,185,87,.18);border-radius:11px;padding:7px 10px;font-size:11.5px;line-height:1.35;display:flex;gap:8px;align-items:center}
+#goal strong{color:var(--gold)}
+#goal .bar{height:4px;flex:1;background:rgba(255,255,255,.1);border-radius:4px;overflow:hidden}.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--jade),var(--gold));transition:width .25s}
+.panel{background:rgba(0,0,0,.22);border:1px solid rgba(231,185,87,.18);border-radius:13px;padding:8px}
+.panel-title{display:flex;align-items:center;gap:7px;font-size:10px;letter-spacing:.11em;text-transform:uppercase;opacity:.72;margin-bottom:6px}.panel-title b{color:var(--gold);letter-spacing:0;font-size:11px}.panel-title span:last-child{margin-left:auto;text-transform:none;letter-spacing:0;font-size:10.5px;color:var(--jade);font-weight:800}
+#khay{display:flex;gap:4px;justify-content:center}.slot{width:min(14vw,48px);aspect-ratio:.78;border:1px dashed rgba(245,234,210,.19);border-radius:8px;background:rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;position:relative}.slot.danger{border-color:rgba(255,98,88,.55);background:rgba(255,98,88,.08)}
+#extra{display:none}.energy-row{display:flex;gap:6px}.energy-pill{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:5px;border-radius:9px;background:rgba(255,255,255,.06);font-size:11px}.energy-pill b{font-size:14px;color:var(--gold)}
+.recipe-list{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.recipe{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.045);border-radius:9px;padding:5px;font-size:9.5px;line-height:1.25}.recipe.done{border-color:rgba(85,213,155,.55);background:rgba(85,213,155,.1)}.recipe b{color:var(--gold)}.recipe .chips{display:flex;gap:2px;margin-top:4px;flex-wrap:wrap}
+#board-wrap{position:relative;display:flex;justify-content:center}
+#board{width:min(100%,56vh);display:grid;grid-template-columns:repeat(6,1fr);gap:3px;padding:6px;border-radius:15px;background:linear-gradient(155deg,var(--felt),var(--felt2));border:1px solid rgba(231,185,87,.23);box-shadow:inset 0 2px 10px rgba(0,0,0,.5),0 7px 20px rgba(0,0,0,.32)}
+.cell{aspect-ratio:1;border-radius:6px;background:rgba(0,0,0,.22);box-shadow:inset 0 0 0 1px rgba(255,255,255,.035);position:relative;display:flex;align-items:center;justify-content:center}.cell.valid{box-shadow:inset 0 0 0 1px rgba(85,213,155,.42)}.cell.anchor{box-shadow:inset 0 0 0 2px var(--gold);background:rgba(231,185,87,.16)}.cell.flash{animation:flash .34s ease-out}.cell.badflash{animation:badflash .45s ease-out}
+@keyframes flash{0%{filter:brightness(1)}45%{filter:brightness(2.5);transform:scale(.95)}100%{filter:brightness(1)}}@keyframes badflash{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px);background:rgba(255,98,88,.3)}75%{transform:translateX(3px);background:rgba(255,98,88,.3)}}
+.tile{width:100%;height:100%;border-radius:6px;background:linear-gradient(165deg,#fff9eb,#eadbbd);box-shadow:inset 0 -2px rgba(0,0,0,.15),inset 0 1px #fff,0 1px 2px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;color:#222}.tile .tag{position:absolute;top:2px;left:3px;font-size:7px;font-weight:900;opacity:.55}.tile .glyph{font-size:clamp(16px,5vw,27px);font-weight:900;line-height:1}.id-A .glyph,.id-A .tag{color:var(--blue)}.id-B .glyph,.id-B .tag{color:var(--green)}.id-C .glyph,.id-C .tag{color:var(--red)}.id-D .glyph,.id-D .tag{color:var(--violet)}
+.tile.safe{outline:2px solid var(--jade);filter:brightness(1.08)}.tile.single{outline:2px solid var(--danger)}
+#forecast{position:absolute;left:50%;bottom:8px;transform:translateX(-50%) translateY(8px);max-width:92%;padding:7px 10px;border-radius:9px;background:rgba(17,12,8,.94);border:1px solid rgba(231,185,87,.35);font-size:11px;font-weight:750;text-align:center;opacity:0;pointer-events:none;transition:.15s;z-index:10}#forecast.on{opacity:1;transform:translateX(-50%) translateY(0)}#forecast.bad{color:#ffd8d5;border-color:rgba(255,98,88,.65)}
+#tray{display:flex;gap:5px;min-height:76px;align-items:center;overflow-x:auto;padding:1px 1px 3px;scrollbar-width:none}#tray::-webkit-scrollbar{display:none}.piece{min-width:72px;flex:1 0 72px;min-height:70px;border-radius:10px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px;position:relative;transition:.12s}.piece.sel{transform:translateY(-3px);border-color:rgba(231,185,87,.75);background:rgba(231,185,87,.12);box-shadow:0 5px 14px rgba(0,0,0,.25)}.piece.locked{opacity:.35;filter:grayscale(.45)}.piece .badge{position:absolute;top:2px;right:3px;font-size:7px;font-weight:900;padding:2px 4px;border-radius:6px;background:rgba(0,0,0,.55);color:var(--gold)}.piece .pname{font-size:8px;opacity:.68}.pgrid{display:grid;gap:2px}.pgrid .tile{width:22px;height:27px;border-radius:4px}.pgrid .tile .glyph{font-size:13px}.pgrid .tile .tag{font-size:5px;top:1px;left:2px}
+.actions{display:flex;gap:6px}.act{flex:1;border-radius:10px;border:1px solid rgba(231,185,87,.25);background:rgba(0,0,0,.28);color:var(--cream);padding:8px 5px;font-size:11px;font-weight:800}.act.primary{background:linear-gradient(180deg,var(--gold),#c99330);color:#25170c;border:0}
+#toast{position:fixed;left:50%;bottom:18px;transform:translate(-50%,12px);max-width:90%;background:rgba(17,11,8,.96);border:1px solid rgba(231,185,87,.4);border-radius:10px;padding:9px 12px;font-size:11.5px;font-weight:700;text-align:center;opacity:0;pointer-events:none;transition:.2s;z-index:50}#toast.on{opacity:1;transform:translate(-50%,0)}
+#modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(8,5,4,.86);backdrop-filter:blur(3px);z-index:80}#modal.on{display:flex}.card{width:100%;max-width:370px;max-height:88vh;overflow:auto;border-radius:16px;background:linear-gradient(165deg,#3e2a1f,#21150f);border:1px solid rgba(231,185,87,.35);padding:17px;box-shadow:0 20px 55px rgba(0,0,0,.6)}.card h2{margin:0 0 5px;color:var(--gold);font-size:20px}.card p,.card li{font-size:12.5px;line-height:1.55}.card ul{padding-left:18px}.card .q{padding:8px;border-left:3px solid var(--jade);background:rgba(85,213,155,.08);border-radius:4px;margin:8px 0}.card button{width:100%;margin-top:7px;padding:11px;border:0;border-radius:10px;background:linear-gradient(180deg,var(--gold),#c99330);color:#25170c;font-weight:900}.card button.ghost{background:rgba(255,255,255,.08);color:var(--cream);border:1px solid rgba(255,255,255,.12)}
+.footer{text-align:center;font-size:8.5px;letter-spacing:.07em;opacity:.35}
+@media(max-height:700px){#app{gap:5px;padding-top:5px}.panel{padding:6px}#board{width:min(100%,51vh)}.piece{min-height:62px}.top .brand{padding:5px 7px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="top">
+    <div class="brand"><small>Mahjong × Block · hook test</small><b id="title"></b></div>
+    <div class="stat"><small id="stat-label">Tiến độ</small><b id="stat-val">0/0</b></div>
+    <button class="iconbtn" id="help">?</button>
+  </div>
+  <div id="goal"><strong>Mục tiêu</strong><span id="goal-text"></span><div class="bar"><i id="goal-fill"></i></div></div>
+  <div class="panel" id="khay-panel">
+    <div class="panel-title">Khay chờ <b id="khay-count">0/6</b><span id="khay-note"></span></div>
+    <div id="khay"></div>
+  </div>
+  <div class="panel" id="extra"><div id="extra-content"></div></div>
+  <div id="board-wrap"><div id="board"></div><div id="forecast"></div></div>
+  <div class="panel">
+    <div class="panel-title">Khối đang có <b id="tray-count"></b><span id="tray-note">Chọn khối → chọn ô</span></div>
+    <div id="tray"></div>
+  </div>
+  <div class="actions"><button class="act" id="hint">💡 Gợi ý</button><button class="act" id="restart">↻ Chơi lại</button><button class="act primary" id="test">Tự chạy</button></div>
+  <div class="footer" id="footer"></div>
+</div>
+<div id="toast"></div>
+<div id="modal"><div class="card" id="card"></div></div>
+<script>
+"use strict";
+const MODE="safe";
+const N=6, CAP=6;
+const TILE_INFO={
+ A:{glyph:'●',name:'Tròn'},
+ B:{glyph:'▥',name:'Sách'},
+ C:{glyph:'萬',name:'Vạn'},
+ D:{glyph:'✦',name:'Chữ'}
+};
+const SH={
+ one:[[0,0]],
+ domH:[[0,0],[0,1]],
+ domV:[[0,0],[1,0]],
+ bar3H:[[0,0],[0,1],[0,2]],
+ bar3V:[[0,0],[1,0],[2,0]],
+ L3:[[0,0],[1,0],[1,1]],
+ square:[[0,0],[0,1],[1,0],[1,1]]
+};
+const C={
+ forge:{
+  title:'Cặp Hóa Khối', footer:'PROTOTYPE A · MATCH TẠO RA BLOCK TIẾP THEO',
+  goal:'Clear 6 line. Những block dùng cho nửa sau phải được rèn từ Match.', statLabel:'Line', target:6,
+  help:`<p><b>Block quyết định thành phần line; Match quyết định block tiếp theo.</b></p><ul><li>Clear hàng/cột để thu tile.</li><li>Match 2 → Domino; Match 3 → khối L; Match 4 → khối 2×2.</li><li>Tile lẻ ở lại khay 6 ô. Khay tràn là thua.</li></ul><div class="q">Câu hỏi test: bạn có chủ động xây một line để sản xuất đúng shape cần cho nước sau không?</div>`,
+  hint:'Bắt đầu bằng Domino A ở hàng 1. Sau đó dùng Domino A vừa rèn để hoàn thành hàng 4.',
+  board:[
+   ['A','A','A','A',null,null],
+   ['B','B','B',null,null,null],
+   ['C','C',null,null,'C','C'],
+   ['A','A',null,null,'A','A'],
+   ['B',null,null,'B','B','B'],
+   [null,null,'C','C','C','C']
+  ],
+  pieces:[
+   {id:'A',shape:'domH',name:'Mồi A',source:'seed'},
+   {id:'B',shape:'bar3H',name:'Mồi B',source:'seed'},
+   {id:'C',shape:'domH',name:'Mồi C',source:'seed'}
+  ],
+  solution:[
+   {id:'A',shape:'domH',source:'seed',r:0,c:4},
+   {id:'A',shape:'domH',source:'forge',r:3,c:2},
+   {id:'B',shape:'bar3H',source:'seed',r:1,c:3},
+   {id:'B',shape:'domH',source:'forge',r:4,c:1},
+   {id:'C',shape:'domH',source:'seed',r:2,c:2},
+   {id:'C',shape:'domH',source:'forge',r:5,c:0}
+  ]
+ },
+ safe:{
+  title:'Cặp An Toàn', footer:'PROTOTYPE B · NHÓM TRÊN BOARD QUYẾT ĐỊNH ÁP LỰC KHAY',
+  goal:'Clear 4 line. Tile nối cạnh cùng ID biến mất an toàn; tile cô lập rơi vào khay.', statLabel:'Line', target:4,
+  help:`<p><b>Không phải line nào cũng đáng clear.</b></p><ul><li>Các tile cùng ID chạm cạnh trong line tạo nhóm an toàn.</li><li>Nhóm từ 2 tile trở lên không vào khay.</li><li>Tile cô lập vào khay; 2 tile giống nhau trong khay tự Match.</li></ul><div class="q">Câu hỏi test: cùng một khoảng trống, bạn có chọn ID khác chỉ để tạo adjacency an toàn không?</div>`,
+  hint:'Hàng 1 cần Domino C: cả ba cặp sẽ an toàn. Hàng 2 với Domino A sẽ đưa bốn tile cô lập vào khay.',
+  board:[
+   ['A','A','B','B',null,null],
+   ['A','B','C','D',null,null],
+   ['B','B','C','C',null,null],
+   ['A','C','B','D',null,null],
+   [null,null,null,null,null,null],
+   [null,null,null,null,null,null]
+  ],
+  pieces:[
+   {id:'C',shape:'domH',name:'An toàn C',source:'seed'},
+   {id:'A',shape:'domH',name:'Rủi ro A',source:'seed'},
+   {id:'D',shape:'domH',name:'An toàn D',source:'seed'},
+   {id:'B',shape:'domH',name:'Rủi ro B',source:'seed'}
+  ],
+  solution:[
+   {id:'C',shape:'domH',source:'seed',r:0,c:4},
+   {id:'D',shape:'domH',source:'seed',r:2,c:4},
+   {id:'A',shape:'domH',source:'seed',r:1,c:4},
+   {id:'B',shape:'domH',source:'seed',r:3,c:4}
+  ]
+ },
+ fuel:{
+  title:'Khay Là Nhiên Liệu', footer:'PROTOTYPE C · MATCH MỞ QUYỀN ĐẶT BLOCK',
+  goal:'Dùng block mồi để tạo năng lượng; chi năng lượng đúng ID để clear 4 line.', statLabel:'Line', target:4,
+  help:`<p><b>Match không chỉ dọn khay: Match trả phí cho hành động Block.</b></p><ul><li>Match 2/3/4 tạo 1/2/3 năng lượng cùng ID.</li><li>Block có biểu tượng ⚡1 chỉ đặt được khi đủ năng lượng cùng ID.</li><li>Đặt block tiêu hao năng lượng trước khi tạo line mới.</li></ul><div class="q">Câu hỏi test: bạn có hoãn một placement tốt vì cần dành năng lượng cho ID khác không?</div>`,
+  hint:'Chỉ block C miễn phí đang mở. Đặt nó ở cuối hàng 1 để nhận năng lượng A, B và C.',
+  board:[
+   ['A','A','B','B','C',null],
+   ['A','A','A','A',null,null],
+   ['B','B','B',null,null,null],
+   ['C','C',null,null,'C','C'],
+   [null,null,null,null,null,null],
+   [null,null,null,null,null,null]
+  ],
+  pieces:[
+   {id:'C',shape:'one',name:'Block mồi',source:'seed',cost:0},
+   {id:'A',shape:'domH',name:'Domino A',source:'fuel',cost:1},
+   {id:'B',shape:'bar3H',name:'Thanh B',source:'fuel',cost:1},
+   {id:'C',shape:'domH',name:'Domino C',source:'fuel',cost:1}
+  ],
+  solution:[
+   {id:'C',shape:'one',source:'seed',r:0,c:5},
+   {id:'A',shape:'domH',source:'fuel',r:1,c:4},
+   {id:'B',shape:'bar3H',source:'fuel',r:2,c:3},
+   {id:'C',shape:'domH',source:'fuel',r:3,c:2}
+  ]
+ },
+ recipe:{
+  title:'Recipe Line', footer:'PROTOTYPE D · XÂY ĐÚNG THÀNH PHẦN ĐỂ NHẬN KHỐI KẾ TIẾP',
+  goal:'Hoàn thành 3 recipe theo thứ tự. Recipe đúng tạo block bắt buộc cho recipe sau.', statLabel:'Recipe', target:3,
+  help:`<p><b>Mỗi hàng là một công thức tile.</b></p><ul><li>Hàng đầy chỉ thành công nếu số lượng ID đúng recipe.</li><li>Recipe 1 tạo block cho Recipe 2; Recipe 2 tạo block cho Recipe 3.</li><li>Đóng sai recipe kết thúc lượt test để hậu quả thật rõ.</li></ul><div class="q">Câu hỏi test: recipe có làm bạn đọc cả shape lẫn tile ID trước khi đặt không?</div>`,
+  hint:'Recipe 1 cần A×4 + B×2. Chọn Domino A và đặt vào hai ô trống của hàng 1.',
+  board:[
+   ['A','A',null,null,'B','B'],
+   ['B','B','B',null,null,null],
+   ['C','C',null,null,'C','C'],
+   [null,null,null,null,null,null],
+   [null,null,null,null,null,null],
+   [null,null,null,null,null,null]
+  ],
+  recipes:[
+   {row:0,counts:{A:4,B:2},reward:{id:'C',shape:'bar3H',name:'Thưởng C'}},
+   {row:1,counts:{B:3,C:3},reward:{id:'A',shape:'domH',name:'Thưởng A'}},
+   {row:2,counts:{A:2,C:4},reward:null}
+  ],
+  pieces:[
+   {id:'A',shape:'domH',name:'Đúng R1',source:'seed'},
+   {id:'C',shape:'domH',name:'Mồi sai',source:'seed'},
+   {id:'B',shape:'domH',name:'Mồi sai',source:'seed'}
+  ],
+  solution:[
+   {id:'A',shape:'domH',source:'seed',r:0,c:2},
+   {id:'C',shape:'bar3H',source:'reward',r:1,c:3},
+   {id:'A',shape:'domH',source:'reward',r:2,c:2}
+  ]
+ }
+}[MODE];
+
+const S={board:[],khay:[],tray:[],reserve:[],sel:-1,lines:0,recipes:0,safeTiles:0,forged:0,energy:{A:0,B:0,C:0,D:0},over:false,busy:false,won:false};
+const $=id=>document.getElementById(id);
+const clone=x=>JSON.parse(JSON.stringify(x));
+function tileHTML(id,cls=''){if(!id)return'';const t=TILE_INFO[id];return `<div class="tile id-${id} ${cls}"><span class="tag">${id}</span><span class="glyph">${t.glyph}</span></div>`}
+function shapeOf(p){return SH[p.shape]||p.shape}
+function cellsOf(p,r,c){return shapeOf(p).map(([dr,dc])=>[r+dr,c+dc])}
+function fits(p,r,c){for(const[rr,cc]of cellsOf(p,r,c)){if(rr<0||cc<0||rr>=N||cc>=N||S.board[rr][cc])return false}return true}
+function anyFit(p){for(let r=0;r<N;r++)for(let c=0;c<N;c++)if(fits(p,r,c))return true;return false}
+function fullLines(){const lines=[];for(let r=0;r<N;r++)if(S.board[r].every(Boolean))lines.push({type:'row',i:r});for(let c=0;c<N;c++){let ok=true;for(let r=0;r<N;r++)if(!S.board[r][c]){ok=false;break}if(ok)lines.push({type:'col',i:c})}return lines}
+function lineKeys(lines){const m=new Map();for(const l of lines){if(l.type==='row')for(let c=0;c<N;c++)m.set(`${l.i},${c}`,S.board[l.i][c]);else for(let r=0;r<N;r++)m.set(`${r},${l.i}`,S.board[r][l.i])}return m}
+function splitGroups(n){const out=[];while(n>=4){if(n===5){out.push(3,2);return out}out.push(4);n-=4}if(n===3)out.push(3);else if(n===2)out.push(2);return out}
+function groupAll(ids){const by={};ids.forEach(id=>(by[id]=by[id]||0,by[id]++));const groups=[],singles=[];for(const id of Object.keys(by)){const gs=splitGroups(by[id]);let used=gs.reduce((a,b)=>a+b,0);gs.forEach(size=>groups.push({id,size}));for(let i=used;i<by[id];i++)singles.push(id)}return{groups,singles}}
+function resolvePairs(ids){const by={};ids.forEach(id=>(by[id]=by[id]||0,by[id]++));const left=[],pairs=[];for(const id of Object.keys(by)){const n=Math.floor(by[id]/2);for(let i=0;i<n;i++)pairs.push(id);if(by[id]%2)left.push(id)}return{left,pairs}}
+function pieceLabel(p){if(MODE==='fuel'&&p.cost>0)return `⚡${p.cost}`;if(p.source==='forge')return'RÈN';if(p.source==='reward')return'THƯỞNG';return'MỒI'}
+function pieceGrid(p){const sh=shapeOf(p),rows=Math.max(...sh.map(x=>x[0]))+1,cols=Math.max(...sh.map(x=>x[1]))+1,map={};sh.forEach(([r,c])=>map[`${r},${c}`]=p.id);let h=`<div class="pgrid" style="grid-template-columns:repeat(${cols},22px);grid-template-rows:repeat(${rows},27px)">`;for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)h+=map[`${r},${c}`]?tileHTML(map[`${r},${c}`]):'<div></div>';return h+'</div>'}
+function renderBoard(){let h='';for(let r=0;r<N;r++)for(let c=0;c<N;c++){const valid=S.sel>=0&&fits(S.tray[S.sel],r,c);h+=`<div class="cell ${valid?'valid':''}" data-r="${r}" data-c="${c}">${tileHTML(S.board[r][c])}</div>`}$('board').innerHTML=h}
+function renderKhay(){let h='';for(let i=0;i<CAP;i++){h+=`<div class="slot ${i===CAP-1&&!S.khay[i]?'danger':''}">${tileHTML(S.khay[i])}</div>`}$('khay').innerHTML=h;$('khay-count').textContent=`${S.khay.length}/${CAP}`;$('khay-note').textContent=MODE==='forge'?'Tile lẻ':'Match 2 tự động'}
+function renderTray(){let h='';S.tray.forEach((p,i)=>{const locked=MODE==='fuel'&&p.cost>0&&S.energy[p.id]<p.cost;h+=`<div class="piece ${S.sel===i?'sel':''} ${locked?'locked':''}" data-i="${i}"><span class="badge">${pieceLabel(p)}</span>${pieceGrid(p)}<span class="pname">${p.name||TILE_INFO[p.id].name}</span></div>`});$('tray').innerHTML=h;$('tray-count').textContent=`${S.tray.length}${S.reserve.length?' +'+S.reserve.length:''}`}
+function renderExtra(){const el=$('extra'),ct=$('extra-content');if(MODE==='fuel'){el.style.display='block';ct.innerHTML=`<div class="panel-title">Năng lượng Match <b>đặt block cùng ID</b></div><div class="energy-row">${['A','B','C'].map(id=>`<div class="energy-pill">${tileHTML(id)}<b>${S.energy[id]}</b></div>`).join('')}</div>`}else if(MODE==='recipe'){el.style.display='block';ct.innerHTML=`<div class="panel-title">Recipe đang chờ <b>đúng số lượng ID</b></div><div class="recipe-list">${C.recipes.map((r,i)=>`<div class="recipe ${i<S.recipes?'done':''}"><b>Hàng ${r.row+1}</b><div class="chips">${Object.entries(r.counts).map(([id,n])=>Array.from({length:n},()=>tileHTML(id)).join('')).join('')}</div></div>`).join('')}</div>`}else{el.style.display='none';ct.innerHTML=''}}
+function progress(){return MODE==='recipe'?S.recipes:S.lines}
+function renderHUD(){$('title').textContent=C.title;$('goal-text').textContent=C.goal;$('stat-label').textContent=C.statLabel;$('stat-val').textContent=`${progress()}/${C.target}`;$('goal-fill').style.width=`${Math.min(100,progress()/C.target*100)}%`;$('footer').textContent=C.footer;renderExtra()}
+function renderAll(){renderBoard();renderKhay();renderTray();renderHUD()}
+let toastTimer;function toast(msg,ms=1800){const e=$('toast');e.innerHTML=msg;e.classList.add('on');clearTimeout(toastTimer);toastTimer=setTimeout(()=>e.classList.remove('on'),ms)}
+function modal(html){$('card').innerHTML=html;$('modal').classList.add('on')}
+function closeModal(){$('modal').classList.remove('on')}
+function help(){modal(`<h2>${C.title}</h2>${C.help}<button onclick="window.__close()">ĐÓNG</button>`)}
+function end(win,title,body){S.busy=true;S.won=win;modal(`<h2 style="${win?'':'color:var(--danger)'}">${title}</h2><p>${body}</p><p><b>Line:</b> ${S.lines} · <b>Khay:</b> ${S.khay.length}/${CAP}${MODE==='recipe'?` · <b>Recipe:</b> ${S.recipes}/3`:''}</p><button onclick="window.__restart()">CHƠI LẠI</button>`)}
+function addPiece(p){const q={...p,source:p.source||'forge'},max=MODE==='forge'?9:5;if(S.tray.length<max)S.tray.push(q);else S.reserve.push(q)}
+function removePiece(i){S.tray.splice(i,1);if(S.reserve.length)S.tray.push(S.reserve.shift())}
+function clearCells(keys){for(const key of keys.keys()){const[r,c]=key.split(',').map(Number);S.board[r][c]=null}}
+function flashKeys(keys,bad=false){for(const key of keys.keys()){const[r,c]=key.split(',');const el=document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);if(el)el.classList.add(bad?'badflash':'flash')}}
+function forgeShape(size,id){if(size===2)return{id,shape:'domH',name:`Domino ${id}`,source:'forge'};if(size===3)return{id,shape:'L3',name:`L ${id}`,source:'forge'};return{id,shape:'square',name:`Vuông ${id}`,source:'forge'}}
+function countsOf(ids){const o={};ids.forEach(id=>o[id]=(o[id]||0)+1);return o}
+function sameCounts(a,b){const keys=new Set([...Object.keys(a),...Object.keys(b)]);for(const k of keys)if((a[k]||0)!==(b[k]||0))return false;return true}
+function recipeText(counts){return Object.entries(counts).map(([id,n])=>`${id}×${n}`).join(' + ')}
+function safeComponents(keys){const set=new Set(keys.keys()),seen=new Set(),safe=new Set();for(const key of set){if(seen.has(key))continue;const id=keys.get(key),stack=[key],comp=[];seen.add(key);while(stack.length){const cur=stack.pop();comp.push(cur);const[r,c]=cur.split(',').map(Number);for(const[dr,dc]of [[1,0],[-1,0],[0,1],[0,-1]]){const nk=`${r+dr},${c+dc}`;if(set.has(nk)&&!seen.has(nk)&&keys.get(nk)===id){seen.add(nk);stack.push(nk)}}}if(comp.length>=2)comp.forEach(k=>safe.add(k))}return safe}
+function forecastFor(p,r,c){if(!fits(p,r,c))return'';const b=S.board.map(row=>row.slice());for(const[rr,cc]of cellsOf(p,r,c))b[rr][cc]=p.id;const lines=[];for(let rr=0;rr<N;rr++)if(b[rr].every(Boolean))lines.push({type:'row',i:rr});for(let cc=0;cc<N;cc++){let ok=true;for(let rr=0;rr<N;rr++)if(!b[rr][cc])ok=false;if(ok)lines.push({type:'col',i:cc})}if(!lines.length)return'Đặt hợp lệ · chưa clear line';const map=new Map();for(const l of lines){if(l.type==='row')for(let cc=0;cc<N;cc++)map.set(`${l.i},${cc}`,b[l.i][cc]);else for(let rr=0;rr<N;rr++)map.set(`${rr},${l.i}`,b[rr][l.i])}
+ if(MODE==='forge'){const all=[...S.khay,...map.values()],g=groupAll(all);return`Rèn ${g.groups.map(x=>`${x.id}×${x.size}`).join(', ')||'0'} · dư ${g.singles.length}/6`}
+ if(MODE==='safe'){const safe=safeComponents(map),incoming=[...map.keys()].filter(k=>!safe.has(k)).map(k=>map.get(k)),res=resolvePairs([...S.khay,...incoming]);return`${safe.size} tile an toàn · ${incoming.length} vào khay · dư ${res.left.length}/6`}
+ if(MODE==='fuel'){const g=groupAll([...S.khay,...map.values()]);return`Năng lượng: ${g.groups.map(x=>`${x.id}+${x.size-1}`).join(', ')||'0'} · dư ${g.singles.length}/6`}
+ if(MODE==='recipe'){const row=lines.find(l=>l.type==='row'&&C.recipes[S.recipes]&&l.i===C.recipes[S.recipes].row);if(!row)return'Line này không phải recipe hiện tại';const ids=[];for(let cc=0;cc<N;cc++)ids.push(b[row.i][cc]);const ok=sameCounts(countsOf(ids),C.recipes[S.recipes].counts);return ok?'✓ ĐÚNG RECIPE':'✕ SAI RECIPE'}return''}
+async function resolveLines(){const lines=fullLines();if(!lines.length)return;const keys=lineKeys(lines);flashKeys(keys);await wait(170);
+ if(MODE==='forge'){
+  const all=[...S.khay,...keys.values()],res=groupAll(all);S.khay=res.singles.slice();clearCells(keys);S.lines+=lines.length;for(const g of res.groups){addPiece(forgeShape(g.size,g.id));S.forged++}toast(`Rèn: ${res.groups.map(g=>`${g.id}×${g.size}`).join(' · ')||'không có'} · dư ${S.khay.length}/6`);
+ }
+ if(MODE==='safe'){
+  const safe=safeComponents(keys),incoming=[...keys.keys()].filter(k=>!safe.has(k)).map(k=>keys.get(k));S.safeTiles+=safe.size;const res=resolvePairs([...S.khay,...incoming]);S.khay=res.left;clearCells(keys);S.lines+=lines.length;toast(`${safe.size} tile an toàn · Match ${res.pairs.length} cặp trong khay · dư ${S.khay.length}/6`);
+ }
+ if(MODE==='fuel'){
+  const res=groupAll([...S.khay,...keys.values()]);S.khay=res.singles;for(const g of res.groups)S.energy[g.id]+=g.size-1;clearCells(keys);S.lines+=lines.length;toast(`Nạp: ${res.groups.map(g=>`${g.id} +${g.size-1}⚡`).join(' · ')} · dư ${S.khay.length}/6`);
+ }
+ if(MODE==='recipe'){
+  const active=C.recipes[S.recipes];let resolved=false;for(const l of lines){if(l.type!=='row'||!active||l.i!==active.row)continue;const ids=[];for(let c=0;c<N;c++)ids.push(S.board[l.i][c]);const ok=sameCounts(countsOf(ids),active.counts);if(!ok){flashKeys(keys,true);await wait(220);return end(false,'SAI RECIPE',`Hàng ${l.i+1} cần ${recipeText(active.counts)}. Bạn đã đóng hàng bằng ${recipeText(countsOf(ids))}.`)}clearCells(keys);S.lines+=1;S.recipes+=1;resolved=true;if(active.reward)addPiece({...active.reward,source:'reward'});toast(active.reward?`Recipe đúng → nhận ${active.reward.name}`:'Recipe cuối hoàn tất!')}
+  if(!resolved)return;
+ }
+ renderAll();if(S.khay.length>CAP)return end(false,'KHAY TRÀN','Các tile lẻ đã vượt quá 6 ô.');checkEnd();
+}
+function checkEnd(){if(progress()>=C.target)return end(true,'HOOK ĐÃ HOÀN TẤT',MODE==='forge'?'Bạn đã dùng vòng Block → Match → Block để clear cả sáu line.':MODE==='safe'?`Bạn clear ${S.lines} line với ${S.safeTiles} tile được xử lý an toàn trên board.`:MODE==='fuel'?'Match đã thực sự mở quyền cho các placement tiếp theo.':'Ba recipe đã tạo thành một chuỗi block bắt buộc.');if(!S.tray.length)return end(false,'HẾT BLOCK','Không còn block để tiếp tục.');if(!S.tray.some(p=>anyFit(p)&&(MODE!=='fuel'||p.cost===0||S.energy[p.id]>=p.cost)))toast('Không có block khả dụng — hãy xem lại nguồn lực hoặc chơi lại.',2600)}
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+async function place(i,r,c){if(S.busy||S.won)return;const p=S.tray[i];if(!p||!fits(p,r,c))return toast('Không đặt được tại ô này');if(MODE==='fuel'&&p.cost>0){if(S.energy[p.id]<p.cost)return toast(`Thiếu năng lượng ${p.id}`);S.energy[p.id]-=p.cost}S.busy=true;for(const[rr,cc]of cellsOf(p,r,c))S.board[rr][cc]=p.id;removePiece(i);S.sel=-1;renderAll();await wait(100);await resolveLines();S.busy=false;renderAll();checkEnd()}
+function selectPiece(i){if(S.busy||S.won)return;const p=S.tray[i];if(MODE==='fuel'&&p.cost>0&&S.energy[p.id]<p.cost)return toast(`Cần ${p.cost} năng lượng ${p.id}`);S.sel=S.sel===i?-1:i;renderAll();if(S.sel>=0)toast(`Đã chọn ${p.name||p.id}`)}
+function init(showIntro=true){S.board=clone(C.board);S.khay=[];S.tray=clone(C.pieces);S.reserve=[];S.sel=-1;S.lines=0;S.recipes=0;S.safeTiles=0;S.forged=0;S.energy={A:0,B:0,C:0,D:0};S.over=false;S.busy=false;S.won=false;renderAll();if(showIntro)setTimeout(()=>modal(`<h2>${C.title}</h2><p>${C.goal}</p>${C.help}<button onclick="window.__close()">BẮT ĐẦU</button>`),80)}
+$('tray').addEventListener('click',e=>{const p=e.target.closest('.piece');if(p)selectPiece(+p.dataset.i)});
+$('board').addEventListener('click',e=>{const cell=e.target.closest('.cell');if(!cell||S.sel<0||S.busy)return;const r=+cell.dataset.r,c=+cell.dataset.c,p=S.tray[S.sel];const f=$('forecast');f.textContent=forecastFor(p,r,c);f.className='on';if(!fits(p,r,c)){f.id='forecast';f.classList.add('bad');return}place(S.sel,r,c);setTimeout(()=>f.className='',500)});
+$('help').onclick=help;$('hint').onclick=()=>toast(C.hint,4200);$('restart').onclick=()=>init(true);$('test').onclick=async()=>{closeModal();await autoSolve()};
+window.__close=closeModal;window.__restart=()=>{closeModal();init(true)};
+async function autoSolve(){if(S.busy)return;init(false);closeModal();await wait(50);for(const step of C.solution){const idx=S.tray.findIndex(p=>p.id===step.id&&p.shape===step.shape&&(!step.source||p.source===step.source));if(idx<0){toast('Auto test không tìm thấy '+step.id+' '+step.shape,2500);break}await place(idx,step.r,step.c);await wait(120);if(S.won)break}}
+window.__proto={S,C,init,place,autoSolve,state:()=>({mode:MODE,lines:S.lines,recipes:S.recipes,khay:S.khay.slice(),energy:{...S.energy},tray:S.tray.map(p=>({id:p.id,shape:p.shape,source:p.source})),won:S.won})};
+init(true);
+</script>
+</body>
+</html>

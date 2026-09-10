@@ -1,0 +1,212 @@
+{"kind":"deck","id":"pr/gw2y7a","name":"Deck"}
+{"kind":"layout","layoutId":"86846e37-31a4-4a25-98ad-3bc4bd2dee71","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"329e7391-0be3-4485-8cce-c1f509677722","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/kuymak","slide":1,"title":"MAHJONG × BLOCK","textShapes":4}
+{"kind":"shape","id":"sh/fetwvahs","slide":1,"bbox":[0,0,870,720]}
+{"kind":"shape","id":"sh/edkf25gn","slide":1,"bbox":[72,104,138,5]}
+{"kind":"textbox","id":"sh/dcbet0z2","slide":1,"text":"MAHJONG × BLOCK","textPreview":"MAHJONG × BLOCK","textChars":15,"textLines":1,"bbox":[72,142,690,78]}
+{"kind":"textbox","id":"sh/sb2x0vyh","slide":1,"text":"Pitch deck","textPreview":"Pitch deck","textChars":10,"textLines":1,"bbox":[72,232,380,32]}
+{"kind":"textbox","id":"sh/ratwrahw","slide":1,"text":"Puzzle thả khối lai mạt chược\ntrên bàn cờ hai tầng","textPreview":"Puzzle thả khối lai mạt chược | trên bàn cờ hai tầng","textChars":50,"textLines":2,"bbox":[72,286,620,100]}
+{"kind":"textbox","id":"sh/q9kfy5gb","slide":1,"text":"Bản trình bày dựa trên GDD và bản game hiện có","textPreview":"Bản trình bày dựa trên GDD và bản game hiện có","textChars":46,"textLines":1,"bbox":[72,602,560,28]}
+{"kind":"image","id":"im/1obaho72","slide":1,"name":"","geometry":"roundRect","alt":"Product UI screenshot","bbox":[810,0,470,720]}
+{"kind":"notes","id":"nt/kuymak","slide":1,"text":"[Sources]\n- Final/07-GDD-TONG-HOP-TU-INDEX.md\n- Figma UI Export/01_menu_gate_closed.png"}
+{"kind":"slide","id":"sl/pl3fyg","slide":2,"title":"CORE HOOK","textShapes":9}
+{"kind":"shape","id":"sh/x4ny1g32","slide":2,"bbox":[0,0,1280,18]}
+{"kind":"textbox","id":"sh/a1cfq1kb","slide":2,"text":"CORE HOOK","textPreview":"CORE HOOK","textChars":9,"textLines":1,"bbox":[72,34,360,22]}
+{"kind":"textbox","id":"sh/b2lgz6lw","slide":2,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1140,34,68,22]}
+{"kind":"shape","id":"sh/krehwv2d","slide":2,"bbox":[72,672,1136,1]}
+{"kind":"textbox","id":"sh/lsny5g3y","slide":2,"text":"Nguồn: GDD Tổng Hợp — Mahjong × Block (Final Core)","textPreview":"Nguồn: GDD Tổng Hợp — Mahjong × Block (Final Core)","textChars":50,"textLines":1,"bbox":[72,682,620,18]}
+{"kind":"textbox","id":"sh/y5wzulkn","slide":2,"text":"Không chọn cặp có sẵn — người chơi tạo ra cơ hội ghép","textPreview":"Không chọn cặp có sẵn — người chơi tạo ra cơ hội ghép","textChars":53,"textLines":1,"bbox":[72,76,760,76]}
+{"kind":"shape","id":"sh/z65g3qls","slide":2,"bbox":[72,164,124,4]}
+{"kind":"textbox","id":"sh/0vaxkr29","slide":2,"text":"Mỗi lượt là một quyết định đặt polyomino, không phải thao tác chọn hai quân.","textPreview":"Mỗi lượt là một quyết định đặt polyomino, không phải thao tác chọn hai quân.","textChars":76,"textLines":1,"bbox":[72,182,760,48]}
+{"kind":"shape","id":"sh/1w3ytw3u","slide":2,"bbox":[72,254,472,324]}
+{"kind":"textbox","id":"sh/pg7qlkzq","slide":2,"text":"Điểm khác biệt","textPreview":"Điểm khác biệt","textChars":14,"textLines":1,"bbox":[108,286,340,30]}
+{"kind":"textbox","id":"sh/4fy9cfy5","slide":2,"text":"Thả một khối nhiều ô vào vị trí hợp lệ. Từng ô rơi độc lập xuống tầng trống thấp nhất của cột đó.","textPreview":"Thả một khối nhiều ô vào vị trí hợp lệ. Từng ô rơi độc lập xuống tầng trống thấp nhất của cột đó.","textChars":97,"textLines":1,"bbox":[108,336,372,104]}
+{"kind":"textbox","id":"sh/3ep8jahk","slide":2,"text":"Từ đó, người chơi chủ động tạo, che và lộ các quân để chuẩn bị Match.","textPreview":"Từ đó, người chơi chủ động tạo, che và lộ các quân để chuẩn bị Match.","textChars":69,"textLines":1,"bbox":[108,465,372,74]}
+{"kind":"textbox","id":"sh/d47qpkzm","slide":2,"text":"Gameplay hiện có: Current / Next, bàn 2 tầng, booster","textPreview":"Gameplay hiện có: Current / Next, bàn 2 tầng, booster","textChars":53,"textLines":1,"bbox":[610,618,526,24]}
+{"kind":"image","id":"im/5kn6dgfi","slide":2,"name":"","geometry":"roundRect","alt":"Product UI screenshot","bbox":[610,214,526,394]}
+{"kind":"notes","id":"nt/pl3fyg","slide":2,"text":"[Sources]\n- Final/07-GDD-TONG-HOP-TU-INDEX.md, mục 1 và 2.1–2.3\n- Figma UI Export/05_gameplay.png"}
+{"kind":"slide","id":"sl/3gwoac","slide":3,"title":"CORE RULE","textShapes":15}
+{"kind":"shape","id":"sh/m5k3e1o3","slide":3,"bbox":[0,0,1280,18]}
+{"kind":"textbox","id":"sh/9svmpg7u","slide":3,"text":"CORE RULE","textPreview":"CORE RULE","textChars":9,"textLines":1,"bbox":[72,34,360,22]}
+{"kind":"textbox","id":"sh/8r2lgb69","slide":3,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1140,34,68,22]}
+{"kind":"shape","id":"sh/vud4rqpk","slide":3,"bbox":[72,672,1136,1]}
+{"kind":"textbox","id":"sh/at43iloz","slide":3,"text":"Nguồn: GDD Tổng Hợp — Mahjong × Block (Final Core)","textPreview":"Nguồn: GDD Tổng Hợp — Mahjong × Block (Final Core)","textChars":50,"textLines":1,"bbox":[72,682,620,18]}
+{"kind":"textbox","id":"sh/hwvmtgnq","slide":3,"text":"Hai tầng biến “lộ mặt” thành một lựa chọn chiến thuật","textPreview":"Hai tầng biến “lộ mặt” thành một lựa chọn chiến thuật","textChars":53,"textLines":1,"bbox":[72,76,760,76]}
+{"kind":"shape","id":"sh/wvmlkb65","slide":3,"bbox":[72,164,124,4]}
+{"kind":"textbox","id":"sh/by94fmpg","slide":3,"text":"Chỉ quân cùng mặt, cùng tầng, kề cạnh và đang lộ mới Match.","textPreview":"Chỉ quân cùng mặt, cùng tầng, kề cạnh và đang lộ mới Match.","textChars":59,"textLines":1,"bbox":[72,182,760,48]}
+{"kind":"shape","id":"sh/qx036hov","slide":3,"bbox":[72,264,300,280]}
+{"kind":"textbox","id":"sh/gry90ned","slide":3,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[102,292,80,42]}
+{"kind":"textbox","id":"sh/hs7atsfy","slide":3,"text":"Tầng sàn & mái","textPreview":"Tầng sàn & mái","textChars":14,"textLines":1,"bbox":[102,350,238,48]}
+{"kind":"textbox","id":"sh/u5grydwn","slide":3,"text":"Mỗi ô chứa tối đa 2 quân. Khối chỉ rơi khi mọi ô con còn chỗ.","textPreview":"Mỗi ô chứa tối đa 2 quân. Khối chỉ rơi khi mọi ô con còn chỗ.","textChars":61,"textLines":1,"bbox":[102,412,238,98]}
+{"kind":"shape","id":"sh/vqpsrixs","slide":3,"bbox":[430,264,300,280]}
+{"kind":"textbox","id":"sh/4vi947ep","slide":3,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[460,292,80,42]}
+{"kind":"textbox","id":"sh/5wraxcfa","slide":3,"text":"Che để trì hoãn","textPreview":"Che để trì hoãn","textChars":15,"textLines":1,"bbox":[460,350,238,48]}
+{"kind":"textbox","id":"sh/it0r2xwj","slide":3,"text":"Quân tầng sàn bị mái che không được Match, dù đang kề quân cùng mặt.","textPreview":"Quân tầng sàn bị mái che không được Match, dù đang kề quân cùng mặt.","textChars":68,"textLines":1,"bbox":[460,412,238,98]}
+{"kind":"shape","id":"sh/3u9sv2x4","slide":3,"bbox":[788,264,300,280]}
+{"kind":"textbox","id":"sh/kze9s3e5","slide":3,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[818,292,80,42]}
+{"kind":"textbox","id":"sh/l0nal8fq","slide":3,"text":"Lộ để tạo chuỗi","textPreview":"Lộ để tạo chuỗi","textChars":15,"textLines":1,"bbox":[818,350,238,48]}
+{"kind":"textbox","id":"sh/1kfy903i","slide":3,"text":"Sau khi Match, mái rơi xuống sàn và có thể kích hoạt wave tiếp theo.","textPreview":"Sau khi Match, mái rơi xuống sàn và có thể kích hoạt wave tiếp theo.","textChars":68,"textLines":1,"bbox":[818,412,238,98]}
+{"kind":"textbox","id":"sh/0jmh0v2x","slide":3,"text":"Tín hiệu thiết kế: “đặt đúng chỗ” quan trọng hơn “đặt thật nhanh”.","textPreview":"Tín hiệu thiết kế: “đặt đúng chỗ” quan trọng hơn “đặt thật nhanh”.","textChars":66,"textLines":1,"bbox":[72,584,1035,34]}
+{"kind":"notes","id":"nt/3gwoac","slide":3,"text":"[Sources]\n- Final/07-GDD-TONG-HOP-TU-INDEX.md, mục 2.1 và 2.3"}
+{"kind":"slide","id":"sl/ci13gv","slide":4,"title":"CORE LOOP","textShapes":21}
+{"kind":"shape","id":"sh/honyh8f2","slide":4,"bbox":[0,0,1280,18]}
+{"kind":"textbox","id":"sh/u1wz6dgr","slide":4,"text":"CORE LOOP","textPreview":"CORE LOOP","textChars":9,"textLines":1,"bbox":[72,34,360,22]}
+{"kind":"textbox","id":"sh/vm5gfixc","slide":4,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[1140,34,68,22]}
+{"kind":"shape","id":"sh/8zex43yl","slide":4,"bbox":[72,672,1136,1]}
+{"kind":"textbox","id":"sh/t0nyd8f6","slide":4,"text":"Nguồn: GDD Tổng Hợp — Mahjong × Block (Final Core)","textPreview":"Nguồn: GDD Tổng Hợp — Mahjong × Block (Final Core)","textChars":50,"textLines":1,"bbox":[72,682,620,18]}
+{"kind":"textbox","id":"sh/6xwf2tgf","slide":4,"text":"Core loop tập trung vào đọc bàn, lựa chọn và phản ứng dây chuyền","textPreview":"Core loop tập trung vào đọc bàn, lựa chọn và phản ứng dây chuyền","textChars":64,"textLines":1,"bbox":[72,76,760,76]}
+{"kind":"shape","id":"sh/7y5gbyx0","slide":4,"bbox":[72,164,124,4]}
+{"kind":"textbox","id":"sh/kvux03yp","slide":4,"text":"Một lượt có thể tạo nhiều wave Match liên tiếp.","textPreview":"Một lượt có thể tạo nhiều wave Match liên tiếp.","textChars":47,"textLines":1,"bbox":[72,182,760,48]}
+{"kind":"shape","id":"sh/lw3y9ofa","slide":4,"bbox":[72,300,226,172]}
+{"kind":"textbox","id":"sh/dgbm1kzq","slide":4,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[94,316,50,24]}
+{"kind":"textbox","id":"sh/sf2lsfy5","slide":4,"text":"ĐỌC","textPreview":"ĐỌC","textChars":3,"textLines":1,"bbox":[94,355,176,30]}
+{"kind":"textbox","id":"sh/ret4zahk","slide":4,"text":"Current, Next, các quân đang lộ","textPreview":"Current, Next, các quân đang lộ","textChars":31,"textLines":1,"bbox":[94,402,176,44]}
+{"kind":"textbox","id":"sh/qdk3q5gz","slide":4,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[306,360,38,32]}
+{"kind":"shape","id":"sh/5sbmx0zu","slide":4,"bbox":[352,300,226,172]}
+{"kind":"textbox","id":"sh/4rilofy9","slide":4,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[374,316,50,24]}
+{"kind":"textbox","id":"sh/3q94vaho","slide":4,"text":"ĐẶT","textPreview":"ĐẶT","textChars":3,"textLines":1,"bbox":[374,355,176,30]}
+{"kind":"textbox","id":"sh/ip03m5g3","slide":4,"text":"Chọn điểm rơi hợp lệ cho cả khối","textPreview":"Chọn điểm rơi hợp lệ cho cả khối","textChars":32,"textLines":1,"bbox":[374,402,176,44]}
+{"kind":"textbox","id":"sh/hormt0zi","slide":4,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[586,360,38,32]}
+{"kind":"shape","id":"sh/gnilkvyx","slide":4,"bbox":[632,300,226,172]}
+{"kind":"textbox","id":"sh/87m50v6t","slide":4,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[654,316,50,24]}
+{"kind":"textbox","id":"sh/98vm907e","slide":4,"text":"MATCH","textPreview":"MATCH","textChars":5,"textLines":1,"bbox":[654,355,176,30]}
+{"kind":"textbox","id":"sh/m543ylon","slide":4,"text":"Nhóm ≥2 quân cùng mặt cùng tầng biến mất","textPreview":"Nhóm ≥2 quân cùng mặt cùng tầng biến mất","textChars":40,"textLines":1,"bbox":[654,402,176,44]}
+{"kind":"textbox","id":"sh/n6d47qp8","slide":4,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[866,360,38,32]}
+{"kind":"shape","id":"sh/032lwv6x","slide":4,"bbox":[912,300,226,172]}
+{"kind":"textbox","id":"sh/l4bm507i","slide":4,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[934,316,50,24]}
+{"kind":"textbox","id":"sh/y1k3ul8r","slide":4,"text":"CASCADE","textPreview":"CASCADE","textChars":7,"textLines":1,"bbox":[934,355,176,30]}
+{"kind":"textbox","id":"sh/z2t43qpc","slide":4,"text":"Mái rơi xuống, tạo wave mới nếu đủ điều kiện","textPreview":"Mái rơi xuống, tạo wave mới nếu đủ điều kiện","textChars":44,"textLines":1,"bbox":[934,402,176,44]}
+{"kind":"textbox","id":"sh/4z658f61","slide":4,"text":"Hệ thống tính chuỗi dài nhất trong một lượt để cộng điểm và hỗ trợ nhiệm vụ chain2.","textPreview":"Hệ thống tính chuỗi dài nhất trong một lượt để cộng điểm và hỗ trợ nhiệm vụ chain2.","textChars":83,"textLines":1,"bbox":[72,536,1040,42]}
+{"kind":"notes","id":"nt/ci13gv","slide":4,"text":"[Sources]\n- Final/07-GDD-TONG-HOP-TU-INDEX.md, mục 2.3"}
+{"kind":"slide","id":"sl/2wbd7g","slide":5,"title":"CONTENT","textShapes":6}
+{"kind":"shape","id":"sh/bul0n2ho","slide":5,"bbox":[0,0,1280,18]}
+{"kind":"textbox","id":"sh/wvuhg7y9","slide":5,"text":"CONTENT","textPreview":"CONTENT","textChars":7,"textLines":1,"bbox":[72,34,360,22]}
+{"kind":"textbox","id":"sh/xw3ipczu","slide":5,"text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[1140,34,68,22]}
+{"kind":"shape","id":"sh/2pszaxg7","slide":5,"bbox":[72,672,1136,1]}
+{"kind":"textbox","id":"sh/nq1gj2hs","slide":5,"text":"Nguồn: GDD Tổng Hợp — Mahjong × Block (Final Core)","textPreview":"Nguồn: GDD Tổng Hợp — Mahjong × Block (Final Core)","textChars":50,"textLines":1,"bbox":[72,682,620,18]}
+{"kind":"textbox","id":"sh/orahc7yd","slide":5,"text":"50 level là một curriculum có mục tiêu rõ ràng","textPreview":"50 level là một curriculum có mục tiêu rõ ràng","textChars":46,"textLines":1,"bbox":[72,76,760,76]}
+{"kind":"shape","id":"sh/psjilczi","slide":5,"bbox":[72,164,124,4]}
+{"kind":"textbox","id":"sh/e18z6xgv","slide":5,"text":"5 chương × 10 level; toàn bộ level chính có lượt đi giới hạn và lời giải được kiểm tra.","textPreview":"5 chương × 10 level; toàn bộ level chính có lượt đi giới hạn và lời giải được kiểm tra.","textChars":87,"textLines":1,"bbox":[72,182,760,48]}
+{"kind":"textbox","id":"sh/mtkje94j","slide":5,"text":"Phân bố 4 goal type trong 50 level","textPreview":"Phân bố 4 goal type trong 50 level","textChars":34,"textLines":1,"bbox":[72,580,560,26]}
+{"kind":"chart","id":"ch/ryx0b2l4","slide":5,"name":"","chartType":"bar","bbox":[72,256,560,294]}
+{"kind":"image","id":"im/oze9cjm1","slide":5,"name":"","geometry":"roundRect","alt":"Product UI screenshot","bbox":[726,232,316,360]}
+{"kind":"notes","id":"nt/2wbd7g","slide":5,"text":"[Sources]\n- Final/07-GDD-TONG-HOP-TU-INDEX.md, mục 3 và 5\n- Figma UI Export/03_levelselect_top.png"}
+{"kind":"slide","id":"sl/erfasn","slide":6,"title":"CONTENT","textShapes":16}
+{"kind":"shape","id":"sh/zaxwjupg","slide":6,"bbox":[0,0,1280,18]}
+{"kind":"textbox","id":"sh/kb6dsz61","slide":6,"text":"CONTENT","textPreview":"CONTENT","textChars":7,"textLines":1,"bbox":[72,34,360,22]}
+{"kind":"textbox","id":"sh/lcfel47m","slide":6,"text":"06","textPreview":"06","textChars":2,"textLines":1,"bbox":[1140,34,68,22]}
+{"kind":"shape","id":"sh/al4vmpoz","slide":6,"bbox":[72,672,1136,1]}
+{"kind":"textbox","id":"sh/bmdwfap4","slide":6,"text":"Nguồn: GDD Tổng Hợp — Mahjong × Block (Final Core)","textPreview":"Nguồn: GDD Tổng Hợp — Mahjong × Block (Final Core)","textChars":50,"textLines":1,"bbox":[72,682,620,18]}
+{"kind":"textbox","id":"sh/c7mdof6p","slide":6,"text":"Độ khó tăng bằng không gian, áp lực và điều kiện mở khóa","textPreview":"Độ khó tăng bằng không gian, áp lực và điều kiện mở khóa","textChars":56,"textLines":1,"bbox":[72,76,760,76]}
+{"kind":"shape","id":"sh/x8vehk7a","slide":6,"bbox":[72,164,124,4]}
+{"kind":"textbox","id":"sh/uhovy9o3","slide":6,"text":"Không cần thêm luật Match mới để tạo biến thể màn chơi.","textPreview":"Không cần thêm luật Match mới để tạo biến thể màn chơi.","textChars":55,"textLines":1,"bbox":[72,182,760,48]}
+{"kind":"textbox","id":"sh/vihwrepo","slide":6,"text":"2×2 → 6×6","textPreview":"2×2 → 6×6","textChars":9,"textLines":1,"bbox":[72,264,260,58]}
+{"kind":"textbox","id":"sh/nmh036dg","slide":6,"text":"kích thước bàn","textPreview":"kích thước bàn","textChars":14,"textLines":1,"bbox":[72,325,260,46]}
+{"kind":"textbox","id":"sh/mlojulwv","slide":6,"text":"1–8","textPreview":"1–8","textChars":3,"textLines":1,"bbox":[362,264,190,58]}
+{"kind":"textbox","id":"sh/9oz25gvm","slide":6,"text":"lượt đặt khối","textPreview":"lượt đặt khối","textChars":13,"textLines":1,"bbox":[362,325,190,46]}
+{"kind":"textbox","id":"sh/onq1wbe1","slide":6,"text":"tới 6","textPreview":"tới 6","textChars":5,"textLines":1,"bbox":[600,264,210,58]}
+{"kind":"textbox","id":"sh/bqhk7qds","slide":6,"text":"mặt mục tiêu đồng thời","textPreview":"mặt mục tiêu đồng thời","textChars":22,"textLines":1,"bbox":[600,325,210,46]}
+{"kind":"textbox","id":"sh/ap8jylw7","slide":6,"text":"3","textPreview":"3","textChars":1,"textLines":1,"bbox":[864,264,180,58]}
+{"kind":"textbox","id":"sh/xsz290vi","slide":6,"text":"level dùng Lock","textPreview":"level dùng Lock","textChars":15,"textLines":1,"bbox":[864,325,180,46]}
+{"kind":"shape","id":"sh/wrq10ved","slide":6,"bbox":[72,432,1058,1]}
+{"kind":"textbox","id":"sh/ju1kbqdo","slide":6,"text":"Mốc dạy cụ thể","textPreview":"Mốc dạy cụ thể","textChars":14,"textLines":1,"bbox":[72,468,220,28]}
+{"kind":"textbox","id":"sh/ytsj25w3","slide":6,"text":"Lv1: Match cùng tầng + lộ mặt  •  Lv11: Phong Ấn đầu tiên  •  Lv21: Ô Chắn  •  Lv46: One Shot  •  Lv50: tổng hợp toàn bộ cơ chế","textPreview":"Lv1: Match cùng tầng + lộ mặt  •  Lv11: Phong Ấn đầu tiên  •  Lv21: Ô Chắn  •  Lv46: One Shot  •  Lv50: tổng hợp toàn bộ cơ chế","textChars":127,"textLines":1,"bbox":[72,514,1020,50]}
+{"kind":"textbox","id":"sh/upc3upgb","slide":6,"text":"Chỉ Level 1 dùng bàn tay hướng dẫn; các level sau dạy qua cấu trúc bàn và mục tiêu.","textPreview":"Chỉ Level 1 dùng bàn tay hướng dẫn; các level sau dạy qua cấu trúc bàn và mục tiêu.","textChars":83,"textLines":1,"bbox":[72,590,1020,34]}
+{"kind":"notes","id":"nt/erfasn","slide":6,"text":"[Sources]\n- Final/07-GDD-TONG-HOP-TU-INDEX.md, mục 4, 5 và 9.4"}
+{"kind":"slide","id":"sl/f4efre","slide":7,"title":"SUPPORT","textShapes":10}
+{"kind":"shape","id":"sh/m50valgb","slide":7,"bbox":[0,0,1280,18]}
+{"kind":"textbox","id":"sh/98belgf2","slide":7,"text":"SUPPORT","textPreview":"SUPPORT","textChars":7,"textLines":1,"bbox":[72,34,360,22]}
+{"kind":"textbox","id":"sh/872dcvyh","slide":7,"text":"07","textPreview":"07","textChars":2,"textLines":1,"bbox":[1140,34,68,22]}
+{"kind":"shape","id":"sh/z29cf6xk","slide":7,"bbox":[72,672,1136,1]}
+{"kind":"textbox","id":"sh/yh0v61gf","slide":7,"text":"Nguồn: GDD Tổng Hợp — Mahjong × Block (Final Core)","textPreview":"Nguồn: GDD Tổng Hợp — Mahjong × Block (Final Core)","textChars":50,"textLines":1,"bbox":[72,682,620,18]}
+{"kind":"textbox","id":"sh/l4rehgfq","slide":7,"text":"Booster hỗ trợ quyết định, không thay đổi điều kiện thắng","textPreview":"Booster hỗ trợ quyết định, không thay đổi điều kiện thắng","textChars":57,"textLines":1,"bbox":[72,76,760,76]}
+{"kind":"shape","id":"sh/k3id8by5","slide":7,"bbox":[72,164,124,4]}
+{"kind":"textbox","id":"sh/jydwrax4","slide":7,"text":"Đổi khối và Hint cùng dùng kho chung, nhưng Level 1 cố ý khóa chúng để dạy luật cơ bản.","textPreview":"Đổi khối và Hint cùng dùng kho chung, nhưng Level 1 cố ý khóa chúng để dạy luật cơ bản.","textChars":87,"textLines":1,"bbox":[72,182,760,48]}
+{"kind":"shape","id":"sh/wny5032d","slide":7,"bbox":[516,258,566,118]}
+{"kind":"textbox","id":"sh/xo76983i","slide":7,"text":"Đổi khối","textPreview":"Đổi khối","textChars":8,"textLines":1,"bbox":[550,280,190,30]}
+{"kind":"textbox","id":"sh/a1gnytk7","slide":7,"text":"Bỏ Current, đưa khối kế tiếp lên — không tốn lượt đặt.","textPreview":"Bỏ Current, đưa khối kế tiếp lên — không tốn lượt đặt.","textChars":54,"textLines":1,"bbox":[550,320,470,30]}
+{"kind":"shape","id":"sh/b2po7yls","slide":7,"bbox":[516,398,566,118]}
+{"kind":"textbox","id":"sh/ozy5wj21","slide":7,"text":"Hint","textPreview":"Hint","textChars":4,"textLines":1,"bbox":[550,420,190,30]}
+{"kind":"textbox","id":"sh/90765o3m","slide":7,"text":"DFS từ trạng thái live, highlight vị trí đặt tiếp theo — không tốn lượt.","textPreview":"DFS từ trạng thái live, highlight vị trí đặt tiếp theo — không tốn lượt.","textChars":72,"textLines":1,"bbox":[550,460,470,30]}
+{"kind":"textbox","id":"sh/mxwnutkv","slide":7,"text":"Người chơi mới: 5 Đổi khối + 5 Hint trong kho dùng chung.","textPreview":"Người chơi mới: 5 Đổi khối + 5 Hint trong kho dùng chung.","textChars":57,"textLines":1,"bbox":[516,548,540,32]}
+{"kind":"image","id":"im/3edkzudk","slide":7,"name":"","geometry":"roundRect","alt":"Product UI screenshot","bbox":[72,230,372,388]}
+{"kind":"notes","id":"nt/f4efre","slide":7,"text":"[Sources]\n- Final/07-GDD-TONG-HOP-TU-INDEX.md, mục 2.5 và 7.2\n- Figma UI Export/07_shop_upgrades.png"}
+{"kind":"slide","id":"sl/u1chwf","slide":8,"title":"ENGAGEMENT","textShapes":9}
+{"kind":"shape","id":"sh/uxofmtsb","slide":8,"bbox":[0,0,1280,18]}
+{"kind":"textbox","id":"sh/hkfyh8bm","slide":8,"text":"ENGAGEMENT","textPreview":"ENGAGEMENT","textChars":10,"textLines":1,"bbox":[72,34,360,22]}
+{"kind":"textbox","id":"sh/gz6ho3a1","slide":8,"text":"08","textPreview":"08","textChars":2,"textLines":1,"bbox":[1140,34,68,22]}
+{"kind":"shape","id":"sh/7udgbytk","slide":8,"bbox":[72,672,1136,1]}
+{"kind":"textbox","id":"sh/6t4fitcz","slide":8,"text":"Nguồn: GDD Tổng Hợp — Mahjong × Block (Final Core)","textPreview":"Nguồn: GDD Tổng Hợp — Mahjong × Block (Final Core)","textChars":50,"textLines":1,"bbox":[72,682,620,18]}
+{"kind":"textbox","id":"sh/twvyd8bq","slide":8,"text":"Vòng lặp hằng ngày đặt trên core loop thay vì thay thế nó","textPreview":"Vòng lặp hằng ngày đặt trên core loop thay vì thay thế nó","textChars":57,"textLines":1,"bbox":[72,76,760,76]}
+{"kind":"shape","id":"sh/8vmxk3u5","slide":8,"bbox":[72,164,124,4]}
+{"kind":"textbox","id":"sh/zqdg7et8","slide":8,"text":"Quest và điểm danh tái sử dụng Xu / booster, không có kho tài nguyên riêng.","textPreview":"Quest và điểm danh tái sử dụng Xu / booster, không có kho tài nguyên riêng.","textChars":75,"textLines":1,"bbox":[72,182,760,48]}
+{"kind":"shape","id":"sh/9wfm5ofu","slide":8,"bbox":[862,254,274,154]}
+{"kind":"textbox","id":"sh/mtonu9gj","slide":8,"text":"3 / 6","textPreview":"3 / 6","textChars":5,"textLines":1,"bbox":[892,282,210,42]}
+{"kind":"textbox","id":"sh/nux43exo","slide":8,"text":"nhiệm vụ được chọn xác định theo ngày","textPreview":"nhiệm vụ được chọn xác định theo ngày","textChars":37,"textLines":1,"bbox":[892,330,210,48]}
+{"kind":"shape","id":"sh/07m5szyd","slide":8,"bbox":[862,428,274,154]}
+{"kind":"textbox","id":"sh/lsvm14fy","slide":8,"text":"30 ngày","textPreview":"30 ngày","textChars":7,"textLines":1,"bbox":[892,456,210,42]}
+{"kind":"textbox","id":"sh/y54nq9g7","slide":8,"text":"điểm danh cộng dồn, không phạt khi bỏ lỡ","textPreview":"điểm danh cộng dồn, không phạt khi bỏ lỡ","textChars":40,"textLines":1,"bbox":[892,504,210,48]}
+{"kind":"image","id":"im/fed076p0","slide":8,"name":"","geometry":"roundRect","alt":"Product UI screenshot","bbox":[88,242,338,344]}
+{"kind":"image","id":"im/fy543aps","slide":8,"name":"","geometry":"roundRect","alt":"Product UI screenshot","bbox":[476,242,338,344]}
+{"kind":"notes","id":"nt/u1chwf","slide":8,"text":"[Sources]\n- Final/07-GDD-TONG-HOP-TU-INDEX.md, mục 8\n- Figma UI Export/10_quest_tab.png\n- Figma UI Export/11_checkin_tab.png"}
+{"kind":"slide","id":"sl/rh1kt3","slide":9,"title":"ECONOMY","textShapes":11}
+{"kind":"shape","id":"sh/rypcr25s","slide":9,"bbox":[0,0,1280,18]}
+{"kind":"textbox","id":"sh/szyd07md","slide":9,"text":"ECONOMY","textPreview":"ECONOMY","textChars":7,"textLines":1,"bbox":[72,34,360,22]}
+{"kind":"textbox","id":"sh/t07utcny","slide":9,"text":"09","textPreview":"09","textChars":2,"textLines":1,"bbox":[1140,34,68,22]}
+{"kind":"shape","id":"sh/el0v2x43","slide":9,"bbox":[72,672,1136,1]}
+{"kind":"textbox","id":"sh/fm9cv25o","slide":9,"text":"Nguồn: GDD Tổng Hợp — Mahjong × Block (Final Core)","textPreview":"Nguồn: GDD Tổng Hợp — Mahjong × Block (Final Core)","textChars":50,"textLines":1,"bbox":[72,682,620,18]}
+{"kind":"textbox","id":"sh/0nid47m9","slide":9,"text":"Economy thiên về cosmetic, với booster là một sink cần được cân nhắc","textPreview":"Economy thiên về cosmetic, với booster là một sink cần được cân nhắc","textChars":68,"textLines":1,"bbox":[72,76,760,76]}
+{"kind":"shape","id":"sh/1oruxcnu","slide":9,"bbox":[72,164,124,4]}
+{"kind":"textbox","id":"sh/2p0v6h4f","slide":9,"text":"GDD quy định economy không được chỉnh luật thắng / thua của core loop.","textPreview":"GDD quy định economy không được chỉnh luật thắng / thua của core loop.","textChars":70,"textLines":1,"bbox":[72,182,760,48]}
+{"kind":"shape","id":"sh/zulsn65c","slide":9,"bbox":[72,258,586,108]}
+{"kind":"textbox","id":"sh/etcbu147","slide":9,"text":"12 skin quân bài","textPreview":"12 skin quân bài","textChars":16,"textLines":1,"bbox":[108,280,250,30]}
+{"kind":"textbox","id":"sh/1w3apwni","slide":9,"text":"0–2.265 Xu; skin mặc định miễn phí.","textPreview":"0–2.265 Xu; skin mặc định miễn phí.","textChars":35,"textLines":1,"bbox":[108,322,430,20]}
+{"kind":"shape","id":"sh/0vutwrmx","slide":9,"bbox":[72,388,586,108]}
+{"kind":"textbox","id":"sh/rq1sjm5g","slide":9,"text":"11 skin bàn cờ","textPreview":"11 skin bàn cờ","textChars":14,"textLines":1,"bbox":[108,410,250,30]}
+{"kind":"textbox","id":"sh/qpsbqh4v","slide":9,"text":"0–2.150 Xu; toàn bộ là cosmetic.","textPreview":"0–2.150 Xu; toàn bộ là cosmetic.","textChars":32,"textLines":1,"bbox":[108,452,430,20]}
+{"kind":"shape","id":"sh/ds3alwnm","slide":9,"bbox":[72,518,586,108]}
+{"kind":"textbox","id":"sh/crutsrm1","slide":9,"text":"Gói 5 booster","textPreview":"Gói 5 booster","textChars":13,"textLines":1,"bbox":[108,540,250,30]}
+{"kind":"textbox","id":"sh/vm5cvqlk","slide":9,"text":"100 Xu / gói; là điểm còn cần quyết định về ưu tiên core versus buff phụ.","textPreview":"100 Xu / gói; là điểm còn cần quyết định về ưu tiên core versus buff phụ.","textChars":73,"textLines":1,"bbox":[108,582,480,20]}
+{"kind":"image","id":"im/6loze9kr","slide":9,"name":"","geometry":"roundRect","alt":"Product UI screenshot","bbox":[742,204,352,420]}
+{"kind":"notes","id":"nt/rh1kt3","slide":9,"text":"[Sources]\n- Final/07-GDD-TONG-HOP-TU-INDEX.md, mục 7 và 12\n- Figma UI Export/06_shop_tiles.png"}
+{"kind":"slide","id":"sl/np6rce","slide":10,"title":"READINESS","textShapes":18}
+{"kind":"shape","id":"sh/sfeds32x","slide":10,"bbox":[0,0,1280,18]}
+{"kind":"textbox","id":"sh/re5wzylc","slide":10,"text":"READINESS","textPreview":"READINESS","textChars":9,"textLines":1,"bbox":[72,34,360,22]}
+{"kind":"textbox","id":"sh/6dwvqtk7","slide":10,"text":"10","textPreview":"10","textChars":2,"textLines":1,"bbox":[1140,34,68,22]}
+{"kind":"shape","id":"sh/147e5s3u","slide":10,"bbox":[72,672,1136,1]}
+{"kind":"textbox","id":"sh/g3edwn29","slide":10,"text":"Nguồn: GDD Tổng Hợp — Mahjong × Block (Final Core)","textPreview":"Nguồn: GDD Tổng Hợp — Mahjong × Block (Final Core)","textChars":50,"textLines":1,"bbox":[72,682,620,18]}
+{"kind":"textbox","id":"sh/f25w3ilo","slide":10,"text":"Nội dung deterministic đã có “lan can” kỹ thuật; rủi ro chính còn là trải nghiệm thật","textPreview":"Nội dung deterministic đã có “lan can” kỹ thuật; rủi ro chính còn là trải nghiệm thật","textChars":85,"textLines":1,"bbox":[72,76,760,76]}
+{"kind":"shape","id":"sh/e1wvudk3","slide":10,"bbox":[72,164,124,4]}
+{"kind":"textbox","id":"sh/p87e9s3q","slide":10,"text":"Mỗi lần tải, self-test kiểm tra luật, dữ liệu và lời giải authored.","textPreview":"Mỗi lần tải, self-test kiểm tra luật, dữ liệu và lời giải authored.","textChars":67,"textLines":1,"bbox":[72,182,760,48]}
+{"kind":"shape","id":"sh/o7yx0n25","slide":10,"bbox":[72,254,506,140]}
+{"kind":"textbox","id":"sh/q5wr6h8f","slide":10,"text":"✓","textPreview":"✓","textChars":1,"textLines":1,"bbox":[100,284,42,42]}
+{"kind":"textbox","id":"sh/r658zm90","slide":10,"text":"50 / 50","textPreview":"50 / 50","textChars":7,"textLines":1,"bbox":[164,280,324,34]}
+{"kind":"textbox","id":"sh/c7e98rql","slide":10,"text":"level có lời giải authored đạt điều kiện thắng dưới luật hiện tại.","textPreview":"level có lời giải authored đạt điều kiện thắng dưới luật hiện tại.","textChars":66,"textLines":1,"bbox":[164,324,354,48]}
+{"kind":"shape","id":"sh/d87q1wrq","slide":10,"bbox":[626,254,506,140]}
+{"kind":"textbox","id":"sh/e9gra18b","slide":10,"text":"✓","textPreview":"✓","textChars":1,"textLines":1,"bbox":[654,284,42,42]}
+{"kind":"textbox","id":"sh/zap8369w","slide":10,"text":"2–5 ô","textPreview":"2–5 ô","textChars":5,"textLines":1,"bbox":[718,280,324,34]}
+{"kind":"textbox","id":"sh/0by9crqh","slide":10,"text":"mọi khối chính thức hợp lệ; tránh tự-Match ngoài ngoại lệ Level 1.","textPreview":"mọi khối chính thức hợp lệ; tránh tự-Match ngoài ngoại lệ Level 1.","textChars":66,"textLines":1,"bbox":[718,324,354,48]}
+{"kind":"shape","id":"sh/1c7q5wr2","slide":10,"bbox":[72,430,506,140]}
+{"kind":"textbox","id":"sh/udc7yx87","slide":10,"text":"!","textPreview":"!","textChars":1,"textLines":1,"bbox":[100,460,42,42]}
+{"kind":"textbox","id":"sh/fel8r29s","slide":10,"text":"~6,85 MB","textPreview":"~6,85 MB","textChars":8,"textLines":1,"bbox":[164,456,324,34]}
+{"kind":"textbox","id":"sh/ji1ozypk","slide":10,"text":"HTML tự chứa; cần đo độ mượt trên thiết bị yếu bằng playtest thật.","textPreview":"HTML tự chứa; cần đo độ mượt trên thiết bị yếu bằng playtest thật.","textChars":66,"textLines":1,"bbox":[164,500,354,48]}
+{"kind":"shape","id":"sh/ihsn6toz","slide":10,"bbox":[626,430,506,140]}
+{"kind":"textbox","id":"sh/5kj6187q","slide":10,"text":"!","textPreview":"!","textChars":1,"textLines":1,"bbox":[654,460,42,42]}
+{"kind":"textbox","id":"sh/kja58365","slide":10,"text":"Nợ kỹ thuật","textPreview":"Nợ kỹ thuật","textChars":11,"textLines":1,"bbox":[718,456,324,34]}
+{"kind":"textbox","id":"sh/vehovyp8","slide":10,"text":"prototype tầng 1 vẫn còn trong file và cần refactor rủi ro cao.","textPreview":"prototype tầng 1 vẫn còn trong file và cần refactor rủi ro cao.","textChars":63,"textLines":1,"bbox":[718,500,354,48]}
+{"kind":"textbox","id":"sh/at8n2to3","slide":10,"text":"Chế độ generative mới qua mô phỏng bot, chưa qua playtest người thật.","textPreview":"Chế độ generative mới qua mô phỏng bot, chưa qua playtest người thật.","textChars":69,"textLines":1,"bbox":[72,594,1036,30]}
+{"kind":"notes","id":"nt/np6rce","slide":10,"text":"[Sources]\n- Final/07-GDD-TONG-HOP-TU-INDEX.md, mục 6, 11.1, 11.3 và 12"}
+{"kind":"slide","id":"sl/ap8rlv","slide":11,"title":"Quyết định tiếp theo","textShapes":5}
+{"kind":"shape","id":"sh/ux8zipk7","slide":11,"bbox":[0,0,920,720]}
+{"kind":"shape","id":"sh/vyh0ru1s","slide":11,"bbox":[72,92,142,5]}
+{"kind":"textbox","id":"sh/8vqhgz2h","slide":11,"text":"Quyết định tiếp theo","textPreview":"Quyết định tiếp theo","textChars":20,"textLines":1,"bbox":[72,130,650,58]}
+{"kind":"shape","id":"sh/twzip4jm","slide":11,"bbox":[72,244,660,76]}
+{"kind":"textbox","id":"sh/6t8zepkb","slide":11,"text":"01  Chạy playtest người thật, ưu tiên thiết bị yếu.","textPreview":"01  Chạy playtest người thật, ưu tiên thiết bị yếu.","textChars":51,"textLines":1,"bbox":[102,262,590,40]}
+{"kind":"shape","id":"sh/7uhgnu1w","slide":11,"bbox":[72,354,660,76]}
+{"kind":"textbox","id":"sh/sruhsj2l","slide":11,"text":"02  Quyết định giữ hay đưa generative mode vào bản chính thức.","textPreview":"02  Quyết định giữ hay đưa generative mode vào bản chính thức.","textChars":62,"textLines":1,"bbox":[102,372,590,40]}
+{"kind":"shape","id":"sh/ds3i1oj6","slide":11,"bbox":[72,464,660,76]}
+{"kind":"textbox","id":"sh/ts76ts7e","slide":11,"text":"03  Đối chiếu booster-upgrade với định hướng ưu tiên core gameplay.","textPreview":"03  Đối chiếu booster-upgrade với định hướng ưu tiên core gameplay.","textChars":67,"textLines":1,"bbox":[102,482,590,40]}
+{"kind":"textbox","id":"sh/8ryp0nqt","slide":11,"text":"Mahjong × Block đã có một core loop khác biệt, curriculum 50 màn và vòng lặp hỗ trợ được định nghĩa rõ; bước tiếp theo là kiểm chứng cảm nhận người chơi.","textPreview":"Mahjong × Block đã có một core loop khác biệt, curriculum 50 màn và vòng lặp hỗ trợ được định nghĩa rõ; bước tiếp theo là kiểm chứng cảm ...","textChars":153,"textLines":1,"bbox":[72,588,650,58]}
+{"kind":"image","id":"im/czu1s3yl","slide":11,"name":"","geometry":"roundRect","alt":"Product UI screenshot","bbox":[842,0,438,720]}
+{"kind":"notes","id":"nt/ap8rlv","slide":11,"text":"[Sources]\n- Final/07-GDD-TONG-HOP-TU-INDEX.md, mục 6 và 12\n- Figma UI Export/01_menu_gate_closed.png"}

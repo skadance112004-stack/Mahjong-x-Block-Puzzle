@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Khay Tiêu Hóa: Bộ Lớn — Mahjong × Block (prototype 23)</title>
+<style>
+:root{
+  --wood:#2b1d16; --wood2:#3d2a20; --felt:#14342b; --felt2:#0d241d;
+  --cream:#f6ecd8; --cream2:#e6d7ba; --ink:#2a2018;
+  --gold:#e8b64c; --jade:#4ec98a; --danger:#ff5d51; --blue:#4a9fe0; --red:#e0553f; --green:#3fae6a;
+  --cell:34px;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  background:
+    radial-gradient(120% 80% at 50% -10%, #5a3d2c 0%, var(--wood) 55%, #1b120d 100%);
+  color:var(--cream); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  overscroll-behavior:none; touch-action:manipulation; user-select:none;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-height:100%; padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+}
+#app{width:100%; max-width:440px; display:flex; flex-direction:column; gap:7px; padding:8px 10px 12px;}
+
+/* ---------- HUD ---------- */
+#hud{display:flex; align-items:center; gap:8px;}
+.hud-box{flex:1; background:rgba(0,0,0,.28); border:1px solid rgba(232,182,76,.22); border-radius:10px; padding:5px 8px;}
+.hud-lab{font-size:9px; letter-spacing:.12em; text-transform:uppercase; opacity:.55;}
+.hud-val{font-size:16px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1.15;}
+.hud-val small{font-size:11px; font-weight:600; opacity:.6;}
+#goalbar{height:4px; background:rgba(255,255,255,.12); border-radius:3px; margin-top:3px; overflow:hidden;}
+#goalfill{height:100%; width:0%; background:linear-gradient(90deg,var(--jade),var(--gold)); transition:width .3s;}
+#btn-help{width:34px;height:34px;flex:none;border-radius:10px;background:rgba(0,0,0,.28);border:1px solid rgba(232,182,76,.22);color:var(--cream);font-size:15px;font-weight:700;}
+
+/* ---------- KHAY ---------- */
+#khay-wrap{
+  background:linear-gradient(180deg,#432e22,#2e2018);
+  border:1px solid rgba(232,182,76,.3); border-radius:14px; padding:7px 8px 8px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07), 0 4px 14px rgba(0,0,0,.4);
+  position:relative; transition:box-shadow .2s, border-color .2s;
+}
+#khay-wrap.warn{border-color:rgba(255,93,81,.65); box-shadow:inset 0 1px 0 rgba(255,255,255,.07), 0 0 20px rgba(255,93,81,.35);}
+#khay-wrap.warn #khay-title b{color:var(--danger);}
+#khay-wrap.shake{animation:shake .34s;}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+#khay-title{display:flex; align-items:baseline; gap:6px; font-size:10px; letter-spacing:.14em; text-transform:uppercase; opacity:.75; margin-bottom:5px;}
+#khay-title b{font-size:11px; letter-spacing:0; opacity:1; color:var(--gold);}
+#forecast{margin-left:auto; font-size:10.5px; letter-spacing:0; text-transform:none; font-weight:700; opacity:0; transition:opacity .12s;}
+#forecast.on{opacity:1;}
+#forecast.bad{color:var(--danger);}
+#forecast.ok{color:var(--jade);}
+#khay{display:flex; gap:4px; justify-content:center;}
+.slot{
+  flex:1 1 0; max-width:46px; aspect-ratio:.78; border-radius:7px;
+  background:rgba(0,0,0,.32); border:1px dashed rgba(246,236,216,.16);
+  display:flex; align-items:center; justify-content:center; position:relative;
+}
+.slot.filled{border-style:solid; border-color:transparent; background:transparent;}
+.slot.last{border-color:rgba(255,93,81,.5); background:rgba(255,93,81,.08);}
+.slot .tile{width:100%; height:100%;}
+.slot .ghostres{opacity:.34; filter:grayscale(.3);}
+.slot.popping{animation:popslot .38s ease-out;}
+@keyframes popslot{0%{transform:scale(1)}35%{transform:scale(1.3); filter:brightness(1.9)}100%{transform:scale(0); opacity:0}}
+.slot.popping.big{animation:popslotbig .46s ease-out;}
+@keyframes popslotbig{0%{transform:scale(1)}35%{transform:scale(1.6); filter:brightness(2.5)}100%{transform:scale(0); opacity:0}}
+
+/* ---------- BOARD ---------- */
+#board-wrap{position:relative; width:100%; display:flex; justify-content:center;}
+#board{
+  width:min(100%, 54vh); flex:none;
+  display:grid; gap:3px; padding:6px; border-radius:14px;
+  background:linear-gradient(160deg,var(--felt),var(--felt2));
+  border:1px solid rgba(232,182,76,.22);
+  box-shadow:inset 0 2px 10px rgba(0,0,0,.5), 0 6px 18px rgba(0,0,0,.35);
+}
+.cell{aspect-ratio:1; border-radius:6px; background:rgba(0,0,0,.22); box-shadow:inset 0 0 0 1px rgba(255,255,255,.035); position:relative;}
+.cell.ghost{background:rgba(232,182,76,.2); box-shadow:inset 0 0 0 2px rgba(232,182,76,.75);}
+.cell.ghostbad{background:rgba(255,93,81,.2); box-shadow:inset 0 0 0 2px rgba(255,93,81,.8);}
+.cell.lineon::after,.cell.linebad::after{content:''; position:absolute; inset:0; border-radius:6px; pointer-events:none; z-index:3;}
+.cell.lineon::after{box-shadow:inset 0 0 0 2px rgba(78,201,138,.95); background:rgba(78,201,138,.26);}
+.cell.linebad::after{box-shadow:inset 0 0 0 2px rgba(255,93,81,1); background:rgba(255,93,81,.34);}
+.cell.flash{animation:flash .22s ease-out;}
+@keyframes flash{0%{filter:brightness(1)}45%{filter:brightness(2.6)}100%{filter:brightness(1)}}
+.cell .tile{position:absolute; inset:0;}
+.cell .tile.drop{animation:drop .19s cubic-bezier(.3,1.5,.5,1);}
+@keyframes drop{0%{transform:scale(.55) translateY(-8px); opacity:.3}100%{transform:scale(1) translateY(0); opacity:1}}
+.ghosttile{opacity:.5;}
+
+/* ---------- TILE ART ---------- */
+.tile{border-radius:6px; background:linear-gradient(170deg,#fdf6e6 0%,var(--cream) 40%,var(--cream2) 100%);
+  box-shadow:inset 0 -2px 0 rgba(0,0,0,.16), inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.35);
+  display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative;}
+.tile svg{width:88%; height:88%; display:block;}
+.tile .rk{position:absolute; top:1px; left:2.5px; font-size:8px; font-weight:800; line-height:1; opacity:.62;}
+.tile.s .rk{color:var(--green)} .tile.c .rk{color:var(--blue)} .tile.w .rk{color:var(--red)} .tile.h .rk{color:#b3862a}
+.tile.h{background:linear-gradient(170deg,#fff6dd,#f2dfab 100%);}
+
+/* ---------- TRAY ---------- */
+#tray-wrap{background:rgba(0,0,0,.24); border:1px solid rgba(232,182,76,.18); border-radius:14px; padding:8px;}
+#tray{display:flex; gap:6px; align-items:center; justify-content:space-around; min-height:74px;}
+.piece{flex:1; display:flex; align-items:center; justify-content:center; padding:5px 2px; border-radius:10px; position:relative; transition:transform .12s, background .12s;}
+.piece.sel{background:rgba(232,182,76,.15); box-shadow:inset 0 0 0 2px rgba(232,182,76,.6); transform:translateY(-3px);}
+.piece.used{opacity:.16; pointer-events:none;}
+.pgrid{display:grid; gap:2px;}
+.pgrid .tile{width:26px; height:32px;}
+#tools{display:flex; gap:6px; margin-top:7px;}
+.tool{flex:1; padding:8px 4px; border-radius:10px; border:1px solid rgba(232,182,76,.28); background:rgba(0,0,0,.3);
+  color:var(--cream); font-size:11.5px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:5px;}
+.tool:disabled{opacity:.3;}
+.tool.armed{background:rgba(255,93,81,.22); border-color:var(--danger); color:#ffd9d5;}
+.tool b{color:var(--gold); font-variant-numeric:tabular-nums;}
+
+/* ---------- FLOATING ---------- */
+.fly{position:fixed; z-index:60; pointer-events:none;}
+#dragghost{position:fixed; z-index:70; pointer-events:none; opacity:.92; filter:drop-shadow(0 6px 10px rgba(0,0,0,.5));}
+#dragghost .pgrid{gap:3px;}
+.float{position:fixed; z-index:80; pointer-events:none; font-weight:900; font-size:17px; color:var(--gold);
+  text-shadow:0 2px 6px rgba(0,0,0,.8); animation:floatup 1s ease-out forwards;}
+@keyframes floatup{0%{transform:translate(-50%,0) scale(.7); opacity:0}25%{transform:translate(-50%,-12px) scale(1.15); opacity:1}100%{transform:translate(-50%,-46px) scale(1); opacity:0}}
+.spark{position:fixed; z-index:75; width:6px; height:6px; border-radius:50%; pointer-events:none;}
+
+/* ---------- OVERLAY ---------- */
+#ov{position:fixed; inset:0; z-index:100; background:rgba(12,8,6,.86); backdrop-filter:blur(3px);
+  display:none; align-items:center; justify-content:center; padding:18px;}
+#ov.on{display:flex;}
+#ovcard{width:100%; max-width:360px; background:linear-gradient(170deg,#3d2a20,#241812); border:1px solid rgba(232,182,76,.35);
+  border-radius:16px; padding:18px; box-shadow:0 20px 50px rgba(0,0,0,.6); max-height:86vh; overflow:auto;}
+#ovcard h2{margin:0 0 4px; font-size:20px; color:var(--gold);}
+#ovcard .sub{font-size:12px; opacity:.7; margin-bottom:12px;}
+#ovcard p{font-size:13px; line-height:1.55; margin:0 0 9px;}
+#ovcard ul{font-size:12.5px; line-height:1.6; padding-left:17px; margin:0 0 10px;}
+#ovcard .hl{color:var(--gold); font-weight:700;}
+#ovcard .dg{color:var(--danger); font-weight:700;}
+.btn{width:100%; padding:12px; border-radius:11px; border:0; font-size:14px; font-weight:800;
+  background:linear-gradient(180deg,var(--gold),#c8912e); color:#2a1d0b; margin-top:6px;}
+.btn.ghost{background:rgba(255,255,255,.09); color:var(--cream); border:1px solid rgba(255,255,255,.16);}
+.demo{display:flex; gap:4px; justify-content:center; margin:8px 0 12px;}
+.demo .tile{width:30px;height:38px;}
+.demo .arw{align-self:center; opacity:.6; font-size:16px; padding:0 3px;}
+#toast{position:absolute; left:50%; bottom:10px; transform:translateX(-50%); z-index:90; background:rgba(20,14,10,.95);
+  border:1px solid rgba(232,182,76,.4); color:var(--cream); padding:9px 14px; border-radius:10px; font-size:12.5px;
+  width:max-content; max-width:90%; text-align:center; opacity:0; transition:opacity .25s, transform .25s; pointer-events:none;}
+#toast.on{opacity:1; transform:translateX(-50%) translateY(-4px);}
+.foot{text-align:center; font-size:9.5px; opacity:.32; letter-spacing:.05em;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div class="hud-box"><div class="hud-lab">Màn</div><div class="hud-val" id="h-lv">1<small>/8</small></div></div>
+    <div class="hud-box"><div class="hud-lab">Điểm</div><div class="hud-val" id="h-sc">0</div></div>
+    <div class="hud-box"><div class="hud-lab">Bộ đã nổ</div><div class="hud-val" id="h-gl">0<small>/4</small></div><div id="goalbar"><div id="goalfill"></div></div></div>
+    <button id="btn-help">?</button>
+  </div>
+
+  <div id="khay-wrap">
+    <div id="khay-title">Khay chờ <b id="h-cap">0/9</b><span id="forecast"></span></div>
+    <div id="khay"></div>
+  </div>
+
+  <div id="board-wrap"><div id="board"></div><div id="toast"></div></div>
+
+  <div id="tray-wrap">
+    <div id="tray"></div>
+    <div id="tools">
+      <button class="tool" id="t-reroll">🔄 Đổi khối <b id="n-reroll">2</b></button>
+      <button class="tool" id="t-flush">✋ Xả 1 quân <b id="n-flush">2</b></button>
+    </div>
+  </div>
+  <div class="foot">PROTOTYPE 23 · KHAY TIÊU HÓA: BỘ LỚN · hook test</div>
+</div>
+
+<div id="ov"><div id="ovcard"></div></div>
+
+<script>
+"use strict";
+/* =========================================================================
+   KHAY TIÊU HÓA: BỘ LỚN — Mahjong × Block hybrid, hook prototype
+   Bản nối tiếp của prototype 11, theo 2 phản hồi liên tiếp:
+   1) Bỏ Sảnh (Chow) hoàn toàn — không còn luật "3 quân liên tiếp cùng chất".
+      Chỉ còn đúng 1 khái niệm: BỘ (nhiều quân giống nhau).
+   2) BỘ giờ nhận diện được cả kích cỡ 4 và 5 (không chỉ 3) — nếu khay đang
+      có sẵn 4 hoặc 5 quân cùng id, nổ hết cả bộ đó một lần, thưởng điểm
+      leo thang mạnh hơn hẳn (120 → 220 → 360), thay vì luôn vội nổ đúng 3
+      con đầu tiên và bỏ phí phần dư.
+   HOOK gốc (giữ nguyên): Đóng hàng KHÔNG làm quân bốc hơi — quân bay vào
+   KHAY; khay đầy = THUA. "Có nên đóng hàng này không?" vẫn là quyết định
+   trung tâm — giờ thêm cả "có nên chờ bộ lớn hơn không?" vì quân được nạp
+   HẾT vào khay trước khi mới bắt đầu quét-và-nổ (không nổ vội giữa chừng).
+   ========================================================================= */
+
+/* ------------------------- LEVELS (đường cong dạy) ------------------------ */
+/* Giữ nguyên toàn bộ trục số (size/suits/maxRank/honors/cap/goal/maxCells/
+   rig/intake/rr/fl) từ prototype 11 — chỉ sửa lời dạy ở các màn từng nói về
+   Sảnh, vì luật đó không còn tồn tại. Đường cong khó CHƯA được retune lại
+   riêng cho bộ-4/5; đây là việc để làm sau khi có dữ liệu playtest. */
+const LEVELS = [
+ {size:6, suits:['s'],          maxRank:5, honors:0, cap:9, goal:4,  maxCells:3, rig:.72, intake:6, rr:2, fl:2,
+  title:'Quân không bốc hơi',   teach:'Đóng đủ một hàng → quân <b class="hl">bay vào KHAY</b>, không mất đi.<br><b class="hl">3 quân giống nhau</b> trong khay sẽ NỔ (Phỗng).'},
+ {size:6, suits:['s'],          maxRank:7, honors:0, cap:9, goal:5,  maxCells:3, rig:.68, intake:6, rr:2, fl:2,
+  title:'Bộ Lớn',               teach:'Nếu khay có sẵn <b class="hl">4 hoặc 5 quân giống nhau</b> cùng lúc, nổ hết cả bộ một lần — thưởng cao hơn nhiều so với chỉ 3.'},
+ {size:6, suits:['s','c'],      maxRank:5, honors:0, cap:9, goal:5,  maxCells:4, rig:.64, intake:6, rr:2, fl:2,
+  title:'Hai chất',             teach:'Thêm chất <b class="hl">Văn (xanh)</b> — quân đa dạng hơn, bộ 4-5 sẽ hiếm gặp hơn một chút.'},
+ {size:6, suits:['s','c'],      maxRank:7, honors:0, cap:8, goal:6,  maxCells:4, rig:.60, intake:6, rr:3, fl:2,
+  title:'Khay hẹp lại',         teach:'Nhiều quân khác nhau hơn, khay chỉ còn <b class="dg">8 ô</b>.<br>Bắt đầu phải <b class="hl">chọn hàng nào nên đóng</b>.'},
+ {size:7, suits:['s','c'],      maxRank:7, honors:0, cap:8, goal:6,  maxCells:4, rig:.58, intake:6, rr:3, fl:2,
+  title:'Bàn rộng, hàng dài',   teach:'Bàn 7×7 → một hàng có <b class="dg">7 quân</b>. Khay chỉ nhận <b>6 quân</b>/lượt, quân dư bay đi.'},
+ {size:7, suits:['s','c'],      maxRank:9, honors:0, cap:8, goal:7,  maxCells:4, rig:.55, intake:6, rr:3, fl:3,
+  title:'Đủ 9 số',              teach:'Mỗi chất đủ 1→9. Hàng ngẫu nhiên gần như không tự tiêu hóa nữa — phải <b class="hl">xếp hàng có chủ đích</b>.'},
+ {size:7, suits:['s','c','w'],  maxRank:5, honors:3, cap:8, goal:6,  maxCells:4, rig:.58, intake:6, rr:3, fl:3,
+  title:'Quân chữ',             teach:'Thêm chất <b class="hl">Vạn (đỏ)</b> và <b class="hl">quân chữ (vàng)</b>.<br>Quân chữ cũng tính vào bộ 3-4-5 như mọi chất khác. Lẻ một con là rác.<br><span style="opacity:.7">Bù lại: mỗi chất chỉ còn 1→5.</span>'},
+ {size:8, suits:['s','c','w'],  maxRank:6, honors:3, cap:9, goal:8,  maxCells:4, rig:.54, intake:7, rr:3, fl:3,
+  title:'Màn cuối bản test',    teach:'Bàn 8×8, hàng <b class="dg">8 quân</b> — nên khay được nới lên <b class="hl">9 ô</b>.<br>Không có luật mới; chỉ là mọi thứ cùng lúc.'},
+];
+
+const SUIT_NAME = {s:'Sách', c:'Văn', w:'Vạn', h:'Chữ'};
+const HONOR_LAB = ['中','發','白'];
+
+/* ------------------------------ SHAPES ---------------------------------- */
+const SHAPES = [
+  [[0,0]],
+  [[0,0],[0,1]], [[0,0],[1,0]],
+  [[0,0],[0,1],[0,2]], [[0,0],[1,0],[2,0]],
+  [[0,0],[0,1],[1,0]], [[0,0],[0,1],[1,1]], [[0,0],[1,0],[1,1]], [[0,1],[1,0],[1,1]],
+  [[0,0],[0,1],[1,0],[1,1]],
+  [[0,0],[0,1],[0,2],[0,3]], [[0,0],[1,0],[2,0],[3,0]],
+  [[0,0],[0,1],[0,2],[1,1]], [[0,1],[1,0],[1,1],[1,2]],
+  [[0,0],[1,0],[1,1],[1,2]], [[0,2],[1,0],[1,1],[1,2]],
+  [[0,0],[0,1],[1,1],[1,2]], [[0,1],[0,2],[1,0],[1,1]],
+];
+
+/* ------------------------------ STATE ----------------------------------- */
+const S = {
+  lv:0, cfg:null, size:6, board:[], khay:[], tray:[], sel:-1, prev:null,
+  score:0, melds:0, rerolls:2, flushes:2, busy:false, armFlush:false,
+  sound:true, ids:[], placed:0, chainBest:0, fast:false
+};
+
+/* ------------------------------ AUDIO ----------------------------------- */
+let AC=null;
+function ac(){ if(!AC){ try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){AC=false;} } return AC; }
+function beep(f,d,type,vol,slide){
+  if(!S.sound||S.fast) return; const a=ac(); if(!a) return;
+  try{
+    const o=a.createOscillator(), g=a.createGain();
+    o.type=type||'sine'; o.frequency.setValueAtTime(f,a.currentTime);
+    if(slide) o.frequency.exponentialRampToValueAtTime(slide,a.currentTime+d);
+    g.gain.setValueAtTime(0,a.currentTime);
+    g.gain.linearRampToValueAtTime(vol||.12,a.currentTime+.012);
+    g.gain.exponentialRampToValueAtTime(.0008,a.currentTime+d);
+    o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime+d+.02);
+  }catch(e){}
+}
+const sfx={
+  place:()=>beep(320,.07,'triangle',.09,420),
+  line: ()=>beep(180,.16,'sawtooth',.08,90),
+  fly:  ()=>beep(700,.05,'sine',.05,900),
+  pop:  n=>beep(520*Math.pow(1.13,Math.min(n,7)),.2,'triangle',.14,1180),
+  popBig:()=>beep(880,.2,'sine',.13,1300),
+  clean:()=>{beep(760,.1,'sine',.11,1140); setTimeout(()=>beep(1140,.16,'sine',.1,1520),90);},
+  danger:()=>beep(120,.3,'square',.1,70),
+  win:  ()=>{[523,659,784,1047].forEach((f,i)=>setTimeout(()=>beep(f,.22,'triangle',.12),i*95));},
+  lose: ()=>{[330,262,196,147].forEach((f,i)=>setTimeout(()=>beep(f,.3,'sawtooth',.1),i*130));}
+};
+
+/* ------------------------------ TILE ART -------------------------------- */
+const ROWS = {1:[1],2:[2],3:[3],4:[2,2],5:[2,1,2],6:[3,3],7:[2,3,2],8:[3,2,3],9:[3,3,3]};
+function dotsSVG(n,color,round){
+  const rows=ROWS[n]||[n]; const H=rows.length; let out='';
+  const cellH=100/H;
+  rows.forEach((cnt,ri)=>{
+    const cy=cellH*ri+cellH/2;
+    for(let i=0;i<cnt;i++){
+      const cx=100/(cnt+1)*(i+1);
+      const r=Math.min(cellH*.30, 100/(cnt+1)*.42);
+      if(round) out+=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" opacity=".92"/><circle cx="${cx}" cy="${cy}" r="${r*.45}" fill="#fdf6e6" opacity=".55"/>`;
+      else out+=`<rect x="${cx-r*.42}" y="${cy-r*1.05}" width="${r*.84}" height="${r*2.1}" rx="${r*.42}" fill="${color}" opacity=".92"/><rect x="${cx-r*.16}" y="${cy-r*.75}" width="${r*.32}" height="${r*1.5}" fill="#fdf6e6" opacity=".45"/>`;
+    }
+  });
+  return out;
+}
+function honorSVG(k){
+  if(k===1) return '<rect x="20" y="12" width="60" height="76" rx="8" fill="none" stroke="#d33b2c" stroke-width="9"/><rect x="38" y="34" width="24" height="32" rx="3" fill="#d33b2c"/>';
+  if(k===2) return '<path d="M50 10 L86 46 L68 46 L68 90 L32 90 L32 46 L14 46 Z" fill="#2f9e5c"/>';
+  return '<rect x="18" y="12" width="64" height="76" rx="8" fill="none" stroke="#3d7fbf" stroke-width="9"/>';
+}
+function tileHTML(t, extraCls){
+  if(!t) return '';
+  let inner='', cls='tile '+t.suit+(extraCls?' '+extraCls:''), lab=t.rank;
+  if(t.suit==='c') inner=dotsSVG(t.rank,'#3d7fbf',true);
+  else if(t.suit==='s') inner=dotsSVG(t.rank,'#2f9e5c',false);
+  else if(t.suit==='w') inner=`<text x="50" y="63" font-size="60" font-weight="800" text-anchor="middle" fill="#d33b2c" font-family="Georgia,serif">${t.rank}</text><rect x="24" y="76" width="52" height="6" rx="3" fill="#d33b2c" opacity=".8"/><rect x="30" y="15" width="40" height="5" rx="2.5" fill="#d33b2c" opacity=".55"/>`;
+  else { inner=honorSVG(t.rank); lab=HONOR_LAB[t.rank-1]; }
+  return `<div class="${cls}"><span class="rk">${lab}</span><svg viewBox="0 0 100 100">${inner}</svg></div>`;
+}
+
+/* ------------------------------ TILE POOL ------------------------------- */
+function buildIds(cfg){
+  const out=[];
+  cfg.suits.forEach(s=>{ for(let r=1;r<=cfg.maxRank;r++) out.push(s+r); });
+  for(let k=1;k<=cfg.honors;k++) out.push('h'+k);
+  return out;
+}
+const T = id => ({id, suit:id[0], rank:+id.slice(1)});
+
+/* ------------------------------ MELD LOGIC ------------------------------ */
+/* Không còn Sảnh. Chỉ còn BỘ: 3, 4 hoặc 5 quân cùng id. Quá 5 vẫn chỉ nổ
+ * đúng 5 (phần dư ở lại khay) — "bộ 6+" không phải luật của bản này. */
+const MELD_PTS   = {3:120, 4:220, 5:360};
+const MELD_LABEL = {3:'PHỖNG', 4:'KHẠP', 5:'BỘ NĂM'};
+const MELD_COLOR = {3:'#e8b64c', 4:'#4ec98a', 5:'#ff8bd6'};
+/** Tìm bộ LỚN NHẤT hiện có trong khay (ưu tiên kích cỡ lớn hơn, không phải
+ *  id nào xuất hiện trước). Trả về null nếu không có id nào đủ 3 quân. */
+function findBestMeld(k){
+  const byId={};
+  k.forEach((t,i)=>{ (byId[t.id]=byId[t.id]||[]).push(i); });
+  let best=null;
+  for(const id in byId){
+    const idxs=byId[id];
+    if(idxs.length<3) continue;
+    const size=Math.min(idxs.length,5);
+    if(!best || size>best.size) best={idx:idxs.slice(0,size), size, id, pts:MELD_PTS[size]};
+  }
+  return best;
+}
+
+/* ------------------------------ BOARD OPS ------------------------------- */
+function emptyBoard(n){ return Array.from({length:n},()=>Array(n).fill(null)); }
+function cellsOf(shape,r,c){ return shape.map(([dr,dc])=>[r+dr,c+dc]); }
+function fits(board,shape,r,c){
+  const n=board.length;
+  for(const [rr,cc] of cellsOf(shape,r,c)){
+    if(rr<0||cc<0||rr>=n||cc>=n) return false;
+    if(board[rr][cc]) return false;
+  }
+  return true;
+}
+function anyFit(board,piece){
+  const n=board.length;
+  for(let r=0;r<n;r++)for(let c=0;c<n;c++) if(fits(board,piece.shape,r,c)) return true;
+  return false;
+}
+/** hàng/cột đầy → trả về danh sách quân theo thứ tự + set ô */
+function fullLines(board){
+  const n=board.length, lines=[], cells=new Map();
+  for(let r=0;r<n;r++) if(board[r].every(Boolean)){
+    lines.push({type:'row',i:r}); for(let c=0;c<n;c++) cells.set(r+','+c, board[r][c]);
+  }
+  for(let c=0;c<n;c++){
+    let ok=true; for(let r=0;r<n;r++) if(!board[r][c]){ok=false;break;}
+    if(ok){ lines.push({type:'col',i:c}); for(let r=0;r<n;r++) cells.set(r+','+c, board[r][c]); }
+  }
+  return {lines, cells};
+}
+
+/* ---------------------- SIMULATION (forecast: linh hồn của hook) -------- */
+function simulate(r,c,shapeIdx){
+  const piece=S.tray[shapeIdx];
+  if(!piece || piece.used) return {legal:false};
+  if(!fits(S.board,piece.shape,r,c)) return {legal:false};
+  // bàn giả
+  const b=S.board.map(row=>row.slice());
+  cellsOf(piece.shape,r,c).forEach(([rr,cc],i)=>{ b[rr][cc]=piece.tiles[i]; });
+  const {lines,cells}=fullLines(b);
+  const all=[...cells.values()];
+  const cap=intakeCap();
+  const incoming=all.slice(0,cap), evaporated=all.length-incoming.length;
+  // tiêu hóa giả: nạp HẾT quân vào khay giả trước, rồi mới quét-và-nổ bộ lớn nhất mỗi lần
+  let k=S.khay.slice();
+  for(const t of incoming) k.push(t);
+  let melds=0, pts=0, m;
+  while((m=findBestMeld(k))){ melds++; pts+=m.pts; m.idx.slice().sort((a,b)=>b-a).forEach(i=>k.splice(i,1)); }
+  const overflow = k.length>S.cfg.cap;
+  return {legal:true, lines, cells, all, incoming, evaporated, residue:k.length, overflow, melds, pts, piece, cellList:cellsOf(piece.shape,r,c)};
+}
+/** TRỤC MỊN quan trọng nhất: mỗi lượt khay chỉ NHẬN tối đa N quân, phần dư bay đi.
+ *  Cho phép nới/siết độ khó nửa nấc mà không đổi luật. */
+function intakeCap(){ return S.cfg.intake || S.size; }
+
+/* ------------------------------ PIECE GEN ------------------------------- */
+/** Rig tray theo nhu cầu của khay — bài học từ 03-hand-builder.
+ *  Không còn Sảnh nên chỉ còn 1 hướng cần: quân trùng id với thứ đang có
+ *  trong khay (hướng "bộ"), không còn hướng "sảnh" (chuỗi liên tiếp). */
+function needIds(){
+  const need=new Set();
+  S.khay.forEach(t=>need.add(t.id));
+  return [...need].filter(id=>S.ids.includes(id));
+}
+function boardFreq(){
+  const f={}; S.board.forEach(row=>row.forEach(t=>{ if(t) f[t.id]=(f[t.id]||0)+1; })); return f;
+}
+function pickId(need,freq){
+  if(need.length && Math.random()<S.cfg.rig) return need[(Math.random()*need.length)|0];
+  // thiên vị nhẹ về quân đã có trên bàn → hàng dễ tự tiêu hóa hơn
+  const pool=S.ids.slice();
+  Object.keys(freq).forEach(id=>{ if(S.ids.includes(id)) for(let i=0;i<Math.min(freq[id],2);i++) pool.push(id); });
+  return pool[(Math.random()*pool.length)|0];
+}
+function makePiece(){
+  const cand=SHAPES.filter(s=>s.length<=S.cfg.maxCells);
+  const shape=cand[(Math.random()*cand.length)|0];
+  const need=needIds(), freq=boardFreq();
+  let tiles;
+  // đôi khi phát một khối "tự tiêu hóa": toàn quân giống nhau (nuôi bộ lớn)
+  if(shape.length>=3 && Math.random()<S.cfg.rig*0.45){
+    const id=S.ids[(Math.random()*S.ids.length)|0];
+    tiles=shape.map(()=>T(id));
+  }else{
+    tiles=shape.map(()=>T(pickId(need,freq)));
+  }
+  return {shape, tiles, used:false};
+}
+function refillTray(force){
+  if(force || S.tray.every(p=>!p||p.used)) S.tray=[makePiece(),makePiece(),makePiece()];
+}
+
+/* ------------------------------ RENDER ---------------------------------- */
+const $=id=>document.getElementById(id);
+const boardEl=$('board'), khayEl=$('khay'), trayEl=$('tray');
+
+function renderHUD(){
+  $('h-lv').innerHTML=(S.lv+1)+'<small>/'+LEVELS.length+'</small>';
+  $('h-sc').textContent=S.score;
+  $('h-gl').innerHTML=S.melds+'<small>/'+S.cfg.goal+'</small>';
+  $('goalfill').style.width=Math.min(100,S.melds/S.cfg.goal*100)+'%';
+  $('h-cap').textContent=S.khay.length+'/'+S.cfg.cap;
+  $('n-reroll').textContent=S.rerolls; $('n-flush').textContent=S.flushes;
+  $('t-reroll').disabled=S.rerolls<=0||S.busy;
+  $('t-flush').disabled=S.flushes<=0||S.busy||!S.khay.length;
+  $('t-flush').classList.toggle('armed',S.armFlush);
+  $('khay-wrap').classList.toggle('warn', S.khay.length>=S.cfg.cap-1);
+}
+function renderBoard(){
+  boardEl.style.gridTemplateColumns=`repeat(${S.size},1fr)`;
+  let h='';
+  for(let r=0;r<S.size;r++)for(let c=0;c<S.size;c++)
+    h+=`<div class="cell" data-r="${r}" data-c="${c}">${tileHTML(S.board[r][c])}</div>`;
+  boardEl.innerHTML=h;
+}
+/** future = khay sau nước đi đang xem trước. Quân sẽ thay đổi → vẽ mờ.
+ *  Dùng so sánh tham chiếu (future là bản slice của S.khay) nên prefix không đổi hiện rõ. */
+function renderKhay(future){
+  const arr = future || S.khay;
+  let h='';
+  for(let i=0;i<S.cfg.cap;i++){
+    const t=arr[i];
+    const isNew = future ? !(S.khay[i] && future[i]===S.khay[i]) : false;
+    const cls='slot'+(t?' filled':'')+(!t&&i===S.cfg.cap-1?' last':'');
+    h+=`<div class="${cls}" data-i="${i}">${t?tileHTML(t, isNew?'ghostres':''):''}</div>`;
+  }
+  khayEl.innerHTML=h;
+}
+function renderTray(){
+  let h='';
+  S.tray.forEach((p,i)=>{
+    if(!p){ h+='<div class="piece"></div>'; return; }
+    const rows=Math.max(...p.shape.map(s=>s[0]))+1, cols=Math.max(...p.shape.map(s=>s[1]))+1;
+    let g=`<div class="pgrid" style="grid-template-columns:repeat(${cols},1fr);grid-template-rows:repeat(${rows},1fr)">`;
+    const map={}; p.shape.forEach(([dr,dc],k)=>map[dr+','+dc]=p.tiles[k]);
+    for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+      const t=map[r+','+c];
+      g+= t ? tileHTML(t) : '<div style="width:22px;height:28px"></div>';
+    }
+    g+='</div>';
+    h+=`<div class="piece ${p.used?'used':''} ${S.sel===i?'sel':''}" data-i="${i}">${g}</div>`;
+  });
+  trayEl.innerHTML=h;
+}
+function renderAll(){ renderBoard(); renderKhay(); renderTray(); renderHUD(); }
+
+/* ------------------------------ PREVIEW --------------------------------- */
+function clearPreview(){
+  boardEl.querySelectorAll('.cell').forEach(e=>e.classList.remove('ghost','ghostbad','lineon','linebad'));
+  boardEl.querySelectorAll('.ghosttile').forEach(e=>e.remove());
+  $('forecast').className=''; $('forecast').textContent='';
+  renderKhay();
+}
+function showPreview(r,c,i){
+  clearPreview();
+  const sim=simulate(r,c,i);
+  if(!sim.legal){ S.prev=null; return; }
+  S.prev={r,c,i,sim};
+  const bad=sim.overflow;
+  sim.cellList.forEach(([rr,cc],k)=>{
+    const el=boardEl.querySelector(`.cell[data-r="${rr}"][data-c="${cc}"]`);
+    if(!el) return;
+    el.classList.add(bad?'ghostbad':'ghost');
+    el.insertAdjacentHTML('beforeend', tileHTML(sim.piece.tiles[k],'ghosttile'));
+  });
+  if(sim.lines.length){
+    sim.cells.forEach((_t,key)=>{
+      const [rr,cc]=key.split(',');
+      const el=boardEl.querySelector(`.cell[data-r="${rr}"][data-c="${cc}"]`);
+      if(el && !el.classList.contains('ghost') && !el.classList.contains('ghostbad')) el.classList.add(bad?'linebad':'lineon');
+    });
+    const f=$('forecast');
+    if(bad){ f.className='on bad'; f.textContent='⚠ TRÀN KHAY — SẼ THUA'; }
+    else{
+      f.className='on ok';
+      f.textContent=`+${sim.incoming.length}${sim.evaporated?'(↑'+sim.evaporated+')':''} · nổ ${sim.melds} · dư ${sim.residue}/${S.cfg.cap}`;
+      // vẽ trước khay sẽ trông như thế nào: nạp hết rồi mới nổ, giống thật
+      let k=S.khay.slice();
+      for(const t of sim.incoming) k.push(t);
+      let m; while((m=findBestMeld(k))) m.idx.slice().sort((a,b)=>b-a).forEach(x=>k.splice(x,1));
+      renderKhay(k);
+    }
+  }
+}
+
+/* ------------------------------ FX -------------------------------------- */
+/* S.fast = bỏ toàn bộ animation → dùng cho balance probe / tuning 50 màn */
+const sleep=ms=>S.fast?Promise.resolve():new Promise(r=>setTimeout(r,ms));
+function floatTxt(x,y,txt,color){
+  if(S.fast) return;
+  const d=document.createElement('div'); d.className='float'; d.textContent=txt;
+  if(color) d.style.color=color;
+  d.style.left=x+'px'; d.style.top=y+'px'; document.body.appendChild(d);
+  setTimeout(()=>d.remove(),1000);
+}
+function sparks(x,y,color,n){
+  if(S.fast) return;
+  for(let i=0;i<(n||8);i++){
+    const s=document.createElement('div'); s.className='spark';
+    s.style.left=x+'px'; s.style.top=y+'px'; s.style.background=color||'#e8b64c';
+    document.body.appendChild(s);
+    const a=Math.random()*Math.PI*2, d=22+Math.random()*30;
+    s.animate([{transform:'translate(-50%,-50%) scale(1)',opacity:1},
+               {transform:`translate(${Math.cos(a)*d-4}px,${Math.sin(a)*d-4}px) scale(0)`,opacity:0}],
+              {duration:420+Math.random()*260, easing:'cubic-bezier(.2,.8,.3,1)'});
+    setTimeout(()=>s.remove(),720);
+  }
+}
+async function flyTile(fromRect, toRect, tile){
+  if(S.fast) return;
+  const d=document.createElement('div'); d.className='fly';
+  d.style.left=fromRect.left+'px'; d.style.top=fromRect.top+'px';
+  d.style.width=fromRect.width+'px'; d.style.height=fromRect.height+'px';
+  d.innerHTML=tileHTML(tile); document.body.appendChild(d);
+  const dx=toRect.left-fromRect.left, dy=toRect.top-fromRect.top;
+  const sx=toRect.width/fromRect.width, sy=toRect.height/fromRect.height;
+  const an=d.animate([
+    {transform:'translate(0,0) scale(1,1)'},
+    {transform:`translate(${dx*.45}px,${dy*.35-16}px) scale(${(1+sx)/2},${(1+sy)/2})`, offset:.55},
+    {transform:`translate(${dx}px,${dy}px) scale(${sx},${sy})`}
+  ],{duration:230, easing:'cubic-bezier(.35,.05,.3,1)'});
+  sfx.fly();
+  await an.finished.catch(()=>{});
+  d.remove();
+}
+
+/* ------------------------------ TURN ------------------------------------ */
+async function place(r,c,i){
+  if(S.busy) return;
+  const sim=simulate(r,c,i);
+  if(!sim.legal) return;
+  S.busy=true; clearPreview(); S.sel=-1;
+
+  // 1. đặt khối
+  sim.cellList.forEach(([rr,cc],k)=>{ S.board[rr][cc]=sim.piece.tiles[k]; });
+  S.tray[i].used=true; S.placed++;
+  S.score += sim.piece.tiles.length*2;
+  renderBoard(); renderTray(); renderHUD();
+  sim.cellList.forEach(([rr,cc])=>{
+    const t=boardEl.querySelector(`.cell[data-r="${rr}"][data-c="${cc}"] .tile`);
+    if(t) t.classList.add('drop');
+  });
+  sfx.place();
+  await sleep(140);
+
+  // 2. hàng đầy?
+  const {lines,cells}=fullLines(S.board);
+  if(lines.length){
+    sfx.line();
+    S.score += lines.length*30;
+    const keys=[...cells.keys()];
+    keys.forEach(k=>{ const [rr,cc]=k.split(','); boardEl.querySelector(`.cell[data-r="${rr}"][data-c="${cc}"]`)?.classList.add('flash'); });
+    await sleep(190);
+
+    // ghi rect trước khi xóa; chỉ `intake` quân đầu tiên vào khay, phần dư bay đi
+    const lim=intakeCap();
+    const rects=keys.slice(0,lim).map(k=>{
+      const [rr,cc]=k.split(',');
+      const el=boardEl.querySelector(`.cell[data-r="${rr}"][data-c="${cc}"]`);
+      return {key:k, tile:cells.get(k), rect:el.getBoundingClientRect()};
+    });
+    if(keys.length>lim) S.score += (keys.length-lim)*6;   // quân bay đi vẫn có điểm nhỏ
+    keys.forEach(k=>{ const [rr,cc]=k.split(','); S.board[+rr][+cc]=null; });
+    renderBoard();
+
+    // 3. nuốt HẾT quân của hàng này vào khay trước — để bộ 4-5 (nếu batch
+    // này vừa mang tới) có cơ hội được nhận diện đủ, không bị vội nổ ở bộ 3.
+    for(const it of rects){
+      const slot=khayEl.querySelector(`.slot[data-i="${S.khay.length}"]`);
+      const target = slot ? slot.getBoundingClientRect() : it.rect;
+      await flyTile(it.rect, target, it.tile);
+      S.khay.push(it.tile);
+      renderKhay(); renderHUD();
+    }
+
+    // 4. rồi mới tiêu hóa: mỗi lần lấy đúng BỘ LỚN NHẤT đang có (3, 4 hoặc 5)
+    let chain=0, m;
+    while((m=findBestMeld(S.khay))){
+      chain++;
+      const els=m.idx.map(x=>khayEl.querySelector(`.slot[data-i="${x}"]`));
+      els.forEach(e=>{ if(e){ e.classList.add('popping'); if(m.size>=4) e.classList.add('big'); } });
+      const mult=Math.min(chain,5);
+      const gain=m.pts*mult;
+      S.score+=gain; S.melds++;
+      sfx.pop(chain);
+      if(m.size>=4) sfx.popBig();
+      const rc=(els[1]||els[0])?.getBoundingClientRect() || $('khay-wrap').getBoundingClientRect();
+      floatTxt(rc.left+rc.width/2, rc.top-4, MELD_LABEL[m.size]+' +'+gain+(mult>1?' ×'+mult:''), MELD_COLOR[m.size]);
+      sparks(rc.left+rc.width/2, rc.top+rc.height/2, MELD_COLOR[m.size], 8+m.size*2);
+      await sleep(230);
+      m.idx.slice().sort((a,b)=>b-a).forEach(x=>S.khay.splice(x,1));
+      renderKhay(); renderHUD();
+      if(S.melds>=S.cfg.goal) break;
+    }
+    S.chainBest=Math.max(S.chainBest,chain);
+
+    if(S.khay.length>S.cfg.cap){
+      $('khay-wrap').classList.add('shake'); sfx.danger();
+      await sleep(420);
+      return lose('KHAY TRÀN','Khay chỉ chứa được '+S.cfg.cap+' quân. Bạn đã đóng một hàng mà khay không tiêu hóa nổi, dù đã nổ hết các bộ có thể.');
+    }
+    if(!S.khay.length && rects.length){
+      S.score+=80; sfx.clean();
+      const kr=$('khay-wrap').getBoundingClientRect();
+      floatTxt(kr.left+kr.width/2, kr.top+20, 'SẠCH KHAY +80', '#4ec98a');
+      sparks(kr.left+kr.width/2, kr.top+kr.height/2, '#4ec98a', 16);
+    }
+  }
+
+  renderAll();
+  if(S.melds>=S.cfg.goal){ S.busy=false; return win(); }
+
+  // 4. hết khối → phát tray mới; kiểm tra bí
+  refillTray(false); renderTray();
+  const alive=S.tray.some(p=>p&&!p.used&&anyFit(S.board,p));
+  if(!alive){
+    if(S.rerolls>0){ toast('Không còn nước đi — dùng 🔄 Đổi khối'); }
+    else { S.busy=false; return lose('BÍ NƯỚC','Không còn khối nào đặt được và bạn đã hết lượt đổi khối.'); }
+  }
+  S.busy=false; renderHUD();
+}
+
+/* ------------------------------ FLOW ------------------------------------ */
+function toast(msg,ms){
+  const t=$('toast'); t.innerHTML=msg; t.classList.add('on');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('on'), ms||2000);
+}
+function overlay(html){ $('ovcard').innerHTML=html; $('ov').classList.add('on'); }
+function closeOv(){ $('ov').classList.remove('on'); }
+
+function startLevel(n){
+  S.lv=Math.max(0,Math.min(LEVELS.length-1,n));
+  S.cfg=LEVELS[S.lv]; S.size=S.cfg.size; S.ids=buildIds(S.cfg);
+  S.board=emptyBoard(S.size); S.khay=[]; S.melds=0; S.sel=-1; S.prev=null;
+  S.rerolls=S.cfg.rr==null?2:S.cfg.rr; S.flushes=S.cfg.fl==null?2:S.cfg.fl;
+  S.busy=false; S.armFlush=false; S.placed=0;
+  // seed một ít quân, tránh tạo hàng đầy ngay
+  const seed=Math.max(4,Math.round(S.size*0.9));
+  let guard=0;
+  for(let k=0;k<seed && guard<400;guard++){
+    const r=(Math.random()*S.size)|0, c=(Math.random()*S.size)|0;
+    if(S.board[r][c]) continue;
+    S.board[r][c]=T(S.ids[(Math.random()*S.ids.length)|0]);
+    if(fullLines(S.board).lines.length){ S.board[r][c]=null; continue; }
+    k++;
+  }
+  refillTray(true); renderAll();
+  const c=S.cfg;
+  overlay(`<h2>Màn ${S.lv+1} — ${c.title}</h2>
+   <div class="sub">Bàn ${c.size}×${c.size} · Khay ${c.cap} ô · Mục tiêu: tiêu hóa ${c.goal} bộ</div>
+   <p>${c.teach}</p>
+   <button class="btn" onclick="__go()">CHƠI</button>`);
+}
+function win(){
+  sfx.win();
+  const last=S.lv>=LEVELS.length-1;
+  overlay(`<h2>${last?'HẾT BẢN TEST':'Qua màn '+(S.lv+1)}</h2>
+   <div class="sub">Điểm: <b class="hl">${S.score}</b> · chuỗi dài nhất: ${S.chainBest} bộ</div>
+   <p>${last?'Bạn đã đi hết 8 màn của bản prototype. Bản đầy đủ sẽ trải 50 màn trên cùng các trục: <b class="hl">số ô khay · số chất · trần quân vào khay</b>.':'Khay sắp hẹp lại.'}</p>
+   ${last?'<button class="btn" onclick="__restart()">CHƠI LẠI TỪ ĐẦU</button>'
+         :'<button class="btn" onclick="__next()">MÀN TIẾP</button>'}`);
+}
+function lose(title,why){
+  S.busy=false; sfx.lose();
+  overlay(`<h2 style="color:var(--danger)">${title}</h2>
+   <div class="sub">Điểm: <b class="hl">${S.score}</b> · tiêu hóa ${S.melds}/${S.cfg.goal} bộ</div>
+   <p>${why}</p>
+   <p style="opacity:.65;font-size:12px">Gợi ý: trước khi đặt, xem dòng dự báo ở góc phải khay — nó cho biết hàng đó sẽ đẩy bao nhiêu quân vào khay, nổ mấy bộ (kể cả bộ 4-5), và còn <b>dư</b> mấy quân.</p>
+   <button class="btn" onclick="__retry()">CHƠI LẠI MÀN ${S.lv+1}</button>
+   <button class="btn ghost" onclick="__restart()">Về màn 1</button>`);
+}
+window.__go=()=>{ closeOv(); ac(); };
+window.__next=()=>{ closeOv(); S.score+=0; startLevel(S.lv+1); };
+window.__retry=()=>{ closeOv(); startLevel(S.lv); };
+window.__restart=()=>{ closeOv(); S.score=0; S.chainBest=0; startLevel(0); };
+
+const HELP=`<h2>Khay Tiêu Hóa: Bộ Lớn</h2>
+ <div class="sub">Mahjong × Block Puzzle · prototype kiểm chứng hook</div>
+ <p><b class="hl">Đóng hàng KHÔNG làm quân bốc hơi.</b> Quân trong hàng bay vào <b class="hl">KHAY</b> phía trên.</p>
+ <p>Trong khay, hễ có <b>3, 4 hoặc 5 quân giống nhau</b> cùng lúc là nổ hết cả bộ đó — bộ lớn hơn thưởng nhiều hơn hẳn (3=120đ, 4=220đ, 5=360đ), không có Sảnh.</p>
+ <p><b class="dg">Khay tràn = thua ngay.</b></p>
+ <ul>
+  <li>Kéo khối từ khay dưới lên bàn (hoặc bấm khối → bấm ô → bấm lại để xác nhận).</li>
+  <li>Dòng chữ bên phải chữ "Khay chờ" là <b class="hl">dự báo</b>: bao nhiêu quân sẽ vào khay, nổ mấy bộ, còn dư mấy.</li>
+  <li>✋ <b>Xả 1 quân</b>: bấm nút rồi bấm một quân trong khay để bỏ nó đi.</li>
+ </ul>
+ <p style="font-size:12px;opacity:.7">Câu hỏi cần trả lời khi playtest: <i>bạn có bao giờ <b>cố tình không đóng</b> một hàng đã đầy, chỉ để chờ khay đủ bộ 4-5 không?</i></p>
+ <button class="btn" onclick="__go()">ĐÓNG</button>`;
+
+/* ------------------------------ INPUT ----------------------------------- */
+const hoverable = window.matchMedia('(hover:hover) and (pointer:fine)').matches;
+let drag=null;
+
+function cellFromPoint(x,y){
+  const br=boardEl.getBoundingClientRect();
+  const pad=6, gap=3;
+  const cs=(br.width-pad*2-gap*(S.size-1))/S.size;
+  const c=Math.floor((x-br.left-pad)/(cs+gap)), r=Math.floor((y-br.top-pad)/(cs+gap));
+  return {r,c,cs,br};
+}
+function pieceDims(p){
+  return {rows:Math.max(...p.shape.map(s=>s[0]))+1, cols:Math.max(...p.shape.map(s=>s[1]))+1};
+}
+function makeDragGhost(p,cs){
+  const {rows,cols}=pieceDims(p);
+  const d=document.createElement('div'); d.id='dragghost';
+  const map={}; p.shape.forEach(([dr,dc],k)=>map[dr+','+dc]=p.tiles[k]);
+  let g=`<div class="pgrid" style="grid-template-columns:repeat(${cols},${cs}px);grid-template-rows:repeat(${rows},${cs}px)">`;
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const t=map[r+','+c];
+    g+= t ? tileHTML(t) : `<div style="width:${cs}px;height:${cs}px"></div>`;
+  }
+  g+='</div>'; d.innerHTML=g;
+  d.querySelectorAll('.tile').forEach(e=>{ e.style.width=cs+'px'; e.style.height=cs+'px'; });
+  document.body.appendChild(d);
+  return {el:d, rows, cols};
+}
+function moveDrag(x,y){
+  const {cs,br}=cellFromPoint(x,y);
+  const bw=drag.cols*(cs+3)-3, bh=drag.rows*(cs+3)-3;
+  const left=x-bw/2, top=y-bh-cs*0.55;
+  drag.el.style.left=left+'px'; drag.el.style.top=top+'px';
+  const c=Math.round((left-br.left-6)/(cs+3)), r=Math.round((top-br.top-6)/(cs+3));
+  if(r!==drag.r||c!==drag.c){
+    drag.r=r; drag.c=c;
+    if(fits(S.board,S.tray[drag.i].shape,r,c)) showPreview(r,c,drag.i); else clearPreview();
+  }
+}
+trayEl.addEventListener('pointerdown',e=>{
+  if(S.busy) return;
+  const pe=e.target.closest('.piece'); if(!pe) return;
+  const i=+pe.dataset.i; const p=S.tray[i]; if(!p||p.used) return;
+  S.sel=i; renderTray();
+  const cs=(boardEl.getBoundingClientRect().width-12-3*(S.size-1))/S.size;
+  const g=makeDragGhost(p,cs);
+  drag={i, el:g.el, rows:g.rows, cols:g.cols, r:-99, c:-99, moved:false, sx:e.clientX, sy:e.clientY};
+  try{ trayEl.setPointerCapture(e.pointerId); }catch(_){}
+  moveDrag(e.clientX,e.clientY);
+  e.preventDefault();
+});
+trayEl.addEventListener('pointermove',e=>{
+  if(!drag) return;
+  if(Math.abs(e.clientX-drag.sx)>4||Math.abs(e.clientY-drag.sy)>4) drag.moved=true;
+  moveDrag(e.clientX,e.clientY); e.preventDefault();
+});
+function endDrag(e){
+  if(!drag) return;
+  const d=drag; drag=null; d.el.remove();
+  if(d.moved && fits(S.board,S.tray[d.i].shape,d.r,d.c)){ place(d.r,d.c,d.i); }
+  else { clearPreview(); if(!d.moved) toast('Đã chọn khối — bấm một ô trên bàn'); }
+}
+trayEl.addEventListener('pointerup',endDrag);
+trayEl.addEventListener('pointercancel',endDrag);
+
+boardEl.addEventListener('pointerdown',e=>{
+  if(S.busy||drag) return;
+  const ce=e.target.closest('.cell'); if(!ce) return;
+  if(S.sel<0){ toast('Chọn một khối ở khay dưới trước'); return; }
+  const r=+ce.dataset.r, c=+ce.dataset.c;
+  if(!fits(S.board,S.tray[S.sel].shape,r,c)) return;
+  if(S.prev && S.prev.r===r && S.prev.c===c && S.prev.i===S.sel) place(r,c,S.sel);
+  else showPreview(r,c,S.sel);
+});
+if(hoverable){
+  boardEl.addEventListener('mousemove',e=>{
+    if(S.busy||drag||S.sel<0) return;
+    const ce=e.target.closest('.cell'); if(!ce) return;
+    const r=+ce.dataset.r,c=+ce.dataset.c;
+    if(S.prev&&S.prev.r===r&&S.prev.c===c&&S.prev.i===S.sel) return;
+    if(fits(S.board,S.tray[S.sel].shape,r,c)) showPreview(r,c,S.sel); else clearPreview();
+  });
+  boardEl.addEventListener('mouseleave',()=>{ if(!drag) clearPreview(); });
+}
+khayEl.addEventListener('pointerdown',e=>{
+  if(!S.armFlush||S.busy) return;
+  const s=e.target.closest('.slot'); if(!s) return;
+  const i=+s.dataset.i; if(!S.khay[i]) return;
+  S.khay.splice(i,1); S.flushes--; S.armFlush=false;
+  sparks(e.clientX,e.clientY,'#ff5d51',8);
+  renderKhay(); renderHUD();
+});
+$('t-flush').addEventListener('click',()=>{
+  if(S.flushes<=0||!S.khay.length) return;
+  S.armFlush=!S.armFlush; renderHUD();
+  if(S.armFlush) toast('Bấm một quân trong khay để bỏ nó');
+});
+$('t-reroll').addEventListener('click',()=>{
+  if(S.rerolls<=0||S.busy) return;
+  S.rerolls--; S.tray=S.tray.map(p=>p&&p.used?p:makePiece()); S.sel=-1; clearPreview(); renderTray(); renderHUD();
+  beep(600,.09,'triangle',.09,760);
+});
+$('btn-help').addEventListener('click',()=>overlay(HELP));
+document.addEventListener('contextmenu',e=>{ if(e.target.closest('#app')) e.preventDefault(); });
+window.addEventListener('resize',()=>{ if(!S.busy) renderAll(); });
+
+/* ------------------------------ TEST HOOK ------------------------------- */
+window.__digest={
+  S, simulate, findBestMeld, fullLines, fits, place, startLevel, T,
+  showPreview, clearPreview, anyFit, LEVELS, intakeCap,
+  setKhay(ids){ S.khay=ids.map(T); renderKhay(); renderHUD(); },
+  setBoard(grid){ S.board=grid.map(row=>row.map(x=>x?T(x):null)); renderBoard(); },
+  setTray(list){ S.tray=list.map(p=>({shape:p.shape, tiles:p.tiles.map(T), used:false})); renderTray(); },
+  state:()=>({score:S.score,melds:S.melds,khay:S.khay.map(t=>t.id),cap:S.cfg.cap,lv:S.lv,busy:S.busy})
+};
+/* self-test nhẹ */
+(function selftest(){
+  const t=id=>T(id); const out=[];
+
+  out.push(['finds-3-when-only-3-present', (()=>{
+    const k=[t('s3'),t('s3'),t('s3'),t('c1')];
+    const m=findBestMeld(k);
+    return !!m && m.size===3 && m.id==='s3' && m.pts===MELD_PTS[3];
+  })()]);
+
+  out.push(['prefers-bigger-set-over-smaller', (()=>{
+    const k=[t('s3'),t('s3'),t('s3'),t('c1'),t('c1'),t('c1'),t('c1')]; // s3 x3, c1 x4
+    const m=findBestMeld(k);
+    return !!m && m.size===4 && m.id==='c1' && m.pts===MELD_PTS[4];
+  })()]);
+
+  out.push(['caps-at-5-even-with-6-copies', (()=>{
+    const k=Array.from({length:6},()=>t('w2'));
+    const m=findBestMeld(k);
+    return !!m && m.size===5 && m.idx.length===5 && m.pts===MELD_PTS[5];
+  })()]);
+
+  out.push(['no-meld-when-under-3', (()=>{
+    const k=[t('s3'),t('s3'),t('c1')];
+    return findBestMeld(k)===null;
+  })()]);
+
+  out.push(['pop-indices-match-the-chosen-id', (()=>{
+    const k=[t('s3'),t('c1'),t('s3'),t('c1'),t('s3'),t('c1'),t('c1')]; // s3x3, c1x4
+    const m=findBestMeld(k);
+    return !!m && m.size===4 && m.idx.every(i=>k[i].id==='c1');
+  })()]);
+
+  const bad=out.filter(x=>!x[1]);
+  console.log('[selftest]', bad.length? 'FAIL '+JSON.stringify(bad) : 'OK ('+out.length+' checks)');
+})();
+
+startLevel(0);
+</script>
+</body>
+</html>

@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Kéo Khối Rơi — Mahjong × Block (prototype 22)</title>
+<style>
+:root{
+  --wood:#2b1d16; --wood2:#3d2a20; --felt:#14342b; --felt2:#0d241d;
+  --cream:#f6ecd8; --cream2:#e6d7ba; --ink:#2a2018;
+  --gold:#e8b64c; --jade:#4ec98a; --danger:#ff5d51; --blue:#4a9fe0; --red:#e0553f; --green:#3fae6a;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  background:
+    radial-gradient(120% 80% at 50% -10%, #5a3d2c 0%, var(--wood) 55%, #1b120d 100%);
+  color:var(--cream); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  overscroll-behavior:none; touch-action:manipulation; user-select:none;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-height:100%; padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+}
+#app{width:100%; max-width:440px; display:flex; flex-direction:column; gap:9px; padding:8px 10px 12px;}
+
+#hud{display:flex; align-items:center; gap:8px;}
+.hud-box{flex:1; background:rgba(0,0,0,.28); border:1px solid rgba(232,182,76,.22); border-radius:10px; padding:5px 8px;}
+.hud-lab{font-size:9px; letter-spacing:.12em; text-transform:uppercase; opacity:.55;}
+.hud-val{font-size:16px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1.15;}
+#btn-help{width:34px;height:34px;flex:none;border-radius:10px;background:rgba(0,0,0,.28);border:1px solid rgba(232,182,76,.22);color:var(--cream);font-size:15px;font-weight:700;}
+
+#board-wrap{position:relative; width:100%; display:flex; justify-content:center;}
+#board{
+  width:min(100%, 42vh); flex:none; position:relative;
+  display:grid; gap:3px; padding:6px; border-radius:14px;
+  background:linear-gradient(160deg,var(--felt),var(--felt2));
+  border:1px solid rgba(232,182,76,.22);
+  box-shadow:inset 0 2px 10px rgba(0,0,0,.5), 0 6px 18px rgba(0,0,0,.35);
+}
+.cell{aspect-ratio:1; border-radius:6px; background:rgba(0,0,0,.22); box-shadow:inset 0 0 0 1px rgba(255,255,255,.035); position:relative; transition:background .1s;}
+.cell.colhint{background:rgba(232,182,76,.28);}
+.cell .tile{position:absolute; inset:0;}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}50%{transform:translateX(4px)}75%{transform:translateX(-3px)}}
+.cell.shakebad{animation:shake .3s;}
+
+/* ---------- TILE ART (rút gọn còn 2 chất — copy quy ước từ prototype 11/14/16-21, bỏ nhánh Văn/Rồng vì SUITS chỉ còn s/c) ---------- */
+.tile{border-radius:6px; background:linear-gradient(170deg,#fdf6e6 0%,var(--cream) 40%,var(--cream2) 100%);
+  box-shadow:inset 0 -2px 0 rgba(0,0,0,.16), inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.35);
+  display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative;}
+.tile svg{width:88%; height:88%; display:block;}
+.tile .rk{position:absolute; top:1px; left:2.5px; font-size:8px; font-weight:800; line-height:1; opacity:.62;}
+.tile.s .rk{color:var(--green)} .tile.c .rk{color:var(--blue)}
+.tile.pop{animation:pop .22s ease-out forwards;}
+@keyframes pop{0%{transform:scale(1); opacity:1}50%{transform:scale(1.3); filter:brightness(2)}100%{transform:scale(0); opacity:0}}
+.tile.dropin{animation:dropin .22s ease-out;}
+@keyframes dropin{0%{transform:translateY(-70%); opacity:.4}100%{transform:translateY(0); opacity:1}}
+
+#controls{display:flex; flex-direction:column; gap:8px;}
+.ctrl-row{display:flex; align-items:center; gap:10px; justify-content:center;}
+.pick-label{font-size:9px; letter-spacing:.1em; text-transform:uppercase; opacity:.5; width:64px; flex:none; line-height:1.3;}
+#pair, #khay{display:flex; gap:10px; align-items:center; min-height:34px; flex:1; border-radius:10px; transition:box-shadow .12s;}
+#khay.khayhint{box-shadow:0 0 0 2px var(--jade) inset;}
+.pickslot, .khayslot{position:relative; flex:none; padding:3px; border-radius:8px; cursor:grab; touch-action:none;}
+.pickslot.dragging, .khayslot.dragging{opacity:.22;}
+.khayslot.empty{width:28px; height:28px; border:1.5px dashed rgba(232,182,76,.3); border-radius:6px; cursor:default;}
+.piecebox{display:grid; gap:2px;}
+.piecebox .pcell{width:26px; height:26px; position:relative;}
+.piecebox .pcell .tile{position:absolute; inset:0;}
+.piecebox .pcell.void{visibility:hidden;}
+.drag-ghost{position:fixed; z-index:120; pointer-events:none; transform:translate(-50%,-50%) scale(1.18);
+  filter:drop-shadow(0 10px 16px rgba(0,0,0,.55)); opacity:.96;}
+#btn-area{flex:none; padding:9px 10px; border-radius:10px; border:0; font-size:10.5px; font-weight:800;
+  background:linear-gradient(180deg,var(--gold),#c8912e); color:#2a1d0b; white-space:nowrap;}
+#btn-area:disabled{opacity:.35; filter:grayscale(.5);}
+#btn-area.armed{outline:2.5px solid var(--jade); outline-offset:1px;}
+
+.float{position:fixed; z-index:80; pointer-events:none; font-weight:900; font-size:16px; color:var(--gold);
+  text-shadow:0 2px 6px rgba(0,0,0,.8); animation:floatup 1s ease-out forwards;}
+@keyframes floatup{0%{transform:translate(-50%,0) scale(.7); opacity:0}25%{transform:translate(-50%,-12px) scale(1.15); opacity:1}100%{transform:translate(-50%,-46px) scale(1); opacity:0}}
+.spark{position:fixed; z-index:75; width:6px; height:6px; border-radius:50%; pointer-events:none;}
+
+#ov{position:fixed; inset:0; z-index:100; background:rgba(12,8,6,.86); backdrop-filter:blur(3px);
+  display:none; align-items:center; justify-content:center; padding:18px;}
+#ov.on{display:flex;}
+#ovcard{width:100%; max-width:360px; background:linear-gradient(170deg,#3d2a20,#241812); border:1px solid rgba(232,182,76,.35);
+  border-radius:16px; padding:18px; box-shadow:0 20px 50px rgba(0,0,0,.6); max-height:86vh; overflow:auto;}
+#ovcard h2{margin:0 0 4px; font-size:20px; color:var(--gold);}
+#ovcard .sub{font-size:12px; opacity:.7; margin-bottom:12px;}
+#ovcard p{font-size:13px; line-height:1.55; margin:0 0 9px;}
+#ovcard ul{font-size:12.5px; line-height:1.6; padding-left:17px; margin:0 0 10px;}
+#ovcard .hl{color:var(--gold); font-weight:700;}
+#ovcard .dg{color:var(--danger); font-weight:700;}
+.btn{width:100%; padding:12px; border-radius:11px; border:0; font-size:14px; font-weight:800;
+  background:linear-gradient(180deg,var(--gold),#c8912e); color:#2a1d0b; margin-top:6px;}
+.demo{display:flex; gap:8px; justify-content:center; align-items:center; margin:8px 0 12px;}
+#toast{position:absolute; left:50%; bottom:10px; transform:translateX(-50%); z-index:90; background:rgba(20,14,10,.95);
+  border:1px solid rgba(232,182,76,.4); color:var(--cream); padding:9px 14px; border-radius:10px; font-size:12.5px;
+  width:max-content; max-width:90%; text-align:center; opacity:0; transition:opacity .25s, transform .25s; pointer-events:none;}
+#toast.on{opacity:1; transform:translateX(-50%) translateY(-4px);}
+.foot{text-align:center; font-size:9.5px; opacity:.32; letter-spacing:.05em;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div class="hud-box"><div class="hud-lab">Điểm</div><div class="hud-val" id="h-score">0</div></div>
+    <div class="hud-box"><div class="hud-lab">Chỉ tiêu</div><div class="hud-val" id="h-quota">0/0</div></div>
+    <div class="hud-box"><div class="hud-lab">Phá Vùng</div><div class="hud-val" id="h-charges">0</div></div>
+    <button id="btn-help">?</button>
+  </div>
+
+  <div id="board-wrap"><div id="board"></div><div id="toast"></div></div>
+
+  <div id="controls">
+    <div class="ctrl-row">
+      <div class="pick-label">Kéo 1 khối vào bàn</div>
+      <div id="pair"></div>
+    </div>
+    <div class="ctrl-row">
+      <div class="pick-label">Khay giữ (kéo vào đây)</div>
+      <div id="khay"></div>
+      <button id="btn-area">PHÁ VÙNG <span id="area-charge">0</span></button>
+    </div>
+  </div>
+
+  <div class="foot">PROTOTYPE 22 · KÉO KHỐI RƠI (SHAPE DRAG) · hook test</div>
+</div>
+
+<div id="ov"><div id="ovcard"></div></div>
+
+<script>
+"use strict";
+/* =========================================================================
+   KÉO KHỐI RƠI (Shape Drag) — Mahjong × Block hybrid, hook prototype
+   Bản nối tiếp của prototype 21, chỉnh theo 3 phản hồi:
+   1) Giảm SỐ LOẠI quân mahjong (không phải giảm luật) — chỉ còn 2 chất ×
+      4 hạng = 8 loại, thay vì 3 chất × 6 hạng = 18 loại như bản 20/21. Đây
+      là fix ở mức THAM SỐ/NỘI DUNG, không đụng tới bất kỳ luật mahjong nào
+      (không sảnh, không rồng-wild, không thứ bậc chất) — nguyên tắc: giảm
+      độ phức tạp bằng cách giảm KÍCH THƯỚC bộ ký hiệu cần nhận diện tức
+      thời, giống cách match-3 thường chỉ dùng 5-7 màu dù chủ đề có thể có
+      nhiều hơn, không phải bằng cách thêm cơ chế mahjong để "bù" cho nó.
+   2) Đổi input: KÉO (drag) 1 khối từ khay chọn thẳng vào bàn hoặc vào Khay
+      giữ, thay cho bấm-chọn-rồi-bấm-cột như bản 20/21.
+   3) Khối còn lại trong cặp 2 khối được GIỮ NGUYÊN — chỉ đúng khối vừa dùng
+      mới được thay bằng khối mới (giống Block Blast thật: dùng 1 trong 3
+      hình chỉ làm mới đúng ô đó, không xáo cả cụm).
+
+   Toàn bộ luật lõi (trọng lực, rơi khối cứng, quân không có gì bên dưới
+   rơi tiếp, match 3+ ngang/dọc không sảnh, Kong -> Phá Vùng, chỉ tiêu/qua
+   màn) giữ nguyên logic thuần từ prototype 21 — chỉ thay input & nội dung.
+   ========================================================================= */
+
+/* ------------------------------ CONFIG ---------------------------------- */
+const ROWS = 9;
+const COLS = 6;
+const SUITS = ['s','c'];   // rút từ 3 chất -> 2 chất
+const MAX_RANK = 4;        // rút từ 6 hạng -> 4 hạng  =>  2*4 = 8 loại quân, thay vì 3*6 = 18
+const DIRS2 = [[0,1],[1,0]]; // chỉ ngang + dọc, không chéo
+const MATCH_MIN = 3;
+const KONG_MIN = 4;
+const AREA_CLEAR_START = 1;
+const LEVEL_QUOTA = 45;
+
+const SHAPES = {
+  domino_h: [[0,0],[0,1]],
+  domino_v: [[0,0],[1,0]],
+  tromino_i: [[0,0],[0,1],[0,2]],
+  tromino_l: [[0,0],[1,0],[1,1]],
+  square:    [[0,0],[0,1],[1,0],[1,1]],
+};
+const SHAPE_KEYS = Object.keys(SHAPES);
+
+/* ------------------------------ STATE ------------------------------------ */
+const S = {
+  board:[], pair:[null,null], khay:[null,null], areaMode:false, areaCharges:0,
+  score:0, cleared:0, busy:false, over:false, sound:true, fast:false
+};
+
+/* ------------------------------ AUDIO (copy quy ước từ prototype 11/14/16-21) */
+let AC=null;
+function ac(){ if(!AC){ try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){AC=false;} } return AC; }
+function beep(f,d,type,vol,slide){
+  if(!S.sound||S.fast) return; const a=ac(); if(!a) return;
+  try{
+    const o=a.createOscillator(), g=a.createGain();
+    o.type=type||'sine'; o.frequency.setValueAtTime(f,a.currentTime);
+    if(slide) o.frequency.exponentialRampToValueAtTime(slide,a.currentTime+d);
+    g.gain.setValueAtTime(0,a.currentTime);
+    g.gain.linearRampToValueAtTime(vol||.12,a.currentTime+.012);
+    g.gain.exponentialRampToValueAtTime(.0008,a.currentTime+d);
+    o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime+d+.02);
+  }catch(e){}
+}
+const sfx={
+  drop:  ()=>beep(220,.09,'sine',.09,150),
+  burst: combo=>beep(360+Math.min(combo,6)*70,.16,'triangle',.12,700+combo*80),
+  kong:  ()=>{[420,560,700,880].forEach((f,i)=>setTimeout(()=>beep(f,.16,'triangle',.12),i*70));},
+  save:  ()=>beep(300,.1,'sine',.08,420),
+  bad:   ()=>beep(140,.12,'square',.08,110),
+  win:   ()=>{[392,494,587,784].forEach((f,i)=>setTimeout(()=>beep(f,.22,'triangle',.1),i*110));},
+  lose:  ()=>{[330,262,196,147].forEach((f,i)=>setTimeout(()=>beep(f,.3,'sawtooth',.1),i*130));}
+};
+
+/* ------------------------------ TILE ART (chỉ còn 2 chất s/c) -------------- */
+const ROWDOTS = {1:[1],2:[2],3:[3],4:[2,2]};
+function dotsSVG(n,color,round){
+  const rows=ROWDOTS[n]||[n]; const H=rows.length; let out='';
+  const cellH=100/H;
+  rows.forEach((cnt,ri)=>{
+    const cy=cellH*ri+cellH/2;
+    for(let i=0;i<cnt;i++){
+      const cx=100/(cnt+1)*(i+1);
+      const r=Math.min(cellH*.30, 100/(cnt+1)*.42);
+      if(round) out+=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" opacity=".92"/><circle cx="${cx}" cy="${cy}" r="${r*.45}" fill="#fdf6e6" opacity=".55"/>`;
+      else out+=`<rect x="${cx-r*.42}" y="${cy-r*1.05}" width="${r*.84}" height="${r*2.1}" rx="${r*.42}" fill="${color}" opacity=".92"/><rect x="${cx-r*.16}" y="${cy-r*.75}" width="${r*.32}" height="${r*1.5}" fill="#fdf6e6" opacity=".45"/>`;
+    }
+  });
+  return out;
+}
+function tileHTML(t, extraCls){
+  if(!t) return '';
+  const cls='tile '+t.suit+(extraCls?' '+extraCls:'');
+  const inner = t.suit==='c' ? dotsSVG(t.rank,'#3d7fbf',true) : dotsSVG(t.rank,'#2f9e5c',false);
+  return `<div class="${cls}"><span class="rk">${t.rank}</span><svg viewBox="0 0 100 100">${inner}</svg></div>`;
+}
+const T = id => ({id, suit:id[0], rank:+id.slice(1)});
+function randTile(){ const su=SUITS[(Math.random()*SUITS.length)|0]; const rk=1+((Math.random()*MAX_RANK)|0); return T(su+rk); }
+
+/* ------------------------------ SHAPE / PIECE ------------------------------ */
+function randomShape(){
+  const key=SHAPE_KEYS[(Math.random()*SHAPE_KEYS.length)|0];
+  const cells=SHAPES[key].map(([dr,dc])=>({dr,dc,tile:randTile()}));
+  return {key, cells};
+}
+function shapeWidth(piece){ return Math.max(...piece.cells.map(c=>c.dc))+1; }
+function shapeHeight(piece){ return Math.max(...piece.cells.map(c=>c.dr))+1; }
+
+/* ------------------------------ BOARD OPS -------------------------------- */
+function emptyBoard(){ return Array.from({length:ROWS},()=>Array(COLS).fill(null)); }
+function inBounds(r,c){ return r>=0&&c>=0&&r<ROWS&&c<COLS; }
+function hasKhaySpace(khay){ return khay.some(x=>x===null); }
+
+/* --------------------- SHAPE-DROP PHYSICS (giữ nguyên từ prototype 21) ---- */
+function computeDropOffset(board, piece, anchorCol){
+  const bottomDrByCol={};
+  for(const cell of piece.cells){
+    const col=anchorCol+cell.dc;
+    if(!(col in bottomDrByCol) || cell.dr>bottomDrByCol[col]) bottomDrByCol[col]=cell.dr;
+  }
+  let minOffset=Infinity;
+  for(const colStr in bottomDrByCol){
+    const col=+colStr, bottomDr=bottomDrByCol[col];
+    let stackTopRow=ROWS;
+    for(let r=0;r<ROWS;r++){ if(board[r][col]){ stackTopRow=r; break; } }
+    const allowed=stackTopRow-1-bottomDr;
+    if(allowed<minOffset) minOffset=allowed;
+  }
+  return minOffset;
+}
+function dropPiece(board, piece, anchorCol){
+  const offset=computeDropOffset(board,piece,anchorCol);
+  if(offset<0) return {offset, cells:[], overflowed:true};
+  const placed=[];
+  for(const cell of piece.cells){
+    const r=offset+cell.dr, c=anchorCol+cell.dc;
+    board[r][c]={id:cell.tile.id, suit:cell.tile.suit, rank:cell.tile.rank};
+    placed.push([r,c]);
+  }
+  return {offset, cells:placed, overflowed:false};
+}
+function anyValidAnchor(board,piece){
+  const w=shapeWidth(piece);
+  for(let anchorCol=0; anchorCol<=COLS-w; anchorCol++) if(computeDropOffset(board,piece,anchorCol)>=0) return true;
+  return false;
+}
+function hasAnyLegalMove(){
+  const candidates=[...S.pair, ...S.khay].filter(Boolean);
+  return candidates.some(p=>anyValidAnchor(S.board,p));
+}
+
+/* --------------------- MATCH RESOLUTION (giữ nguyên từ prototype 20/21) --- */
+function findRunsOf3Plus(board){
+  const marked=new Set(), cellsOut=[]; let hadKong=false;
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const t=board[r][c]; if(!t) continue;
+    for(const [dr,dc] of DIRS2){
+      const pr=r-dr, pc=c-dc;
+      if(inBounds(pr,pc) && board[pr][pc] && board[pr][pc].id===t.id) continue;
+      const run=[[r,c]];
+      let rr=r+dr, cc=c+dc;
+      while(inBounds(rr,cc) && board[rr][cc] && board[rr][cc].id===t.id){ run.push([rr,cc]); rr+=dr; cc+=dc; }
+      if(run.length>=MATCH_MIN){
+        if(run.length>=KONG_MIN) hadKong=true;
+        for(const cell of run){ const key=cell[0]+','+cell[1]; if(!marked.has(key)){ marked.add(key); cellsOut.push(cell); } }
+      }
+    }
+  }
+  return {cells:cellsOut, hadKong};
+}
+function collapseColumn(board,c){
+  const stack=[];
+  for(let r=ROWS-1;r>=0;r--) if(board[r][c]) stack.push(board[r][c]);
+  for(let r=ROWS-1;r>=0;r--) board[r][c] = stack[ROWS-1-r] || null;
+}
+function areaClearCells(board,r,c){
+  const cand=[[r,c],[r-1,c],[r+1,c],[r,c-1],[r,c+1]];
+  return cand.filter(([rr,cc])=>inBounds(rr,cc) && board[rr][cc]);
+}
+
+/* ------------------------------ RENDER ------------------------------------ */
+const $=id=>document.getElementById(id);
+const boardEl=$('board');
+function cellEl(r,c){ return boardEl.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`); }
+function cellRect(r,c){ const el=cellEl(r,c); return el ? el.getBoundingClientRect() : {left:0,top:0,width:40,height:40}; }
+
+function renderBoard(){
+  boardEl.style.gridTemplateColumns=`repeat(${COLS},1fr)`;
+  let h='';
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const t=S.board[r][c];
+    h+=`<div class="cell" data-r="${r}" data-c="${c}">${t?tileHTML(t):''}</div>`;
+  }
+  boardEl.innerHTML=h;
+}
+function renderPieceBox(piece){
+  const w=shapeWidth(piece), h=shapeHeight(piece);
+  const map={};
+  piece.cells.forEach(cell=>{ map[cell.dr+','+cell.dc]=cell; });
+  let html=`<div class="piecebox" style="grid-template-columns:repeat(${w},1fr)">`;
+  for(let r=0;r<h;r++) for(let c=0;c<w;c++){
+    const cell=map[r+','+c];
+    html+= cell ? `<div class="pcell">${tileHTML(cell.tile)}</div>` : `<div class="pcell void"></div>`;
+  }
+  html+=`</div>`;
+  return html;
+}
+function renderControls(){
+  let hp='';
+  S.pair.forEach((p,i)=>{ hp+=`<div class="pickslot" data-i="${i}">${p?renderPieceBox(p):''}</div>`; });
+  $('pair').innerHTML=hp;
+
+  let hk='';
+  S.khay.forEach((p,i)=>{
+    hk+= p ? `<div class="khayslot" data-i="${i}">${renderPieceBox(p)}</div>`
+           : `<div class="khayslot empty" data-i="${i}"></div>`;
+  });
+  $('khay').innerHTML=hk;
+
+  $('btn-area').disabled = S.areaCharges<=0;
+  $('btn-area').classList.toggle('armed', S.areaMode);
+  $('area-charge').textContent = S.areaCharges;
+}
+function renderHUD(){
+  $('h-score').textContent=S.score;
+  $('h-quota').textContent=S.cleared+'/'+LEVEL_QUOTA;
+  $('h-charges').textContent=S.areaCharges;
+}
+function renderAll(){ renderBoard(); renderControls(); renderHUD(); }
+
+function floatTxt(x,y,txt,color){
+  if(S.fast) return;
+  const d=document.createElement('div'); d.className='float'; d.textContent=txt;
+  if(color) d.style.color=color;
+  d.style.left=x+'px'; d.style.top=y+'px'; document.body.appendChild(d);
+  setTimeout(()=>d.remove(),1000);
+}
+function sparks(x,y,color,n){
+  if(S.fast) return;
+  for(let i=0;i<(n||8);i++){
+    const s=document.createElement('div'); s.className='spark';
+    s.style.left=x+'px'; s.style.top=y+'px'; s.style.background=color||'#e8b64c';
+    document.body.appendChild(s);
+    const a=Math.random()*Math.PI*2, d=20+Math.random()*26;
+    s.animate([{transform:'translate(-50%,-50%) scale(1)',opacity:1},
+               {transform:`translate(${Math.cos(a)*d-4}px,${Math.sin(a)*d-4}px) scale(0)`,opacity:0}],
+              {duration:400+Math.random()*240, easing:'cubic-bezier(.2,.8,.3,1)'});
+    setTimeout(()=>s.remove(),700);
+  }
+}
+function flashBad(el){ if(!el) return; el.classList.add('shakebad'); setTimeout(()=>el.classList.remove('shakebad'),320); }
+function toast(msg,ms){
+  const t=$('toast'); t.innerHTML=msg; t.classList.add('on');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('on'), ms||1600);
+}
+
+/* ------------------------------ PARTIAL REFILL (phản hồi #3) --------------
+ * Dùng 1 khối trong cặp CHỈ thay đúng ô đó bằng khối mới — khối còn lại
+ * trong cặp giữ nguyên, không bị xáo lại cả cụm. */
+function useFromPair(index){
+  const used=S.pair[index];
+  S.pair[index]=randomShape();
+  return used;
+}
+
+/* ------------------------------ DRAG & DROP (phản hồi #2) ------------------ */
+let dragState=null;
+function pointInRect(x,y,r){ return x>=r.left && x<=r.right && y>=r.top && y<=r.bottom; }
+
+function startDrag(sourceType, index, piece, originEl, pointerEvent){
+  if(S.busy||S.over||!piece) return;
+  dragState={sourceType, index, piece, pointerId:pointerEvent.pointerId, originEl};
+  originEl.classList.add('dragging');
+  const ghost=document.createElement('div');
+  ghost.className='drag-ghost';
+  ghost.innerHTML=renderPieceBox(piece);
+  document.body.appendChild(ghost);
+  dragState.ghostEl=ghost;
+  positionGhost(pointerEvent.clientX, pointerEvent.clientY);
+  document.addEventListener('pointermove', onDragMove);
+  document.addEventListener('pointerup', onDragEnd);
+  document.addEventListener('pointercancel', onDragEnd);
+}
+function positionGhost(x,y){
+  if(!dragState) return;
+  dragState.ghostEl.style.left=x+'px';
+  dragState.ghostEl.style.top=y+'px';
+}
+function clearDragHighlight(){
+  boardEl.querySelectorAll('.cell.colhint').forEach(el=>el.classList.remove('colhint'));
+  $('khay').classList.remove('khayhint');
+}
+function updateDragHighlight(x,y){
+  clearDragHighlight();
+  const boardRect=boardEl.getBoundingClientRect();
+  if(pointInRect(x,y,boardRect)){
+    const w=shapeWidth(dragState.piece);
+    const colWidth=boardRect.width/COLS;
+    let col=Math.floor((x-boardRect.left)/colWidth);
+    col=Math.min(Math.max(col,0), COLS-w);
+    for(let cc=col; cc<col+w; cc++) boardEl.querySelectorAll(`.cell[data-c="${cc}"]`).forEach(el=>el.classList.add('colhint'));
+    return;
+  }
+  if(dragState.sourceType==='pair'){
+    const khayRect=$('khay').getBoundingClientRect();
+    if(pointInRect(x,y,khayRect)) $('khay').classList.add('khayhint');
+  }
+}
+function onDragMove(e){
+  if(!dragState || e.pointerId!==dragState.pointerId) return;
+  positionGhost(e.clientX, e.clientY);
+  updateDragHighlight(e.clientX, e.clientY);
+}
+function onDragEnd(e){
+  if(!dragState || e.pointerId!==dragState.pointerId) return;
+  const {clientX, clientY}=e;
+  const {sourceType, index, piece, originEl, ghostEl}=dragState;
+  document.removeEventListener('pointermove', onDragMove);
+  document.removeEventListener('pointerup', onDragEnd);
+  document.removeEventListener('pointercancel', onDragEnd);
+  clearDragHighlight();
+  ghostEl.remove();
+  if(originEl) originEl.classList.remove('dragging');
+  dragState=null;
+  resolveDrop(sourceType, index, piece, clientX, clientY);
+}
+function resolveDrop(sourceType, index, piece, x, y){
+  const boardRect=boardEl.getBoundingClientRect();
+  if(pointInRect(x,y,boardRect)){
+    const w=shapeWidth(piece);
+    const colWidth=boardRect.width/COLS;
+    let col=Math.floor((x-boardRect.left)/colWidth);
+    col=Math.min(Math.max(col,0), COLS-w);
+    tryPlacePiece(sourceType, index, piece, col);
+    return;
+  }
+  if(sourceType==='pair'){
+    const khayRect=$('khay').getBoundingClientRect();
+    if(pointInRect(x,y,khayRect)){ tryStashPiece(index, piece); return; }
+  }
+  // thả ra ngoài vùng hợp lệ -> huỷ kéo, khối trở lại nguyên trạng (không đổi state)
+}
+function tryPlacePiece(sourceType, index, piece, anchorCol){
+  const result=dropPiece(S.board, piece, anchorCol);
+  if(result.overflowed){ toast('Không vừa cột này'); sfx.bad(); return; }
+
+  if(sourceType==='khay') S.khay[index]=null;
+  else useFromPair(index); // chỉ đổi mới đúng khối đã dùng, giữ nguyên khối còn lại
+  renderBoard(); renderControls();
+  for(const [r,c] of result.cells){ const el=cellEl(r,c), tl=el&&el.querySelector('.tile'); if(tl) tl.classList.add('dropin'); }
+  sfx.drop();
+
+  S.busy=true;
+  setTimeout(()=>{
+    for(let c=0;c<COLS;c++) collapseColumn(S.board,c);
+    renderBoard();
+    cascadeStep(1);
+  }, 160);
+}
+function tryStashPiece(index, piece){
+  if(!hasKhaySpace(S.khay)){ toast('Khay đã đầy — dùng khối trong khay trước'); sfx.bad(); return; }
+  const slot=S.khay.findIndex(x=>x===null);
+  S.khay[slot]=piece;
+  useFromPair(index);
+  renderControls();
+  toast('Đã giữ khối vào khay'); sfx.save();
+}
+$('pair').addEventListener('pointerdown', e=>{
+  if(S.busy||S.over) return;
+  const el=e.target.closest('.pickslot'); if(!el) return;
+  const i=+el.dataset.i;
+  if(S.pair[i]) startDrag('pair', i, S.pair[i], el, e);
+});
+$('khay').addEventListener('pointerdown', e=>{
+  if(S.busy||S.over) return;
+  const el=e.target.closest('.khayslot'); if(!el || el.classList.contains('empty')) return;
+  const i=+el.dataset.i;
+  if(S.khay[i]) startDrag('khay', i, S.khay[i], el, e);
+});
+
+/* ------------------------------ PHÁ VÙNG (giữ tap, không liên quan kéo) ---- */
+function toggleAreaMode(){
+  if(S.busy||S.over||S.areaCharges<=0) return;
+  S.areaMode=!S.areaMode;
+  renderControls();
+}
+function doAreaClear(r,c){
+  const cells=areaClearCells(S.board,r,c);
+  if(!cells.length){ toast('Không có quân ở đây'); return; }
+  S.areaCharges--; S.areaMode=false; S.busy=true;
+  renderControls();
+  for(const [rr,cc] of cells){ const el=cellEl(rr,cc), tl=el&&el.querySelector('.tile'); if(tl) tl.classList.add('pop'); }
+  sfx.burst(1);
+  setTimeout(()=>{
+    S.cleared+=cells.length; S.score+=cells.length*8;
+    for(const [rr,cc] of cells) S.board[rr][cc]=null;
+    for(let cc=0;cc<COLS;cc++) collapseColumn(S.board,cc);
+    renderBoard(); renderControls(); renderHUD();
+    setTimeout(()=>cascadeStep(1), 180);
+  }, 220);
+}
+boardEl.addEventListener('click', e=>{
+  if(!S.areaMode) return;
+  const ce=e.target.closest('.cell'); if(!ce) return;
+  doAreaClear(+ce.dataset.r, +ce.dataset.c);
+});
+$('btn-area').addEventListener('click', toggleAreaMode);
+
+/* ------------------------------ CASCADE (có animation, dùng cho UI) ------- */
+function cascadeStep(round){
+  const {cells,hadKong}=findRunsOf3Plus(S.board);
+  if(!cells.length){ afterCascadeSettled(); return; }
+  S.busy=true;
+  const gain=cells.length*10*round;
+  S.score+=gain; S.cleared+=cells.length;
+  if(hadKong) S.areaCharges++;
+  renderHUD(); renderControls();
+  for(const [r,c] of cells){ const el=cellEl(r,c), tl=el&&el.querySelector('.tile'); if(tl) tl.classList.add('pop'); }
+  const rect=cellRect(cells[0][0],cells[0][1]);
+  floatTxt(rect.left+rect.width/2, rect.top, '+'+gain, hadKong?'#e8b64c':'#4ec98a');
+  sparks(rect.left+rect.width/2, rect.top+rect.height/2, hadKong?'#e8b64c':'#4ec98a', 8);
+  if(hadKong){ toast('KONG! +1 lượt Phá Vùng'); sfx.kong(); } else sfx.burst(round);
+  setTimeout(()=>{
+    for(const [r,c] of cells) S.board[r][c]=null;
+    for(let c=0;c<COLS;c++) collapseColumn(S.board,c);
+    renderBoard();
+    setTimeout(()=>cascadeStep(round+1), 180);
+  }, 220);
+}
+function afterCascadeSettled(){
+  S.busy=false;
+  if(S.cleared>=LEVEL_QUOTA){ win(); return; }
+  if(!hasAnyLegalMove()){ lose(); return; }
+}
+
+/* ------------------------------ FLOW / OVERLAY ---------------------------- */
+function overlay(html){ $('ovcard').innerHTML=html; $('ov').classList.add('on'); }
+function closeOv(){ $('ov').classList.remove('on'); }
+
+const HOOK_INTRO=`Chỉ còn <b class="hl">${SUITS.length*MAX_RANK} loại quân</b> (2 chất × 4 hạng) để dễ nhận diện khi chơi nhanh. Mỗi lượt bạn thấy 2 KHỐI (2-4 quân dính liền theo hình) — <b class="hl">kéo</b> khối vào bàn để thả (rơi như 1 vật rắn, quân không có gì bên dưới rơi tiếp xuống đáy cột riêng), hoặc kéo vào Khay để giữ dùng sau. Dùng xong 1 khối, chỉ đúng khối đó được thay mới — khối còn lại giữ nguyên. 3+ quân giống nhau liền NGANG/DỌC (không cần sảnh) sẽ tự nổ.`;
+
+function introOverlay(){
+  const demoPiece={key:'demo', cells:[{dr:0,dc:0,tile:T('s1')},{dr:1,dc:0,tile:T('s2')},{dr:1,dc:1,tile:T('s3')}]};
+  overlay(`<h2>Kéo Khối Rơi</h2>
+   <div class="sub">Mahjong × Block Puzzle · prototype kiểm chứng hook</div>
+   <p>${HOOK_INTRO}</p>
+   <div class="demo">${renderPieceBox(demoPiece)}<span class="arw">← kéo bằng tay/chuột</span></div>
+   <ul>
+    <li>Kéo 1 trong 2 khối đang hiện thả vào bàn — khối rơi như 1 vật rắn tới khi cột hẹp nhất của nó chạm vật cản.</li>
+    <li>Kéo khối vào ô "Khay giữ" để dùng sau, nếu khối hiện tại chưa có chỗ vừa.</li>
+    <li>Dùng xong 1 khối (thả vào bàn hoặc vào khay), chỉ đúng khối đó đổi mới — khối còn lại giữ nguyên, không bị xáo.</li>
+    <li>Sau khi mọi quân rơi ổn định, 3+ quân giống nhau liền ngang hoặc dọc sẽ tự nổ, tính vào chỉ tiêu.</li>
+    <li><b class="hl">Kong</b> (4 liên tiếp) nổ to hơn + tặng 1 lượt <b class="hl">Phá Vùng</b> (bấm nút rồi chạm 1 ô trên bàn để phá cả ô đó và tối đa 4 ô liền kề).</li>
+    <li>Qua màn khi phá đủ ${LEVEL_QUOTA} quân; <b class="dg">Thua</b> khi không còn cột nào đặt lọt được khối hiện tại lẫn khối trong Khay.</li>
+   </ul>
+   <button class="btn" onclick="__go()">CHƠI</button>`);
+}
+window.__go=()=>{ closeOv(); ac(); };
+
+const HELP=`<h2>Kéo Khối Rơi</h2>
+ <div class="sub">Mahjong × Block Puzzle · prototype kiểm chứng hook</div>
+ <p>${HOOK_INTRO}</p>
+ <ul>
+  <li>Thả vào cột không vừa sẽ tự huỷ, khối trở lại khay — không mất lượt, kéo lại chỗ khác.</li>
+  <li>Không có chéo: quân giống nhau xếp chéo không tự nổ, chỉ ngang hoặc dọc mới tính.</li>
+  <li>Phá Vùng dùng riêng bằng chạm (không kéo), không tốn lượt đặt khối.</li>
+  <li><b class="dg">Thua</b>: cả khối đang có và khối trong Khay đều không còn cột nào đặt lọt.</li>
+ </ul>
+ <button class="btn" onclick="__closehelp()">ĐÓNG</button>`;
+window.__closehelp=()=>{ closeOv(); };
+$('btn-help').addEventListener('click',()=>overlay(HELP));
+
+function win(){
+  S.over=true; sfx.win();
+  overlay(`<h2 style="color:var(--jade)">QUA MÀN!</h2>
+   <div class="sub">Điểm: <b class="hl">${S.score}</b> · đã phá ${S.cleared}/${LEVEL_QUOTA} quân</div>
+   <p>Đủ số quân cần phá — qua màn thành công.</p>
+   <button class="btn" onclick="__restart()">CHƠI LẠI</button>`);
+}
+function lose(){
+  S.over=true; sfx.lose();
+  overlay(`<h2 style="color:var(--danger)">TRÀN HỘP!</h2>
+   <div class="sub">Điểm: <b class="hl">${S.score}</b> · đã phá ${S.cleared}/${LEVEL_QUOTA} quân</div>
+   <p>Không còn cột nào đặt lọt được khối hiện tại hay khối trong Khay.</p>
+   <button class="btn" onclick="__restart()">CHƠI LẠI</button>`);
+}
+window.__restart=()=>{ closeOv(); startGame(); };
+
+function startGame(){
+  S.board=emptyBoard(); S.score=0; S.cleared=0; S.areaCharges=AREA_CLEAR_START;
+  S.khay=[null,null]; S.areaMode=false; S.busy=false; S.over=false;
+  S.pair=[randomShape(),randomShape()];
+  let seeded=0, guard=0;
+  while(seeded<10 && guard<300){
+    guard++;
+    const c=(Math.random()*COLS)|0;
+    let r=-1; for(let rr=ROWS-1;rr>=0;rr--) if(!S.board[rr][c]){ r=rr; break; }
+    if(r>=0 && r>=ROWS-4){ S.board[r][c]=randTile(); seeded++; }
+  }
+  renderAll();
+}
+document.addEventListener('contextmenu',e=>{ if(e.target.closest('#app')) e.preventDefault(); });
+
+/* ------------------------------ TEST HOOK / SELFTEST ---------------------- */
+window.__digest={ S, T, computeDropOffset, dropPiece, anyValidAnchor, findRunsOf3Plus, hasKhaySpace, useFromPair, startGame,
+  state:()=>({score:S.score,cleared:S.cleared,areaCharges:S.areaCharges,over:S.over}) };
+(function selftest(){
+  const out=[];
+
+  let allValid=true;
+  for(let i=0;i<50;i++){ const t=randTile(); if(!SUITS.includes(t.suit) || t.rank<1 || t.rank>MAX_RANK) allValid=false; }
+  out.push(['tile-pool-reduced-and-bounded', allValid && SUITS.length===2 && MAX_RANK===4]);
+
+  const squarePiece={key:'square', cells:[{dr:0,dc:0,tile:T('s1')},{dr:0,dc:1,tile:T('s2')},{dr:1,dc:0,tile:T('s3')},{dr:1,dc:1,tile:T('s4')}]};
+  S.board=emptyBoard();
+  let d1=dropPiece(S.board, squarePiece, 2);
+  out.push(['drop-square-lands-on-floor', !d1.overflowed && d1.offset===ROWS-2
+    && S.board[ROWS-2][2] && S.board[ROWS-2][2].id==='s1'
+    && S.board[ROWS-1][3] && S.board[ROWS-1][3].id==='s4']);
+
+  const lPiece={key:'L', cells:[{dr:0,dc:0,tile:T('s1')},{dr:1,dc:0,tile:T('s2')},{dr:1,dc:1,tile:T('s3')}]};
+  S.board=emptyBoard();
+  S.board[ROWS-1][2]={id:'x1',suit:'s',rank:1}; // vật cản đứng vững ở đáy cột 2 (dc=1 so với anchorCol=1)
+  let d2=dropPiece(S.board, lPiece, 1);
+  out.push(['rigid-body-stops-at-tallest-column', !d2.overflowed && d2.offset===ROWS-3
+    && S.board[ROWS-3][1] && S.board[ROWS-3][1].id==='s1'
+    && S.board[ROWS-2][1] && S.board[ROWS-2][1].id==='s2'
+    && S.board[ROWS-2][2] && S.board[ROWS-2][2].id==='s3'
+    && !S.board[ROWS-1][1]]);
+
+  for(let c=0;c<COLS;c++) collapseColumn(S.board,c);
+  out.push(['floating-tiles-fall-after-collapse',
+    !S.board[ROWS-3][1]
+    && S.board[ROWS-1][1] && S.board[ROWS-1][1].id==='s2'
+    && S.board[ROWS-2][1] && S.board[ROWS-2][1].id==='s1'
+    && S.board[ROWS-2][2] && S.board[ROWS-2][2].id==='s3']);
+
+  const dominoPiece={key:'domino_h', cells:[{dr:0,dc:0,tile:T('s1')},{dr:0,dc:1,tile:T('s2')}]};
+  S.board = Array.from({length:ROWS},()=>Array.from({length:COLS},()=>({id:'x',suit:'s',rank:1})));
+  out.push(['any-valid-anchor-false-when-board-full', anyValidAnchor(S.board, dominoPiece)===false]);
+
+  S.board=emptyBoard();
+  out.push(['any-valid-anchor-true-when-room-exists', anyValidAnchor(S.board, dominoPiece)===true]);
+
+  S.board=emptyBoard();
+  for(let c=0;c<3;c++) S.board[ROWS-1][c]={id:'s2',suit:'s',rank:2};
+  let m1=findRunsOf3Plus(S.board);
+  out.push(['horizontal-match3-still-detected', m1.cells.length===3 && !m1.hadKong]);
+
+  S.board=emptyBoard();
+  for(let c=0;c<4;c++) S.board[ROWS-1][c]={id:'c3',suit:'c',rank:3};
+  let m2=findRunsOf3Plus(S.board);
+  out.push(['run-of-4-still-sets-kong-flag', m2.cells.length===4 && m2.hadKong===true]);
+
+  S.board=emptyBoard();
+  S.board[ROWS-1][0]={id:'s1',suit:'s',rank:1};
+  S.board[ROWS-2][1]={id:'s1',suit:'s',rank:1};
+  S.board[ROWS-3][2]={id:'s1',suit:'s',rank:1};
+  let m3=findRunsOf3Plus(S.board);
+  out.push(['diagonal-still-not-matched', m3.cells.length===0]);
+
+  out.push(['khay-space-tracks-pieces',
+    hasKhaySpace([null,null])===true && hasKhaySpace([squarePiece,null])===true && hasKhaySpace([squarePiece,lPiece])===false]);
+
+  S.pair=[squarePiece, lPiece];
+  const otherBefore=S.pair[1];
+  const usedPiece=useFromPair(0);
+  out.push(['use-from-pair-keeps-other-slot-untouched',
+    usedPiece===squarePiece && S.pair[1]===otherBefore && S.pair[0]!==squarePiece]);
+
+  startGame();
+
+  const bad=out.filter(x=>!x[1]);
+  console.log('[selftest]', bad.length? 'FAIL '+JSON.stringify(bad) : 'OK ('+out.length+' checks)');
+})();
+
+introOverlay();
+</script>
+</body>
+</html>

@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#102a24">
+  <title>Mahjong Gravity Stack · Prototype 07</title>
+  <style>
+    :root{
+      --ink:#13241f;--muted:#66736d;--paper:#efeade;--panel:#fbf8ef;
+      --jade:#0b765c;--jade-2:#17a27d;--red:#b94f40;--blue:#315f93;
+      --gold:#d09a35;--line:rgba(19,36,31,.15);--shadow:0 22px 60px rgba(13,35,29,.16)
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;background:
+      radial-gradient(circle at 12% 8%,rgba(23,162,125,.10),transparent 28%),
+      radial-gradient(circle at 88% 92%,rgba(208,154,53,.12),transparent 30%),var(--paper);
+      color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+    button{font:inherit;color:inherit}
+    .shell{min-height:100vh;display:grid;grid-template-rows:auto 1fr}
+    header{height:64px;padding:0 max(18px,calc((100vw - 1160px)/2));display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);background:rgba(251,248,239,.84);backdrop-filter:blur(14px)}
+    .brand{font-size:12px;font-weight:900;letter-spacing:.13em}.brand span{color:var(--jade)}
+    .build{font-size:10px;color:var(--muted);font-weight:800;letter-spacing:.13em}
+    main{width:min(1160px,calc(100% - 30px));margin:auto;display:grid;grid-template-columns:310px minmax(0,1fr);gap:50px;padding:40px 0 56px;align-items:start}
+    .info{position:sticky;top:28px}.kicker{margin:0 0 13px;color:var(--jade);font-size:11px;font-weight:950;letter-spacing:.18em}.info h1{font:500 48px/.94 Georgia,"Times New Roman",serif;letter-spacing:-.045em;margin:0 0 20px}.lead{font-size:14px;line-height:1.7;color:var(--muted);margin:0 0 22px}
+    .rule-box{border-top:1px solid var(--line);padding-top:17px}.rule-box h2{font-size:10px;letter-spacing:.15em;margin:0 0 10px}.rule-box ol{padding-left:19px;margin:0;color:#53615b;font-size:13px;line-height:1.6}.rule-box li+li{margin-top:7px}
+    .test-note{margin-top:20px;padding:13px 14px;border-left:3px solid var(--jade);background:rgba(255,255,255,.42);font-size:12px;line-height:1.5;color:#59665f}
+    .tags{display:flex;gap:7px;flex-wrap:wrap;margin-top:17px}.tags span{padding:6px 9px;border:1px solid var(--line);border-radius:999px;font-size:10px;font-weight:800;background:rgba(255,255,255,.35)}
+    .game{min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:26px;padding:22px;box-shadow:var(--shadow)}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:13px}.stat{padding:10px 12px;background:#e9e4d7;border-radius:12px}.stat small{display:block;font-size:8px;letter-spacing:.13em;color:#77827c;font-weight:900;margin-bottom:4px}.stat strong{font:700 20px Georgia,serif}
+    .goal{height:7px;border-radius:999px;background:#ded8ca;overflow:hidden;margin:0 2px 17px}.goal span{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--jade),var(--jade-2));border-radius:inherit;transition:width .3s ease}
+    .board-wrap{position:relative;width:min(100%,620px);margin:auto}
+    .board{display:grid;grid-template-columns:56px repeat(6,minmax(0,1fr));gap:6px;padding:12px;border-radius:18px;background:linear-gradient(160deg,#153d34,#0d2923);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12),0 10px 24px rgba(11,39,32,.2);touch-action:manipulation}
+    .layer-label{min-width:0;border-radius:8px;display:flex;flex-direction:column;justify-content:center;align-items:center;color:rgba(255,255,255,.7);font-size:9px;font-weight:900;letter-spacing:.06em;text-align:center}.layer-label b{font:700 18px Georgia,serif;color:#fff;line-height:1}.layer-label.bottom{background:rgba(23,162,125,.18);color:#bfe8dc}
+    .cell{position:relative;aspect-ratio:.82;border:1px solid rgba(255,255,255,.10);border-radius:8px;background:rgba(255,255,255,.075);padding:0;display:grid;place-items:center;cursor:pointer;min-width:0;transition:transform .12s,background .12s,box-shadow .12s}
+    .cell::after{content:"";position:absolute;inset:auto 9px 5px;height:2px;border-radius:2px;background:rgba(255,255,255,.08)}
+    .cell:hover,.cell.column-hover{background:rgba(255,255,255,.13)}
+    .cell.landing{background:rgba(84,218,177,.22);box-shadow:inset 0 0 0 2px rgba(124,238,203,.72)}
+    .cell.full-column{animation:shake .22s}
+    .cell.filled{background:#fffdf6;border-color:rgba(19,36,31,.16);box-shadow:inset -3px -4px rgba(19,36,31,.07),0 3px 0 rgba(0,0,0,.16)}
+    .cell.clearing{animation:clear .32s forwards;z-index:2}.cell.falling{animation:fall .3s cubic-bezier(.2,.8,.2,1)}
+    .tile{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}.tile b{font:700 clamp(17px,3vw,27px) Georgia,serif;line-height:1}.tile small{font-size:clamp(7px,1vw,10px);font-weight:950;margin-top:4px;letter-spacing:.05em}.tile.s-b{color:var(--jade)}.tile.s-c{color:var(--red)}.tile.s-d{color:var(--blue)}
+    .floor{height:10px;margin:0 13px;border-radius:0 0 12px 12px;background:linear-gradient(90deg,#9c7030,#d0a657,#9c7030);box-shadow:0 4px 0 #694a1d}
+    .column-numbers{display:grid;grid-template-columns:56px repeat(6,1fr);gap:6px;padding:9px 12px 0;color:#75807a;font-size:9px;font-weight:900;text-align:center}.column-numbers span:first-child{visibility:hidden}
+    .message{min-height:24px;margin:10px 0 3px;text-align:center;font-size:12px;line-height:1.4;color:var(--jade);font-weight:850}
+    .offer-title{margin:13px 0 9px;text-align:center;font-size:9px;letter-spacing:.16em;color:#75807a;font-weight:950}.offers{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;max-width:540px;margin:auto}
+    .offer{min-height:86px;border:1px solid var(--line);border-radius:14px;background:#ece7db;display:flex;align-items:center;justify-content:center;gap:9px;cursor:pointer;transition:.16s}.offer:hover{background:#fff;transform:translateY(-2px)}.offer.selected{background:#fff;outline:3px solid rgba(23,162,125,.28);border-color:var(--jade)}.offer .tile-card{width:48px;height:59px;border-radius:8px;background:#fffdf6;display:grid;place-items:center;box-shadow:inset -2px -3px rgba(19,36,31,.07),0 4px 0 rgba(19,36,31,.11)}.offer em{font-style:normal;font-size:10px;color:#6d7872;font-weight:850}.offer.selected em{color:var(--jade)}
+    .actions{display:flex;gap:9px;margin-top:15px}.action{flex:1;border:0;border-radius:12px;padding:12px 14px;background:var(--ink);color:#fff;font-size:12px;font-weight:900;cursor:pointer}.action.secondary{background:#e4ded2;color:var(--ink)}.action:disabled{opacity:.35;cursor:not-allowed}
+    .hint{text-align:center;margin:10px 0 0;color:#78827d;font-size:10px}
+    .overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;padding:20px;border-radius:18px;background:rgba(8,28,23,.82);backdrop-filter:blur(5px);z-index:5}.overlay.show{display:flex}.modal{width:min(380px,100%);padding:27px;background:#fbf8ef;border-radius:20px;text-align:center;box-shadow:var(--shadow)}.modal-icon{width:54px;height:66px;margin:0 auto 14px;border-radius:9px;background:#fff;display:grid;place-items:center;font:700 27px Georgia,serif;color:var(--red);box-shadow:0 5px 0 rgba(19,36,31,.12)}.modal h2{font:500 32px Georgia,serif;margin:0 0 8px}.modal p{font-size:13px;line-height:1.55;color:var(--muted)}.modal button{border:0;border-radius:999px;padding:12px 20px;background:var(--jade);color:#fff;font-weight:900;cursor:pointer}
+    .toast{position:fixed;left:50%;bottom:25px;transform:translate(-50%,24px);padding:10px 16px;border-radius:999px;background:#102a24;color:#fff;font-size:12px;font-weight:850;opacity:0;pointer-events:none;transition:.2s;z-index:20}.toast.show{opacity:1;transform:translate(-50%,0)}
+    @keyframes clear{45%{transform:scale(1.16) rotate(-2deg);filter:brightness(1.18)}100%{transform:scale(.1);opacity:0}}
+    @keyframes fall{0%{transform:translateY(-32px);opacity:.35}70%{transform:translateY(4px)}100%{transform:translateY(0);opacity:1}}
+    @keyframes shake{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+    @media(max-width:880px){main{grid-template-columns:1fr;gap:22px;max-width:700px;padding-top:26px}.info{position:static}.info h1{font-size:38px;margin-bottom:12px}.lead{margin-bottom:8px}.rule-box,.test-note{display:none}.tags{margin-top:10px}}
+    @media(max-width:520px){header{height:54px;padding:0 12px}.build{font-size:8px}main{width:calc(100% - 14px);padding:14px 0 34px}.info h1{font-size:31px}.lead{font-size:12px;line-height:1.5}.game{padding:10px;border-radius:18px}.stats{gap:5px;margin-bottom:9px}.stat{padding:8px 7px}.stat strong{font-size:17px}.board{grid-template-columns:43px repeat(6,minmax(0,1fr));gap:4px;padding:7px}.layer-label b{font-size:15px}.cell{border-radius:6px}.column-numbers{grid-template-columns:43px repeat(6,1fr);gap:4px;padding:8px 7px 0}.offer{min-height:72px;gap:5px;padding:5px}.offer .tile-card{width:39px;height:48px}.offer em{display:none}.actions{margin-top:10px}.hint{margin-top:7px}}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header><div class="brand"><span>MAHJONG × BLOCK</span> · GRAVITY STUDY</div><div class="build">PROTOTYPE 07 · SINGLE HTML</div></header>
+    <main>
+      <aside class="info">
+        <p class="kicker">XẾP TẦNG + TRỌNG LỰC</p>
+        <h1>Mahjong<br>Gravity Stack</h1>
+        <p class="lead">Chọn một quân và thả vào cột. Bàn chỉ cao tối đa ba tầng; khi bộ Mahjong phía dưới biến mất, toàn bộ quân mất điểm tựa sẽ rơi xuống.</p>
+        <div class="rule-box">
+          <h2>LUẬT PROTOTYPE</h2>
+          <ol>
+            <li>Chọn một trong ba quân, sau đó chạm vào cột muốn thả.</li>
+            <li>Ba quân liền nhau tạo bộ ba giống nhau hoặc sảnh cùng chất sẽ bị phá.</li>
+            <li>Quân phía trên rơi xuống lấp chỗ trống. Nếu cú rơi tạo bộ mới, chain tiếp tục.</li>
+            <li>Tất cả sáu cột chạm tầng 3 mà không có bộ để phá: thua.</li>
+          </ol>
+        </div>
+        <div class="tags"><span>Tối đa 3 tầng</span><span>Pung / Chow</span><span>Gravity chain</span></div>
+        <div class="test-note"><strong>Câu hỏi test:</strong> Việc giữ quân ở tầng trên để chờ cú rơi có tạo ra quyết định mới so với Block Puzzle phẳng không?</div>
+      </aside>
+
+      <section class="game" aria-label="Prototype Mahjong Gravity Stack">
+        <div class="stats">
+          <div class="stat"><small>ĐIỂM</small><strong id="score">0</strong></div>
+          <div class="stat"><small>CHAIN</small><strong id="chain">×0</strong></div>
+          <div class="stat"><small>ĐÃ PHÁ</small><strong id="cleared">0</strong></div>
+          <div class="stat"><small>ĐỘ CAO</small><strong id="height">1/3</strong></div>
+        </div>
+        <div class="goal" aria-label="Tiến độ mục tiêu"><span id="goal-bar"></span></div>
+
+        <div class="board-wrap">
+          <div id="board" class="board" aria-label="Bàn sáu cột ba tầng"></div>
+          <div class="floor"></div>
+          <div class="column-numbers"><span>cột</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span></div>
+          <div id="overlay" class="overlay">
+            <div class="modal"><div class="modal-icon">發</div><h2 id="end-title">Mục tiêu hoàn thành!</h2><p id="end-copy"></p><button id="again">Chơi lại</button></div>
+          </div>
+        </div>
+
+        <div id="message" class="message" aria-live="polite">Chọn quân 3索 và thả vào cột 3 để thử cú rơi đầu tiên</div>
+        <div class="offer-title">CHỌN MỘT QUÂN ĐỂ THẢ</div>
+        <div id="offers" class="offers"></div>
+        <div class="actions"><button id="reroll" class="action secondary">Đổi quân · 2</button><button id="restart" class="action">Ván mới</button></div>
+        <p class="hint">Máy tính: phím 1–6 để thả vào cột · R để đổi quân.</p>
+      </section>
+    </main>
+  </div>
+
+  <script>
+  (() => {
+    "use strict";
+    const LEVELS=3, COLS=6, TARGET=1500;
+    const SUITS={b:"索",c:"筒",d:"萬"};
+    const $=selector=>document.querySelector(selector);
+    let board,offers,selected,score,cleared,bestChain,rerolls,busy,ended,uid=0,audio;
+    const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+
+    function tile(id){return{id,uid:++uid}}
+    function randomId(){return `${["b","c","d"][Math.floor(Math.random()*3)]}${1+Math.floor(Math.random()*6)}`}
+    function tileLabel(id){return `${Number(id.slice(1))}${SUITS[id[0]]}`}
+    function tileFace(data){
+      if(!data)return"";
+      const id=typeof data==="string"?data:data.id;
+      return `<span class="tile s-${id[0]}"><b>${Number(id.slice(1))}</b><small>${SUITS[id[0]]}</small></span>`;
+    }
+    function lowestEmpty(col){for(let level=0;level<LEVELS;level++)if(!board[level][col])return level;return-1}
+    function columnHeight(col){let n=0;for(let level=0;level<LEVELS;level++)if(board[level][col])n++;return n}
+    function maxHeight(){return Math.max(0,...Array.from({length:COLS},(_,c)=>columnHeight(c)))}
+
+    function isMeld(ids){
+      if(ids.length!==3||ids.some(Boolean)===false||ids.some(id=>!id))return false;
+      if(ids.every(id=>id===ids[0]))return"pung";
+      if(ids.every(id=>id[0]===ids[0][0])){
+        const ranks=ids.map(id=>Number(id.slice(1))).sort((a,b)=>a-b);
+        if(ranks[1]===ranks[0]+1&&ranks[2]===ranks[1]+1)return"chow";
+      }
+      return false;
+    }
+
+    function completionCandidates(){
+      const candidates=[];
+      for(let level=0;level<LEVELS;level++)for(let start=0;start<=COLS-3;start++){
+        const cells=[0,1,2].map(offset=>board[level][start+offset]);
+        if(cells.filter(Boolean).length!==2)continue;
+        const gap=cells.findIndex(cell=>!cell),col=start+gap;
+        if(lowestEmpty(col)!==level)continue;
+        for(const suit of ["b","c","d"])for(let rank=1;rank<=6;rank++){
+          const id=`${suit}${rank}`,test=cells.map((cell,index)=>index===gap?id:cell.id);
+          if(isMeld(test))candidates.push(id);
+        }
+      }
+      return [...new Set(candidates)];
+    }
+    function drawId(){
+      const smart=completionCandidates();
+      if(smart.length&&Math.random()<.58)return smart[Math.floor(Math.random()*smart.length)];
+      return randomId();
+    }
+    function refillOffers(initial=false){
+      offers=initial?[tile("b3"),tile("c4"),tile("d2")]:[tile(drawId()),tile(drawId()),tile(drawId())];
+      selected=0;
+    }
+
+    function seedBoard(){
+      board=Array.from({length:LEVELS},()=>Array(COLS).fill(null));
+      board[0][0]=tile("b1");board[0][1]=tile("b2");
+      board[1][0]=tile("d2");
+      board[0][3]=tile("c4");board[0][4]=tile("c4");
+      board[1][3]=tile("b5");
+    }
+    function start(){
+      seedBoard();refillOffers(true);score=0;cleared=0;bestChain=0;rerolls=2;busy=false;ended=false;
+      $("#overlay").classList.remove("show");
+      $("#message").textContent="Chọn quân 3索 và thả vào cột 3 để thử cú rơi đầu tiên";
+      render();
+    }
+
+    function renderBoard(states={}){
+      const clearing=states.clearing||new Set(),falling=states.falling||new Set(),landing=states.landing;
+      const root=$("#board");root.innerHTML="";
+      for(let level=LEVELS-1;level>=0;level--){
+        const label=document.createElement("div");
+        label.className=`layer-label${level===0?" bottom":""}`;
+        label.innerHTML=`<b>T${level+1}</b>${level===0?"ĐÁY":"TẦNG"}`;
+        root.append(label);
+        for(let col=0;col<COLS;col++){
+          const data=board[level][col],key=`${level},${col}`;
+          const cell=document.createElement("button");
+          cell.type="button";cell.dataset.level=level;cell.dataset.col=col;
+          cell.className=`cell${data?" filled":""}${clearing.has(key)?" clearing":""}${falling.has(key)?" falling":""}${landing===key?" landing":""}`;
+          cell.innerHTML=tileFace(data);
+          cell.setAttribute("aria-label",data?`Tầng ${level+1}, cột ${col+1}: ${tileLabel(data.id)}`:`Thả vào cột ${col+1}`);
+          cell.onclick=()=>place(col);
+          cell.onmouseenter=()=>previewColumn(col);
+          cell.onmouseleave=clearPreview;
+          root.append(cell);
+        }
+      }
+    }
+    function renderOffers(){
+      const root=$("#offers");root.innerHTML="";
+      offers.forEach((data,index)=>{
+        const button=document.createElement("button");button.type="button";
+        button.className=`offer${selected===index?" selected":""}`;
+        button.innerHTML=`<span class="tile-card">${tileFace(data)}</span><em>${selected===index?"ĐANG CHỌN":"CHỌN"}</em>`;
+        button.setAttribute("aria-label",`Chọn quân ${tileLabel(data.id)}`);
+        button.onclick=()=>{if(!busy&&!ended){selected=index;renderOffers();sfx("tap")}};
+        root.append(button);
+      });
+    }
+    function render(states={}){
+      $("#score").textContent=score.toLocaleString("vi-VN");
+      $("#chain").textContent=`×${bestChain}`;$("#cleared").textContent=cleared;
+      $("#height").textContent=`${Math.max(1,maxHeight())}/3`;
+      $("#goal-bar").style.width=`${Math.min(100,score/TARGET*100)}%`;
+      $("#reroll").textContent=`Đổi quân · ${rerolls}`;$("#reroll").disabled=!rerolls||busy||ended;
+      renderBoard(states);renderOffers();
+    }
+
+    function previewColumn(col){
+      if(busy||ended)return;
+      clearPreview();
+      document.querySelectorAll(`[data-col="${col}"]`).forEach(cell=>cell.classList.add("column-hover"));
+      const level=lowestEmpty(col);
+      if(level>=0)document.querySelector(`[data-level="${level}"][data-col="${col}"]`)?.classList.add("landing");
+    }
+    function clearPreview(){document.querySelectorAll(".column-hover,.landing").forEach(cell=>cell.classList.remove("column-hover","landing"))}
+
+    function findClears(){
+      const cells=new Set();let pungs=0,chows=0;
+      for(let level=0;level<LEVELS;level++)for(let start=0;start<=COLS-3;start++){
+        const row=[0,1,2].map(offset=>board[level][start+offset]);
+        if(row.some(cell=>!cell))continue;
+        const kind=isMeld(row.map(cell=>cell.id));
+        if(!kind)continue;
+        kind==="pung"?pungs++:chows++;
+        for(let offset=0;offset<3;offset++)cells.add(`${level},${start+offset}`);
+      }
+      return{cells,pungs,chows};
+    }
+    function applyGravity(){
+      const moved=new Set();
+      for(let col=0;col<COLS;col++){
+        const stack=[];
+        for(let level=0;level<LEVELS;level++)if(board[level][col])stack.push({data:board[level][col],oldLevel:level});
+        for(let level=0;level<LEVELS;level++)board[level][col]=null;
+        stack.forEach((item,newLevel)=>{board[newLevel][col]=item.data;if(item.oldLevel!==newLevel)moved.add(`${newLevel},${col}`)});
+      }
+      return moved;
+    }
+    async function resolveBoard(){
+      let chain=0,totalFallen=0;
+      while(true){
+        const found=findClears();if(!found.cells.size)break;
+        chain++;bestChain=Math.max(bestChain,chain);
+        const gain=(found.cells.size*18+found.pungs*90+found.chows*120)*chain;
+        score+=gain;cleared+=found.cells.size;
+        const parts=[];if(found.pungs)parts.push(`${found.pungs} bộ ba`);if(found.chows)parts.push(`${found.chows} sảnh`);
+        $("#message").textContent=`${parts.join(" + ")} · CHAIN ×${chain} · +${gain}`;
+        render({clearing:found.cells});sfx("clear");await wait(310);
+        found.cells.forEach(key=>{const[level,col]=key.split(",").map(Number);board[level][col]=null});
+        render();await wait(70);
+        const moved=applyGravity();totalFallen+=moved.size;
+        if(moved.size){$("#message").textContent=`${moved.size} quân mất điểm tựa và rơi xuống…`;render({falling:moved});sfx("fall");await wait(300)}
+      }
+      return{chain,totalFallen};
+    }
+    async function place(col){
+      if(busy||ended)return false;
+      const level=lowestEmpty(col);
+      if(level<0){
+        document.querySelectorAll(`[data-col="${col}"]`).forEach(cell=>{cell.classList.add("full-column");setTimeout(()=>cell.classList.remove("full-column"),240)});
+        toast("Cột này đã chạm tầng 3");sfx("bad");return false;
+      }
+      busy=true;clearPreview();
+      const played=offers[selected];board[level][col]=played;offers[selected]=tile(drawId());score+=5;
+      $("#message").textContent=`${tileLabel(played.id)} rơi xuống tầng ${level+1}`;
+      render({falling:new Set([`${level},${col}`])});sfx("drop");await wait(220);
+      const result=await resolveBoard();
+      if(!result.chain)$("#message").textContent=`${tileLabel(played.id)} đã dừng ở tầng ${level+1} · chưa tạo bộ`;
+      busy=false;render();checkEnd();return true;
+    }
+    function checkEnd(){
+      if(score>=TARGET){end(true);return}
+      if(Array.from({length:COLS},(_,col)=>lowestEmpty(col)).every(level=>level<0))end(false);
+    }
+    function end(win){
+      ended=true;busy=false;
+      $("#end-title").textContent=win?"Chuỗi rơi hoàn thành!":"Tháp đã bị khóa";
+      $("#end-copy").textContent=win?`Bạn đạt ${score.toLocaleString("vi-VN")} điểm, phá ${cleared} quân và tạo chain cao nhất ×${bestChain}.`:`Không còn cột trống. Hãy giữ tầng đáy linh hoạt và dùng quân ở tầng trên để chuẩn bị cú rơi.`;
+      $("#overlay").classList.add("show");render();
+    }
+    function reroll(){if(!rerolls||busy||ended)return;rerolls--;refillOffers();$("#message").textContent="Đã đổi ba quân mới";render();sfx("tap")}
+    function toast(text){let node=document.querySelector(".toast");if(!node){node=document.createElement("div");node.className="toast";document.body.append(node)}node.textContent=text;node.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>node.classList.remove("show"),1200)}
+    function sfx(type){
+      try{
+        audio=audio||new(window.AudioContext||window.webkitAudioContext)();
+        const osc=audio.createOscillator(),gain=audio.createGain(),now=audio.currentTime;
+        const tones={tap:[320,.035],drop:[190,.07],fall:[125,.11],clear:[620,.12],bad:[90,.12]};
+        const [frequency,duration]=tones[type]||tones.tap;osc.frequency.setValueAtTime(frequency,now);
+        if(type==="clear")osc.frequency.exponentialRampToValueAtTime(920,now+duration);
+        gain.gain.setValueAtTime(.035,now);gain.gain.exponentialRampToValueAtTime(.001,now+duration);
+        osc.connect(gain);gain.connect(audio.destination);osc.start(now);osc.stop(now+duration);
+      }catch(_){/* Audio is optional. */}
+    }
+
+    $("#reroll").onclick=reroll;$("#restart").onclick=start;$("#again").onclick=start;
+    addEventListener("keydown",event=>{
+      if(event.key>="1"&&event.key<="6"){event.preventDefault();place(Number(event.key)-1)}
+      if(event.key.toLowerCase()==="r"){event.preventDefault();reroll()}
+    });
+
+    window.__mahjongGravity={
+      getState:()=>({board:board.map(row=>row.map(cell=>cell?.id||null)),offers:offers.map(cell=>cell.id),score,cleared,bestChain,busy,ended}),
+      place,findClears,applyGravity,restart:start
+    };
+    start();
+    if(new URLSearchParams(location.search).has("autotest")){
+      setTimeout(async()=>{
+        await place(2);
+        const passed=board[0][0]?.id==="d2"&&!board[1][0]&&cleared>=3;
+        document.body.dataset.autotest=passed?"passed":"failed";
+      },30);
+    }
+  })();
+  </script>
+</body>
+</html>

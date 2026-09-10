@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>01C · Color Match Levels</title>
+  <link rel="stylesheet" href="./common.css" />
+  <style>
+    :root{--accent:#5b67c8}.board{grid-template-columns:repeat(6,1fr)}.stats{grid-template-columns:repeat(4,1fr)}.combo-pill{color:#5b67c8}.color-rule{color:#5b67c8!important;border-color:rgba(91,103,200,.35)!important;background:#eceefe!important}
+    .color-tile{display:block;width:100%;height:100%;border-radius:6px;box-shadow:inset -3px -4px 0 rgba(20,28,38,.12),inset 2px 2px 0 rgba(255,255,255,.22);pointer-events:none}.cell.filled{padding:3px;background:#f8f5ec}.mini-tile{color:transparent!important;border-width:2px;box-shadow:inset -2px -3px 0 rgba(20,28,38,.12),inset 1px 1px 0 rgba(255,255,255,.25)}
+    .color-red,.mini-tile.color-red{background:#e85b62;border-color:#b93f48}.color-blue,.mini-tile.color-blue{background:#4f8fe8;border-color:#326ab4}.color-green,.mini-tile.color-green{background:#42b985;border-color:#258a61}.color-yellow,.mini-tile.color-yellow{background:#efbd3e;border-color:#bd8c18}.color-purple,.mini-tile.color-purple{background:#9b6bd8;border-color:#7145aa}.color-orange,.mini-tile.color-orange{background:#ef823e;border-color:#bd5b20}.color-teal,.mini-tile.color-teal{background:#25b6b0;border-color:#16817d}
+    .cell.preview{background:rgba(255,255,255,.12);transform:none}.cell.preview .color-tile{opacity:.72;transform:scale(.88)}.cell.preview.preview-red{box-shadow:inset 0 0 0 3px #e85b62}.cell.preview.preview-blue{box-shadow:inset 0 0 0 3px #4f8fe8}.cell.preview.preview-green{box-shadow:inset 0 0 0 3px #42b985}.cell.preview.preview-yellow{box-shadow:inset 0 0 0 3px #efbd3e}.cell.preview.preview-purple{box-shadow:inset 0 0 0 3px #9b6bd8}.cell.preview.preview-orange{box-shadow:inset 0 0 0 3px #ef823e}.cell.preview.preview-teal{box-shadow:inset 0 0 0 3px #25b6b0}
+    .color-legend{display:flex;gap:4px!important}.color-legend i{width:15px;height:15px;border-radius:4px;display:block;box-shadow:inset -1px -2px rgba(20,28,38,.12)}
+  </style>
+</head>
+<body>
+<div class="shell">
+  <nav class="game-nav">
+    <a class="back-link" href="./01-mahjong-block.html"><span>←</span> So sánh Prototype 01</a>
+    <div class="game-index">01C · 3 COLOR LEVELS</div>
+  </nav>
+  <main class="game-layout">
+    <aside class="info-panel">
+      <p class="kicker">3 LEVEL · 3 → 7 MÀU</p>
+      <h1>Color<br>Match Board</h1>
+      <p class="intro">Hoàn thành ba level bằng cách phá đủ số tile mục tiêu. Level càng cao càng có nhiều loại màu, khiến việc tạo chuỗi khó hơn.</p>
+      <div class="rules">
+        <h2>LUẬT THỬ NGHIỆM</h2>
+        <ol>
+          <li>Chọn một trong ba block, sau đó chạm vào ô đặt góc trên-trái. Mỗi block được tạo ngẫu nhiên giữa đồng màu và trộn màu.</li>
+          <li>Từ 3 tile cùng màu liên tục trở lên theo hàng ngang hoặc cột dọc sẽ bị phá.</li>
+          <li>Phá đủ goal của level để mở level tiếp theo: 3 màu → 5 màu → 7 màu.</li>
+        </ol>
+      </div>
+      <div class="legend"><span class="color-rule">3+ CÙNG MÀU</span><span id="level-colors">3 màu</span><span id="color-legend" class="color-legend"></span></div>
+      <div class="feedback"><strong>Câu hỏi test:</strong> Việc tăng số màu qua từng level có tạo cảm giác khó dần mà vẫn công bằng không?</div>
+    </aside>
+
+    <section class="game-panel" aria-label="Prototype Color Match Blocks">
+      <div class="stats">
+        <div class="stat"><small>LEVEL</small><strong id="level">1/3</strong></div>
+        <div class="stat"><small>ĐIỂM</small><strong id="score">0</strong></div>
+        <div class="stat"><small>COMBO</small><strong id="combo">×1</strong></div>
+        <div class="stat"><small>GOAL</small><strong id="cleared">0/12</strong></div>
+      </div>
+      <div class="board-wrap">
+        <div id="board" class="board" aria-label="Bàn cờ 6 nhân 6"></div>
+        <div id="overlay" class="overlay">
+          <div class="modal"><div class="modal-icon">●</div><h2 id="end-title">Hết chỗ rồi!</h2><p id="end-copy"></p><button id="again">Chơi lại</button></div>
+        </div>
+      </div>
+      <div id="message" class="message">Chọn một khối để bắt đầu</div>
+      <div class="offers-label">BA KHỐI CỦA LƯỢT NÀY</div>
+      <div id="offers" class="offers"></div>
+      <div class="action-row"><button class="action secondary" id="reroll">Đổi khối · 1</button><button class="action" id="restart">Ván mới</button></div>
+      <p class="mobile-hint">Mẹo: nối ít nhất 3 ô cùng màu liên tục theo hàng hoặc cột.</p>
+    </section>
+  </main>
+</div>
+<script src="./common.js"></script>
+<script>
+(() => {
+  const R=6,C=6,COLORS=["red","blue","green","yellow","purple","orange","teal"],COLOR_NAMES={red:"Đỏ",blue:"Xanh dương",green:"Xanh lá",yellow:"Vàng",purple:"Tím",orange:"Cam",teal:"Xanh ngọc"};
+  const LEVELS=[{colors:3,target:12},{colors:5,target:24},{colors:7,target:36}];
+  const BLOCK_SHAPES=[[[0,0]],[[0,0],[0,1]],[[0,0],[1,0]],[[0,0],[1,0],[1,1]],[[0,0],[0,1],[1,0],[1,1]]];
+  let board, pieces, selected, score, combo, cleared, rerolls, busy, levelIndex=0,overlayAction="retry",pendingPreview=[];
+  const $=s=>document.querySelector(s);
+  const boardEl=$("#board"), offersEl=$("#offers"), messageEl=$("#message");
+  const currentLevel=()=>LEVELS[levelIndex];
+  const activeColors=()=>COLORS.slice(0,currentLevel().colors);
+  const randomColor=()=>{const colors=activeColors();return colors[Math.floor(Math.random()*colors.length)];};
+  const colorFace=id=>id?`<span class="color-tile color-${id}" aria-hidden="true"></span>`:"";
+  const colorLabel=id=>id?`Màu ${COLOR_NAMES[id]}`:"";
+  function colorPiece(){
+    const cells=BLOCK_SHAPES[Math.floor(Math.random()*BLOCK_SHAPES.length)].map(cell=>[...cell]);
+    const sameColor=cells.length===1||Math.random()<.5;
+    const colors=activeColors(),firstColor=randomColor();
+    const tiles=sameColor
+      ? Array(cells.length).fill(firstColor)
+      : cells.map(()=>colors[Math.floor(Math.random()*colors.length)]);
+    if(!sameColor&&tiles.every(color=>color===tiles[0]))tiles[tiles.length-1]=colors.find(color=>color!==tiles[0]);
+    return{cells,tiles,used:false};
+  }
+
+  function freshBoard(){
+    board=Array.from({length:R},()=>Array(C).fill(null));
+    const starter=[[0,1],[1,4],[2,2],[3,0],[4,3],[5,5]];
+    starter.forEach(([r,c])=>board[r][c]=randomColor());
+  }
+  function newPieces(){pieces=[colorPiece(),colorPiece(),colorPiece()];selected=0;}
+  function startLevel(index=levelIndex){
+    levelIndex=index;freshBoard();newPieces();score=0;combo=1;cleared=0;rerolls=1;busy=false;pendingPreview=[];
+    $("#overlay").classList.remove("show");messageEl.textContent=`Level ${levelIndex+1}: phá ${currentLevel().target} tile`;render();
+  }
+  function startGame(){startLevel(0);}
+
+  function render(){
+    $("#level").textContent=`${levelIndex+1}/${LEVELS.length}`;$("#score").textContent=score.toLocaleString("vi-VN"); $("#combo").textContent=`×${combo}`; $("#cleared").textContent=`${Math.min(cleared,currentLevel().target)}/${currentLevel().target}`;
+    $("#level-colors").textContent=`${currentLevel().colors} màu`;
+    $("#color-legend").innerHTML=activeColors().map(color=>`<i class="color-${color}" title="${colorLabel(color)}"></i>`).join("");
+    $("#reroll").textContent=`Đổi khối · ${rerolls}`; $("#reroll").disabled=!rerolls||busy;
+    renderBoard(); renderOffers();
+  }
+  function renderBoard(){
+    boardEl.innerHTML="";
+    for(let r=0;r<R;r++) for(let c=0;c<C;c++){
+      const cell=document.createElement("button"); cell.className="cell"+(board[r][c]?" filled":""); cell.dataset.r=r;cell.dataset.c=c;
+      cell.setAttribute("aria-label",board[r][c]?colorLabel(board[r][c]):`Ô ${r+1}, ${c+1}`); cell.innerHTML=colorFace(board[r][c]);
+      cell.addEventListener("mouseenter",()=>preview(r,c)); cell.addEventListener("mouseleave",clearPreview); cell.addEventListener("click",()=>place(r,c)); boardEl.append(cell);
+    }
+  }
+  function renderOffers(){
+    offersEl.innerHTML="";
+    pieces.forEach((p,i)=>{
+      const btn=document.createElement("button"); btn.className=`piece${selected===i?" selected":""}${p.used?" used":""}`; btn.innerHTML=renderColoredMini(p); btn.setAttribute("aria-label",`Chọn khối ${i+1}`);
+      btn.onclick=()=>{if(!p.used&&!busy){selected=i;messageEl.textContent="Chạm lên bàn để đặt khối";renderOffers();}}; offersEl.append(btn);
+    });
+  }
+  function renderColoredMini(piece){
+    const size=MJ.dims(piece.cells),lookup=new Map(piece.cells.map((cell,index)=>[`${cell[0]},${cell[1]}`,piece.tiles[index]]));
+    let html=`<div class="piece-grid" style="grid-template-columns:repeat(${size.cols},22px);grid-template-rows:repeat(${size.rows},25px)">`;
+    for(let r=0;r<size.rows;r++)for(let c=0;c<size.cols;c++){const id=lookup.get(`${r},${c}`);html+=id?`<span class="mini-tile color-${id}" title="${colorLabel(id)}"></span>`:"<span></span>";}
+    return html+"</div>";
+  }
+  function cellsFor(r,c){ const p=pieces[selected]; return p?p.cells.map(([dr,dc],i)=>({r:r+dr,c:c+dc,tile:p.tiles[i]})):[]; }
+  function clearPreview(){
+    pendingPreview.forEach(el=>{el.classList.remove("preview","invalid",...COLORS.map(color=>`preview-${color}`));const r=Number(el.dataset.r),c=Number(el.dataset.c);el.innerHTML=colorFace(board[r]?.[c]);el.setAttribute("aria-label",board[r]?.[c]?colorLabel(board[r][c]):`Ô ${r+1}, ${c+1}`);delete el.dataset.previewTile;});pendingPreview=[];
+  }
+  function preview(r,c){
+    clearPreview(); if(busy||selected==null||pieces[selected].used)return;
+    const ok=MJ.fits(board,R,C,pieces[selected].cells,r,c);cellsFor(r,c).forEach(pos=>{const el=boardEl.querySelector(`[data-r="${pos.r}"][data-c="${pos.c}"]`);if(el){if(ok){el.classList.add("preview",`preview-${pos.tile}`);el.innerHTML=colorFace(pos.tile);el.dataset.previewTile=pos.tile;el.setAttribute("aria-label",`Preview ${colorLabel(pos.tile)}`);}else el.classList.add("invalid");pendingPreview.push(el);}});
+  }
+  function place(r,c){
+    if(busy||selected==null||pieces[selected].used)return;
+    const p=pieces[selected]; if(!MJ.fits(board,R,C,p.cells,r,c)){MJ.toast("Không đặt được ở đây");return;}
+    clearPreview(); p.cells.forEach(([dr,dc],i)=>board[r+dr][c+dc]=p.tiles[i]); p.used=true; score+=p.cells.length*5; busy=true;
+    const result=findClears();
+    if(result.cells.size){
+      const base=result.groups*120+result.cells.size*10;
+      score+=base*combo; messageEl.textContent=`${result.label} · +${base*combo}`; combo=Math.min(8,combo+1);
+      render(); result.cells.forEach(key=>{const [rr,cc]=key.split(",");boardEl.querySelector(`[data-r="${rr}"][data-c="${cc}"]`)?.classList.add("clearing");});
+      setTimeout(()=>{result.cells.forEach(key=>{const [rr,cc]=key.split(",").map(Number);board[rr][cc]=null;});cleared+=result.cells.size;if(cleared>=currentLevel().target)completeLevel();else finishTurn();},320);
+    }else{ combo=1; messageEl.textContent="Không có clear · combo trở về ×1"; setTimeout(finishTurn,160); }
+  }
+  function findClears(){
+    const cells=new Set();let groups=0;
+    const scan=arr=>{let start=0;while(start<arr.length){if(!arr[start].id){start++;continue;}let end=start+1;while(end<arr.length&&arr[end].id===arr[start].id)end++;if(end-start>=3){groups++;for(let i=start;i<end;i++)cells.add(arr[i].key);}start=end;}};
+    for(let r=0;r<R;r++)scan(board[r].map((id,c)=>({id,key:`${r},${c}`})));
+    for(let c=0;c<C;c++)scan(board.map((row,r)=>({id:row[c],key:`${r},${c}`})));
+    return{cells,groups,label:groups?`${groups} chuỗi cùng màu`:"Clear"};
+  }
+  function finishTurn(){
+    if(pieces.every(p=>p.used))newPieces(); else selected=pieces.findIndex(p=>!p.used);
+    busy=false;render(); checkEnd();
+  }
+  function completeLevel(){
+    busy=false;render();const finalLevel=levelIndex===LEVELS.length-1;
+    $("#end-title").textContent=finalLevel?"Hoàn thành cả 3 level!":`Hoàn thành Level ${levelIndex+1}!`;
+    $("#end-copy").textContent=finalLevel
+      ? `Bạn đã vượt Level 3 với 7 loại màu và đạt ${score.toLocaleString("vi-VN")} điểm.`
+      : `Bạn đã phá đủ ${currentLevel().target} tile. Level ${levelIndex+2} sẽ có ${LEVELS[levelIndex+1].colors} loại màu và goal ${LEVELS[levelIndex+1].target} tile.`;
+    $("#again").textContent=finalLevel?"Chơi lại từ Level 1":"Level tiếp theo";overlayAction=finalLevel?"restart":"next";$("#overlay").classList.add("show");
+  }
+  function checkEnd(){
+    const playable=pieces.filter(p=>!p.used).some(p=>MJ.anyFit(board,R,C,p.cells));
+    if(!playable){$("#end-title").textContent=`Level ${levelIndex+1}: Hết chỗ rồi!`;$("#end-copy").textContent=`Bạn đã phá ${cleared}/${currentLevel().target} tile. Hãy tạo chuỗi 3+ trước khi bàn bị khóa kín.`;$("#again").textContent=`Thử lại Level ${levelIndex+1}`;overlayAction="retry";$("#overlay").classList.add("show");}
+  }
+  $("#reroll").onclick=()=>{if(!rerolls||busy)return;rerolls--;newPieces();messageEl.textContent="Đã đổi ba khối";render();};
+  $("#restart").onclick=startGame;$("#again").onclick=()=>overlayAction==="next"?startLevel(levelIndex+1):overlayAction==="restart"?startGame():startLevel(levelIndex);
+  window.__colorMatch={getState:()=>({board:board.map(row=>[...row]),pieces,score,combo,cleared,busy,level:levelIndex+1,target:currentLevel().target,colorCount:currentLevel().colors}),findClears,restart:startGame,startLevel};
+  startGame();
+})();
+</script>
+</body>
+</html>

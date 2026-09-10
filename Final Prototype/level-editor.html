@@ -1,0 +1,2158 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mahjong x Block — Level Editor</title>
+<style>
+:root{ --bg:#1b140f; --panel:#241a12; --panel2:#2e2117; --line:#4a3524; --gold:#e8b64c; --jade:#8fbf52;
+  --danger:#ff5d51; --cream:#f6ecd8; --muted:#9c8b76; }
+*{box-sizing:border-box;}
+body{margin:0; background:var(--bg); color:var(--cream); font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  font-size:13px; display:flex; flex-direction:column; min-height:100vh;}
+h1{font-size:16px; margin:0; padding:10px 14px; background:var(--panel2); border-bottom:1px solid var(--line);
+  color:var(--gold); display:flex; align-items:center; gap:10px;}
+h1 small{font-size:11px; color:var(--muted); font-weight:400;}
+main{display:grid; grid-template-columns:280px 1fr 320px; gap:10px; padding:10px; flex:1; min-height:0;}
+@media(max-width:1100px){ main{grid-template-columns:1fr; } }
+section{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px; overflow:auto;}
+h2{font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--gold); margin:0 0 8px; opacity:.85;}
+label{display:block; font-size:11px; color:var(--muted); margin:8px 0 3px;}
+input,select,textarea,button{font:inherit; background:var(--panel2); color:var(--cream); border:1px solid var(--line);
+  border-radius:5px; padding:5px 7px;}
+input,select,textarea{width:100%;}
+textarea{resize:vertical; min-height:36px;}
+button{cursor:pointer; transition:filter .1s;}
+button:hover{filter:brightness(1.15);}
+button.primary{background:linear-gradient(180deg,var(--gold),#c8912e); color:#2a1d0b; border:0; font-weight:700;}
+button.jade{background:linear-gradient(180deg,var(--jade),#5f8a34); color:#0f1c07; border:0; font-weight:700;}
+button.danger{background:rgba(255,93,81,.16); border-color:rgba(255,93,81,.4); color:#ffb3ac;}
+button.small{padding:3px 6px; font-size:11px;}
+button:disabled{opacity:.4; cursor:not-allowed;}
+.row{display:flex; gap:6px; align-items:center;}
+/* .hidden chưa từng được định nghĩa trong file này -- renderTestBoosters()
+   toggle đúng class này để ẩn #testBoosters khi cả 2 booster đều =0, nhưng
+   không có rule CSS nào khớp nên nó KHÔNG BAO GIỜ thực sự ẩn (vẫn hiện text
+   tĩnh "🔄 Đổi khối"/"💡 Hint" không có số/không disabled), nhìn như màn có
+   booster dù thực ra không có. */
+.hidden{display:none !important;}
+.row>*{flex:1;}
+.hint{font-size:10.5px; color:var(--muted); line-height:1.4; margin-top:2px;}
+fieldset{border:1px dashed var(--line); border-radius:6px; margin:8px 0 0; padding:8px;}
+legend{font-size:10.5px; color:var(--gold); padding:0 4px;}
+
+/* board -- "mô phỏng trực tiếp bàn chơi" pass: bamboo-mat green felt + cream tile cards,
+   matching Final Core/index.html's own board/tile look (repeating-linear-gradient felt
+   texture, .tile cream-card-with-bamboo-shadow) instead of a bare dark dev grid. */
+#boardWrap{display:flex; flex-direction:column; align-items:center; gap:10px;}
+#board{display:grid; gap:3px;
+  background:repeating-linear-gradient(90deg, rgba(0,0,0,.07) 0 2px, transparent 2px 9px, rgba(255,255,255,.03) 9px 10px, transparent 10px 19px),
+    linear-gradient(155deg,#4a6b32,#3a5626);
+  padding:6px; border-radius:8px; border:1px solid var(--line);}
+.cell{position:relative; width:64px; height:64px; background:rgba(0,0,0,.12); border-radius:5px; cursor:pointer;
+  border:1px solid rgba(255,255,255,.08); overflow:visible; user-select:none;}
+.cell:hover{border-color:var(--gold);}
+.cell .floorTag,.cell .roofTag{position:absolute; border-radius:6px; display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(155deg,#f6ecd8,#e6d6ae);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7), inset 0 -2px 2px rgba(0,0,0,.14), 1px 2px 0 0 #5a7a3a, 1px 2px 0 1px #3f5a28, 2px 3px 5px rgba(0,0,0,.5);}
+.cell .floorTag{inset:4px; font-size:26px; z-index:1;}
+.cell .roofTag{inset:16px 4px 4px 16px; font-size:18px; z-index:2; box-shadow:inset 0 1px 0 rgba(255,255,255,.7), inset 0 -2px 2px rgba(0,0,0,.14), 1px 2px 0 0 #c8912e, 1px 2px 0 1px #8a6420, 2px 4px 7px rgba(0,0,0,.55);}
+.cell.seal{background:repeating-linear-gradient(45deg,rgba(232,182,76,.18) 0 6px,rgba(0,0,0,.2) 6px 12px);}
+.cell.permanent{background:repeating-linear-gradient(45deg,rgba(255,255,255,.05) 0 6px,rgba(0,0,0,.4) 6px 12px);}
+.cell.lock{background:repeating-linear-gradient(45deg,rgba(120,200,255,.18) 0 6px,rgba(0,0,0,.25) 6px 12px);}
+.cell.lock.lock-active-group{box-shadow:inset 0 0 0 2px var(--gold);}
+.lockGroupCard{border:1px dashed var(--line); border-radius:6px; padding:6px; margin-bottom:6px;}
+.lockGroupCard.active{border-color:var(--gold); border-style:solid;}
+.lockGroupCard .row{margin-top:4px;}
+.cell .lockTag{position:absolute; inset:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; border-radius:4px; font-weight:800; font-size:10px;}
+.cell .lockTag .lt-icon{width:60%; height:auto; border-radius:2px; padding:2px 0; text-align:center;}
+.cell .lockTag .lt-count{color:#bfe6ff;}
+.shapeComposerGrid{display:grid; gap:2px; margin:6px 0; width:max-content; user-select:none;}
+.shapeComposerGrid .sc{width:28px; height:28px; border:1px solid var(--line); border-radius:3px; cursor:pointer; background:rgba(255,255,255,.03);}
+.shapeComposerGrid .sc:hover{border-color:var(--gold);}
+.shapeComposerGrid .sc.on{background:var(--jade); border-color:var(--jade);}
+.cell.guide{box-shadow:inset 0 0 0 2px var(--jade);}
+.cell.badplace{box-shadow:inset 0 0 0 2px var(--danger);}
+.cell.rectpreview{box-shadow:inset 0 0 0 2px var(--gold); background:rgba(232,182,76,.22);}
+.cell.ghost-valid{box-shadow:inset 0 0 0 2px var(--jade);}
+.cell.ghost-invalid{box-shadow:inset 0 0 0 2px var(--danger);}
+.cell .ghostFace{position:absolute; inset:5px; border-radius:4px; opacity:.65; pointer-events:none; z-index:3;
+  display:flex; align-items:center; justify-content:center; font-size:24px;
+  background:rgba(246,236,216,.35);}
+.palette{display:flex; flex-wrap:wrap; gap:5px;}
+.swatch{width:34px; height:28px; border-radius:5px; display:flex; align-items:center; justify-content:center;
+  font-weight:800; font-size:16px; cursor:pointer; border:2px solid transparent;}
+.swatch.active{border-color:var(--cream); box-shadow:0 0 0 2px var(--gold);}
+.toolbtn{padding:5px 9px; border-radius:5px; cursor:pointer; font-size:11px;}
+.toolbtn.active{outline:2px solid var(--gold);}
+
+/* piece list */
+.pieceRow{display:flex; align-items:center; gap:6px; padding:5px; border:1px solid var(--line); border-radius:5px; margin-bottom:5px;}
+.pieceRow .handle{cursor:grab; user-select:none; padding:0 4px; color:var(--muted); flex:none; font-size:13px;}
+.pieceRow.dragging{opacity:.4;}
+.pieceRow.drag-over{box-shadow:inset 0 0 0 2px var(--gold);}
+.pieceRow .cells{display:flex; gap:3px; flex-wrap:wrap; flex:1;}
+.pieceRow .cellTag{font-size:10px; padding:1px 5px; border-radius:8px; border:1px solid var(--line); font-weight:700;}
+.pieceMini{display:grid; gap:2px; margin:6px 0;}
+.pieceMini .mc{width:26px; height:26px; border:1px solid var(--line); border-radius:3px; display:flex; align-items:center;
+  justify-content:center; font-size:9px; cursor:pointer; font-weight:700;}
+.draggable-piece{cursor:grab;}
+.draggable-piece:active{cursor:grabbing;}
+
+/* validation */
+.check{display:flex; gap:6px; align-items:flex-start; padding:4px 0; border-bottom:1px solid rgba(255,255,255,.05); font-size:11px;}
+.check .icon{flex:none; width:14px;}
+.check.pass .icon{color:var(--jade);}
+.check.fail .icon{color:var(--danger);}
+.check.warn .icon{color:var(--gold);}
+.check .detail{color:var(--muted); font-size:10.5px;}
+
+#exportCode{width:100%; height:160px; font-family:Consolas,monospace; font-size:11px; white-space:pre;}
+#status{position:fixed; left:50%; bottom:16px; transform:translateX(-50%); background:#000; color:var(--cream);
+  border:1px solid var(--gold); border-radius:6px; padding:7px 14px; font-size:12px; opacity:0; pointer-events:none;
+  transition:opacity .25s;}
+#status.on{opacity:1;}
+.goalline{font-size:12px; padding:6px 8px; border-radius:5px; background:var(--panel2); margin-bottom:8px;
+  display:flex; flex-wrap:wrap; gap:6px; align-items:center;}
+.goalline.won{background:rgba(143,191,82,.2);}
+.goalline.lost{background:rgba(255,93,81,.2);}
+.goal-banner{font-weight:800; color:var(--gold);}
+.goalline.won .goal-banner{color:var(--jade);}
+.goalline.lost .goal-banner{color:var(--danger);}
+/* Bàn cờ + khay Current/Next mờ đi và khoá tương tác khi game đã thắng/thua --
+   trước đây chỉ có #goalLine đổi màu, còn bàn/khay vẫn y hệt lúc đang chơi nên
+   nhìn như còn chơi tiếp được (report: màn hình thất bại gây hiểu lầm). */
+#boardWrap.board-gameover{opacity:.45; filter:grayscale(.5); pointer-events:none;}
+.queue-gameover{opacity:.4; filter:grayscale(.6);}
+.goal-chip{display:inline-flex; align-items:center; gap:3px; padding:3px 8px; border-radius:12px; font-weight:700;
+  background:linear-gradient(160deg,#8a6234,#5a3f1f); border:1px solid rgba(232,182,76,.5); color:var(--cream);}
+.goal-chip.sub{opacity:.85; font-size:11px; padding:2px 6px;}
+.goal-chip.met{background:linear-gradient(160deg,#6fae44,#3f6a26); border-color:rgba(143,191,82,.7); color:#eafce0;}
+.goal-chip.moves{background:transparent; border-color:var(--line); color:var(--muted); margin-left:auto;}
+.goal-chip small{opacity:.7; font-weight:600;}
+</style>
+</head>
+<body>
+
+<h1>Mahjong × Block — Level Editor <small>chỉnh tay level, đưa thẳng vào P24M_LEVELS</small></h1>
+
+<main>
+<section id="panelMeta">
+  <h2>0 · Chọn màn</h2>
+  <button class="primary" id="btnPickFile" style="width:100%;">Chọn file index.html…</button>
+  <div id="fileInfo" class="hint"></div>
+  <label>Đang chỉnh</label>
+  <select id="fLevelPicker"><option value="new">➕ Màn mới (New Level)</option></select>
+  <div class="hint">Load index.html trước để chọn 1 trong các màn có sẵn — sửa xong bấm "Cập nhật" ở mục 6 để ghi đè đúng màn đó, thay vì thêm màn mới.</div>
+
+  <h2 style="margin-top:14px">1 · Thông tin màn</h2>
+  <label>Title</label>
+  <input id="fTitle" value="New Level">
+  <label>Board size (2–6)</label>
+  <input id="fSize" type="number" min="2" max="6" value="3">
+  <label>Goal type</label>
+  <select id="fGoalType">
+    <option value="TILE_QUOTA">TILE_QUOTA (đủ N mahjong bất kỳ mặt nào)</option>
+    <option value="TARGET_FACE">TARGET_FACE (N-trên-M mặt)</option>
+    <option value="OPEN_SEAL">OPEN_SEAL (phá Phong Ấn)</option>
+    <option value="BURIED_TARGET">BURIED_TARGET (mọi winTargets, bị chôn)</option>
+  </select>
+  <div id="goalFields"></div>
+  <label>Seal — số mặt khác nhau cần (sealRequiredDistinct)</label>
+  <input id="fSealDistinct" type="number" min="0" value="0">
+  <div class="hint">Chỉ có tác dụng nếu bàn có ô Seal (vẽ ở khung giữa).</div>
+  <label>Khóa (locks) — mỗi màn có thể có NHIỀU nhóm Khóa độc lập, mỗi nhóm 1 mặt + 1 ngưỡng riêng</label>
+  <div id="lockGroups"></div>
+  <button class="jade small" id="btnAddLockGroup" type="button" style="width:100%;margin-top:4px;">+ Thêm nhóm Khóa</button>
+  <div class="hint">Chọn "● vẽ" ở 1 nhóm rồi dùng công cụ Khóa (khung giữa) để tô ô cho ĐÚNG nhóm đó. Ô Khóa hiện rõ mặt + số lượng cần cho người chơi ngay trên ô; đếm số MAHJONG (không phải số cặp) của đúng mặt đó đã bị phá ở BẤT KỲ đâu trên bàn — khác Seal (đếm số mặt khác nhau, không quan tâm mặt nào).</div>
+  <label>guideMoves (số nước đầu được pulsing-highlight)</label>
+  <input id="fGuideMoves" type="number" min="0" value="0">
+  <label>moveLimit — số lượt đặt khối tối đa (0 = không giới hạn)</label>
+  <input id="fMoveLimit" type="number" min="0" value="0">
+  <div class="hint">Hết lượt mà chưa đạt goal → thua màn (không còn liên quan số cặp/tile đã phá).</div>
+  <label>Booster 🔄 Đổi khối — số lượt được dùng (0 = tắt, không hiện nút)</label>
+  <input id="fBoosterReroll" type="number" min="0" value="0">
+  <label>Booster 💡 Hint — số lượt được dùng (0 = tắt, không hiện nút)</label>
+  <input id="fBoosterHint" type="number" min="0" value="0">
+  <div class="hint">Cả 2 booster không tốn lượt đặt (moveLimit). Đổi khối = bỏ qua khối hiện tại, lấy khối kế tiếp trong sequence. Hint = tự giải từ đúng trạng thái bàn hiện tại (test ở Play-test bên panel giữa).</div>
+  <label>lesson (nhãn thiết kế ngắn, UPPERCASE — không hiện cho người chơi)</label>
+  <input id="fLesson" value="">
+  <label>teach (HTML popup dạy trong màn — hiện cho người chơi, để trống = không có popup)</label>
+  <textarea id="fTeach" rows="2"></textarea>
+
+  <h2 style="margin-top:14px">Beat Chart (nhịp độ thiết kế)</h2>
+  <div class="hint">Không ghi vào code game — chỉ dùng để xuất bảng beat chart / CSV ở mục 7-8.</div>
+  <label>Beat tag</label>
+  <select id="fBeatTag">
+    <option value="">—</option>
+    <option value="Teach">Teach</option>
+    <option value="Practice">Practice</option>
+    <option value="Test">Test</option>
+    <option value="Relief">Relief</option>
+    <option value="Peak">Peak</option>
+    <option value="Finale">Finale</option>
+  </select>
+  <div class="row" style="margin-top:6px">
+    <div><label>Tension 1-5</label><input id="fTension" type="number" min="0" max="5" value="0"></div>
+    <div><label>Novelty 1-5</label><input id="fNovelty" type="number" min="0" max="5" value="0"></div>
+    <div><label>Mastery 1-5</label><input id="fMastery" type="number" min="0" max="5" value="0"></div>
+  </div>
+</section>
+
+<section id="panelBoard">
+  <h2>Bàn xem trước / Play-test</h2>
+  <div class="row">
+    <button id="btnEditMode" class="toolbtn active">✏️ Sửa bàn</button>
+    <button id="btnPlayMode" class="toolbtn">▶️ Play-test</button>
+    <button id="btnResetPlay" class="small" disabled>Reset playtest</button>
+  </div>
+  <div id="goalLine" class="goalline" style="margin-top:8px"></div>
+  <div id="testBoosters" class="row hidden" style="margin-top:6px">
+    <button class="toolbtn" id="btnTestReroll" type="button">🔄 Đổi khối</button>
+    <button class="toolbtn" id="btnTestHint" type="button">💡 Hint</button>
+  </div>
+  <div class="hint">Ở chế độ Sửa bàn: kéo trực tiếp ô floor/roof đã vẽ sang ô khác để di chuyển; kéo 1 dòng khối từ panel bên phải (mục 3) thả lên đây để dán khối.</div>
+  <div id="boardWrap">
+    <div id="board"></div>
+  </div>
+  <div class="row" style="margin-top:10px">
+    <div>
+      <label>Current</label>
+      <div id="curPiece" class="hint"></div>
+    </div>
+    <div>
+      <label>Next</label>
+      <div id="nextPiece" class="hint"></div>
+    </div>
+  </div>
+  <label style="margin-top:10px">Solution đã ghi lại khi play-test</label>
+  <div id="solutionList" class="hint"></div>
+  <button class="jade small" id="btnUseSolution" style="margin-top:6px" disabled>Dùng làm solution chính thức</button>
+</section>
+
+<section id="panelExport">
+  <h2>2 · Bàn cờ</h2>
+  <div class="hint">Chọn công cụ rồi bấm vào ô trên bàn (panel giữa) để vẽ.</div>
+  <div class="row" style="margin-top:6px">
+    <button class="toolbtn active" data-tool="floor">Floor (z0)</button>
+    <button class="toolbtn" data-tool="roof">Roof (z1)</button>
+  </div>
+  <div class="palette" id="facePalette" style="margin-top:6px"></div>
+  <div class="row" style="margin-top:6px">
+    <button class="toolbtn" data-tool="seal">Seal</button>
+    <button class="toolbtn" data-tool="permanent">Ô Chắn</button>
+    <button class="toolbtn" data-tool="lock">Khóa</button>
+    <button class="toolbtn" data-tool="erase">Xoá ô</button>
+  </div>
+
+  <h2 style="margin-top:14px">3 · Khối (sequence)</h2>
+  <select id="fShape">
+    <option value="DH">Domino ngang (2 ô)</option>
+    <option value="DV">Domino dọc (2 ô)</option>
+    <option value="I3H">I3 ngang (3 ô)</option>
+    <option value="I3V">I3 dọc (3 ô)</option>
+    <option value="L3RD">L3-RD (3 ô)</option>
+    <option value="L3LD">L3-LD (3 ô)</option>
+    <option value="L3RU">L3-RU (3 ô)</option>
+    <option value="L3LU">L3-LU (3 ô)</option>
+    <option value="O4">O4 vuông (4 ô)</option>
+    <option value="T4">T4 (4 ô)</option>
+    <option value="S4">S4 (4 ô)</option>
+    <option value="L4">L4 (4 ô)</option>
+    <option value="PLUS5">Plus5 (5 ô)</option>
+    <option value="L5">L5 (5 ô)</option>
+  </select>
+  <div id="pieceMiniPreview"></div>
+  <label>Thêm khối vào</label>
+  <select id="fAddDestination">
+    <option value="sequence">Sequence (khối cố định, đúng thứ tự)</option>
+    <option value="pool">Queue Pool (rút ngẫu nhiên có trọng số)</option>
+    <option value="fallback">Queue Pool — khối dự phòng (queueFallback)</option>
+  </select>
+  <button class="jade" id="btnAddPiece" style="margin-top:6px; width:100%;">+ Thêm khối</button>
+  <div class="hint" style="margin-top:8px">Kéo thanh <b>⠿</b> để đổi thứ tự, hoặc kéo cả dòng thả lên bàn (panel giữa) để dán khối:</div>
+  <div id="pieceList" style="margin-top:4px"></div>
+
+  <h2 style="margin-top:14px">3b · Queue Pool (semi-random, tùy chọn)</h2>
+  <div class="hint">Bỏ trống mục này để dùng sequence cố định như bình thường. Nếu thêm khối vào Pool, mỗi lượt Current/Next sẽ được rút ngẫu nhiên có trọng số từ danh sách dưới, nhưng CHỈ chấp nhận khối nào vẫn còn đường thắng (proof qua bounded-DFS, xem index.html — p24qDrawGated); nếu không khối nào qua được sau queueRerollBudget lần thử, dùng khối dự phòng (queueFallback) — <b>bắt buộc phải đặt khối dự phòng nếu dùng Pool</b>.</div>
+  <div class="row" style="margin-top:6px">
+    <div><label>queueRerollBudget</label><input id="fQueueRerollBudget" type="number" min="1" value="10"></div>
+    <div><label>queueSolveDepth</label><input id="fQueueSolveDepth" type="number" min="1" value="8"></div>
+  </div>
+  <label style="margin-top:8px">Các khối trong Pool (kèm trọng số)</label>
+  <div id="queuePoolList" class="hint"></div>
+  <label style="margin-top:8px">Khối dự phòng (queueFallback)</label>
+  <div id="queueFallbackPreview" class="hint"></div>
+  <div class="hint" style="margin-top:6px">⚠️ Play-test ở panel giữa hiện CHƯA mô phỏng việc rút ngẫu nhiên — nó chạy các khối Pool tuần tự theo đúng thứ tự trong danh sách, chỉ để bạn thử từng hình dạng/mặt. Muốn thấy đúng hành vi rút-ngẫu-nhiên-có-gate thật, test trực tiếp trong game qua <code>index.html?level=N</code> sau khi đã Đưa trực tiếp vào index.html (mục 6).</div>
+
+  <h2 style="margin-top:14px">3c · Random Shapes × Faces (generative, tùy chọn)</h2>
+  <div class="hint">Khác Queue Pool (rút nguyên khối đã ghép sẵn): điền cả 2 danh sách bên dưới để mỗi khối sinh ra trong game là 1 hình được rút ngẫu nhiên có trọng số từ "Random Shapes", với TỪNG Ô được tô ĐỘC LẬP 1 mặt ngẫu nhiên có trọng số từ "Random Faces". Ưu tiên cao hơn cả sequence lẫn Queue Pool nếu điền đủ cả 2 (xem index.html — p24qRandomModeActive).</div>
+  <label>Vẽ hình khối tự do — kéo để tô/xoá từng ô</label>
+  <div id="shapeComposerGrid" class="shapeComposerGrid"></div>
+  <div class="row" style="margin-top:6px">
+    <button class="small" id="btnClearComposer" type="button">Xoá hình đang vẽ</button>
+    <button class="jade small" id="btnAddRandomShape" type="button">+ Thêm vào Random Shapes</button>
+  </div>
+  <label style="margin-top:8px">Random Shapes (kèm trọng số)</label>
+  <div id="randomShapesList" class="hint"></div>
+  <label style="margin-top:8px">Random Faces (bật mặt + trọng số)</label>
+  <div id="randomFacesList" class="hint"></div>
+  <div class="hint" style="margin-top:6px">Dùng chung queueRerollBudget / queueSolveDepth / queueFallback với Queue Pool ở mục 3b — điền ở đó, kể cả khi không dùng Queue Pool.</div>
+  <div class="hint" style="margin-top:6px">⚠️ Play-test ở panel giữa hiện CHƯA mô phỏng reroll-gate thật — nó chỉ sinh 1 khối ngẫu nhiên hợp lệ theo 2 danh sách trên mỗi lượt, để bạn thử nhanh hình dạng/mặt. Muốn thấy đúng hành vi rút-ngẫu-nhiên-có-gate thật (đảm bảo luôn còn đường thắng), test trực tiếp trong game qua <code>index.html?level=N</code> sau khi đã Đưa trực tiếp vào index.html (mục 6).</div>
+
+  <h2 style="margin-top:14px">4 · Kiểm tra (validate)</h2>
+  <div id="checks"></div>
+
+  <h2 style="margin-top:14px">5 · Xuất dữ liệu</h2>
+  <div class="row">
+    <button class="primary" id="btnCopy">Copy code</button>
+    <button id="btnDownload">Tải .js</button>
+  </div>
+  <textarea id="exportCode" readonly style="margin-top:8px"></textarea>
+
+  <h2 style="margin-top:14px">6 · Đưa trực tiếp vào index.html</h2>
+  <div class="hint">Cần Chrome/Edge trên desktop (File System Access API) và đã "Chọn file index.html…" ở mục 0. Màn mới → thêm vào cuối P24M_LEVELS. Đang sửa 1 màn có sẵn → ghi đè đúng màn đó.</div>
+  <button class="jade" id="btnInject" style="margin-top:8px; width:100%;" disabled>Thêm màn mới vào cuối P24M_LEVELS &amp; Lưu</button>
+  <div class="hint" style="margin-top:6px">Lưu ý: thêm 1 level mới sẽ làm self-test <code>thirty_levels</code> trong game báo FAIL (đúng vì giờ có 31+ level) — đây là cảnh báo đã biết, không phải lỗi công cụ.</div>
+
+  <h2 style="margin-top:14px">7 · Tích hợp file sheet (CSV)</h2>
+  <div class="hint">Xuất/nhập bảng CSV cho toàn bộ level đã load (Excel mở/lưu .csv trực tiếp được). Import chỉ cập nhật title/lesson/beat-chart theo cột Index — không đụng tới bàn/khối/solution.</div>
+  <div class="row" style="margin-top:8px">
+    <button id="btnExportCsv">Xuất CSV</button>
+    <button id="btnImportCsvBtn">Nhập CSV…</button>
+  </div>
+  <input type="file" id="fImportCsv" accept=".csv" style="display:none">
+
+  <h2 style="margin-top:14px">8 · Beat Chart</h2>
+  <div class="hint">Difficulty Score là chỉ số tự tính (System Complexity + Constraint Pressure − Guidance Adjustment) để so sánh tương đối giữa các màn, không phải công thức gốc của tài liệu thiết kế — dùng để tham khảo, cảnh báo <code>delta &gt; 1.5</code> giữa 2 màn liên tiếp.</div>
+  <button class="primary" id="btnExportBeatChart" style="margin-top:8px; width:100%;">Xuất Beat Chart (CSV)</button>
+
+  <h2 style="margin-top:14px">9 · AI thiết kế màn (beta)</h2>
+  <div class="hint">Nhập API key Claude của riêng bạn — chỉ lưu trong localStorage của trình duyệt này, chỉ gửi tới api.anthropic.com, không đi đâu khác. Đây là công cụ nội bộ (BYOK) — không chia sẻ key này cho ai.</div>
+  <label>Anthropic API key</label>
+  <input id="fAiKey" type="password" placeholder="sk-ant-...">
+  <label style="margin-top:8px">Mô tả màn chơi (tiếng Việt/Anh đều được)</label>
+  <textarea id="fAiDesc" style="min-height:70px" placeholder="VD: màn dạy cơ chế Seal cho người chơi mới, bàn 4x4, độ khó thấp, nhấn mạnh 1 mặt chủ đạo"></textarea>
+  <div class="row" style="margin-top:6px">
+    <input type="checkbox" id="fAiUseCurrent"> <span>Sửa dựa trên màn đang mở (thay vì tạo mới hoàn toàn)</span>
+  </div>
+  <button class="primary" id="btnAiGenerate" style="margin-top:8px; width:100%;">✨ Generate / Sửa bằng AI</button>
+  <div class="hint" style="margin-top:6px">Sau khi AI trả về, tool tự động chạy thử một trình giải (auto-solver) để kiểm tra màn có giải được không trước khi bạn playtest tay. Nếu gặp lỗi CORS khi mở file trực tiếp (file://), hãy chạy qua localhost thay vì mở file trực tiếp.</div>
+  <div id="aiNotes" class="hint" style="margin-top:6px"></div>
+</section>
+</main>
+
+<div id="status"></div>
+
+<script>
+"use strict";
+/* =========================================================================
+   ENGINE CORE — copied verbatim in spirit from the scratchpad engine-core.mjs
+   extraction used to validate all 30 shipped levels this session, so a level
+   built/playtested here behaves identically once pasted into P24M_LEVELS.
+   Do not "simplify" this relative to index.html's live match/gravity logic.
+   ========================================================================= */
+const P24K_TILE=(id,r,c,z)=>({id,r,c,z,uid:0,alive:true});
+const P24K_PIECE=(key,cells)=>({key,cells:cells.map(([dr,dc,id])=>({dr,dc,id}))});
+/* Piece-shape constructors — previously only referenced as ctor-name STRINGS for code
+   generation; now defined as real functions too, so parseLevelsFromSource() can eval an
+   existing level's real source text (which calls these by name) and get back the exact
+   same data our own genCode() would produce. Must stay byte-for-byte in sync with the
+   definitions in Final Core/index.html. */
+const P24M_STACK=(bottom,top,r,c)=>[P24K_TILE(bottom,r,c,0),P24K_TILE(top,r,c,1)];
+const P24M_STATION=(bottom,top,r,c,dr=0,dc=1)=>[...P24M_STACK(bottom,top,r,c),P24K_TILE(bottom,r+dr,c+dc,0)];
+const P24M_CHAIN3=(a,b,c,r,col,triggerR,triggerC,support='h1')=>[...P24M_STACK(a,b,r,col),...P24M_STACK(b,c,r,col+1),P24K_TILE(a,r+1,col,0),P24K_TILE(support,triggerR,triggerC,0)];
+const P24K_CHAIN=(ids,r,c,dr=0,dc=1)=>{ const out=[]; for(let i=0;i<ids.length;i++){ out.push(P24K_TILE(ids[i],r+dr*i,c+dc*i,0)); if(i<ids.length-1) out.push(P24K_TILE(ids[i+1],r+dr*i,c+dc*i,1)); } return out; };
+const K_DOMINO_H=(key,a,b)=>P24K_PIECE(key,[[0,0,a],[0,1,b]]);
+const K_DOMINO_V=(key,a,b)=>P24K_PIECE(key,[[0,0,a],[1,0,b]]);
+const P24M_L3=(key,a,b,c)=>P24K_PIECE(key,[[0,0,a],[1,0,b],[1,1,c]]);
+const P24M_L3B=(key,a,b,c)=>P24K_PIECE(key,[[0,1,a],[1,0,b],[1,1,c]]);
+const P24M_L3C=(key,a,b,c)=>P24K_PIECE(key,[[0,0,a],[0,1,b],[1,0,c]]);
+const P24M_L3D=(key,a,b,c)=>P24K_PIECE(key,[[0,0,a],[0,1,b],[1,1,c]]);
+const P24M_I3H=(key,a,b,c)=>P24K_PIECE(key,[[0,0,a],[0,1,b],[0,2,c]]);
+const P24M_I3V=(key,a,b,c)=>P24K_PIECE(key,[[0,0,a],[1,0,b],[2,0,c]]);
+const P24M_O4=(key,a,b,c,d)=>P24K_PIECE(key,[[0,0,a],[0,1,b],[1,0,c],[1,1,d]]);
+const P24M_T4=(key,a,b,c,d)=>P24K_PIECE(key,[[0,0,a],[0,1,b],[0,2,c],[1,1,d]]);
+const P24M_S4=(key,a,b,c,d)=>P24K_PIECE(key,[[0,1,a],[0,2,b],[1,0,c],[1,1,d]]);
+const P24M_L4=(key,a,b,c,d)=>P24K_PIECE(key,[[0,0,a],[1,0,b],[2,0,c],[2,1,d]]);
+const P24M_PLUS5=(key,a,b,c,d,e)=>P24K_PIECE(key,[[0,1,a],[1,0,b],[1,1,c],[1,2,d],[2,1,e]]);
+const P24M_L5=(key,a,b,c,d,e)=>P24K_PIECE(key,[[0,0,a],[1,0,b],[2,0,c],[2,1,d],[2,2,e]]);
+function p24kTileAt(r,c,z,tiles){ return tiles.find(t=>t&&t.alive&&t.r===r&&t.c===c&&t.z===z)||null; }
+function p24kCloneTiles(tiles){ return tiles.map(t=>({...t})); }
+function p24mIsExposed(tile,tiles){ return !!(tile&&tile.alive&&(tile.z===1||!p24kTileAt(tile.r,tile.c,1,tiles))); }
+function p24mTopAt(r,c,tiles){ return p24kTileAt(r,c,1,tiles)||p24kTileAt(r,c,0,tiles); }
+function p24kNeighbors(tile,tiles){ return [[-1,0],[0,-1],[0,1],[1,0]].map(([dr,dc])=>p24mTopAt(tile.r+dr,tile.c+dc,tiles)).filter(Boolean); }
+function p24kFindWavePairs(activeUids,tiles){
+  const active=new Set(activeUids), visited=new Set(), groups=[];
+  const order=[...active].map(uid=>tiles.find(t=>t.uid===uid)).filter(t=>p24mIsExposed(t,tiles)).sort((a,b)=>a.r-b.r||a.c-b.c||a.z-b.z||a.uid-b.uid);
+  for(const seed of order){
+    if(visited.has(seed.uid)) continue;
+    const seen=new Set([seed.uid]), stack=[seed], group=[];
+    while(stack.length){
+      const t=stack.pop(); group.push(t.uid);
+      for(const q of p24kNeighbors(t,tiles)){
+        if(seen.has(q.uid)||visited.has(q.uid)||!p24mIsExposed(q,tiles)||q.z!==seed.z) continue;
+        if(q.id!==seed.id) continue;
+        seen.add(q.uid); stack.push(q);
+      }
+    }
+    group.forEach(uid=>visited.add(uid));
+    if(group.length>=2) groups.push(group.slice().sort((a,b)=>a-b));
+  }
+  return groups;
+}
+function p24kApplyWave(groups,activeUids,tiles){
+  const removed=new Set(groups.flat()), ids=[], reveals=[];
+  for(const group of groups){
+    const members=group.map(uid=>tiles.find(t=>t.uid===uid)).filter(t=>t&&t.alive);
+    if(members.length<2) continue;
+    ids.push(members[0].id);
+    for(const tile of members){
+      if(tile.z===1){ const under=p24kTileAt(tile.r,tile.c,0,tiles); if(under&&under.alive) reveals.push(under.uid); }
+      tile.alive=false;
+    }
+  }
+  const uniqueReveals=[...new Set(reveals)];
+  const next=new Set([...activeUids].filter(uid=>!removed.has(uid)).filter(uid=>p24mIsExposed(tiles.find(t=>t.uid===uid),tiles)));
+  uniqueReveals.forEach(uid=>next.add(uid));
+  return {pairs:groups.map(x=>x.slice()),ids,reveals:uniqueReveals,active:next};
+}
+function p24kResolveAllModel(tiles,activeUids){
+  let active=new Set(activeUids), waves=0, pairCount=0; const idCounts={};
+  while(true){
+    const groups=p24kFindWavePairs(active,tiles); if(!groups.length) break;
+    waves++; pairCount+=groups.reduce((s,g)=>s+(g.length-1),0);
+    const step=p24kApplyWave(groups,active,tiles); active=step.active;
+    step.pairs.forEach((group,gi)=>{ const id=step.ids[gi]; idCounts[id]=(idCounts[id]||0)+group.length; });
+  }
+  return {waves,pairCount,active,idCounts};
+}
+function p24kCellBlocked(level,sealOpen,r,c,targetCounts){
+  if(level.permanents&&level.permanents.some(p=>p[0]===r&&p[1]===c)) return true;
+  if(!sealOpen&&level.seals&&level.seals.some(s=>s[0]===r&&s[1]===c)) return true;
+  // Byte-for-byte the same loop as index.html's p24kCellBlocked (Final Core/index.html
+  // ~line 6929): level.locks is now the real locks:[{cells,face,required}, ...] array (the
+  // editor's live `level` object and the exported/loaded shape are the same schema), so
+  // Play-test and the real game evaluate lock-blocking identically.
+  if(level.locks&&targetCounts){
+    for(const lock of level.locks){
+      if((targetCounts[lock.face]||0)>=lock.required) continue;
+      if(lock.cells.some(cell=>cell[0]===r&&cell[1]===c)) return true;
+    }
+  }
+  return false;
+}
+function p24kSimulateDrop(r,c,tiles,pieces,level,sealOpen,targetCounts){
+  const piece=pieces[0]; if(!piece) return {legal:false,reason:'missing'}; const placements=[];
+  for(let n=0;n<piece.cells.length;n++){
+    const cell=piece.cells[n], rr=r+cell.dr, cc=c+cell.dc;
+    if(rr<0||cc<0||rr>=level.size||cc>=level.size) return {legal:false,reason:'bounds'};
+    if(p24kCellBlocked(level,sealOpen,rr,cc,targetCounts)) return {legal:false,reason:'blocked',blockedAt:[rr,cc]};
+    const bottom=p24kTileAt(rr,cc,0,tiles), top=p24kTileAt(rr,cc,1,tiles);
+    if(top) return {legal:false,reason:'full',blockedAt:[rr,cc]};
+    placements.push({dr:cell.dr,dc:cell.dc,id:cell.id,r:rr,c:cc,z:bottom?1:0,tempUid:-(n+1)});
+  }
+  const projected=p24kCloneTiles(tiles);
+  placements.forEach(p=>projected.push({uid:p.tempUid,id:p.id,r:p.r,c:p.c,z:p.z,alive:true}));
+  const active=new Set(placements.map(p=>p.tempUid)), directPairs=p24kFindWavePairs(active,projected);
+  const resolved=p24kResolveAllModel(projected,new Set(active));
+  return {legal:true,piece,placements,directPairs,previewPairs:resolved.pairCount,previewWaves:resolved.waves};
+}
+function p24qWeightedPick(pool,rng){
+  rng=rng||Math.random;
+  const total=pool.reduce((s,e)=>s+(e.weight||1),0);
+  let x=rng()*total;
+  for(const e of pool){ x-=(e.weight||1); if(x<=0) return e; }
+  return pool[pool.length-1];
+}
+function p24qGeneratePiece(level,rng){
+  rng=rng||Math.random;
+  const shape=p24qWeightedPick(level.randomShapes,rng);
+  const cells=shape.cells.map(([dr,dc])=>({dr,dc,id:p24qWeightedPick(level.randomFaces,rng).id}));
+  return {key:'r'+Math.floor(rng()*1e6), cells};
+}
+function p24kQueuePiece(offset,level,queueIndex){
+  // Play-test doesn't simulate the real reroll-gate (that lives in index.html's
+  // p24qDrawGated / p24qDrawGatedGenerative) -- for both queuePool and the newer
+  // randomShapes×randomFaces generative mode, it just samples a plausible piece each
+  // call so you can try shapes/faces/placement by hand, without proving a win path.
+  if(level.randomShapes&&level.randomShapes.length&&level.randomFaces&&level.randomFaces.length){
+    return p24qGeneratePiece(level, Math.random);
+  }
+  const src=(level.sequence&&level.sequence.length) ? level.sequence : (level.queuePool||[]).map(e=>e.piece);
+  const piece=src[(queueIndex+offset)%src.length];
+  return {key:piece.key,cells:piece.cells.map(x=>({...x}))};
+}
+function p24kFreshModel(level){
+  const tiles=level.tiles.map((t,i)=>({...t,uid:i+1,alive:true}));
+  return {
+    level,
+    tiles,
+    queueIndex:0,
+    pieces:[p24kQueuePiece(0,level,0),p24kQueuePiece(1,level,0)],
+    nextUid: level.tiles.length+1,
+    pairs:0, idCounts:{}, sealOpen:false,
+  };
+}
+function p24kModelDrop(model,r,c){
+  const sim=p24kSimulateDrop(r,c,model.tiles,model.pieces,model.level,model.sealOpen,model.idCounts);
+  if(!sim.legal) return {legal:false,sim};
+  const active=[];
+  for(const p of sim.placements){ const tile={uid:model.nextUid++,id:p.id,r:p.r,c:p.c,z:p.z,alive:true}; model.tiles.push(tile); active.push(tile.uid); }
+  model.queueIndex++;
+  model.pieces=[p24kQueuePiece(0,model.level,model.queueIndex),p24kQueuePiece(1,model.level,model.queueIndex)];
+  const result=p24kResolveAllModel(model.tiles,new Set(active));
+  model.pairs+=result.pairCount;
+  Object.entries(result.idCounts).forEach(([id,n])=>{ model.idCounts[id]=(model.idCounts[id]||0)+n; });
+  if(!model.sealOpen&&model.level.sealRequiredDistinct&&Object.keys(model.idCounts).length>=model.level.sealRequiredDistinct) model.sealOpen=true;
+  return {legal:true,sim,result};
+}
+function p24mTileTotal(idCounts){return Object.values(idCounts||{}).reduce((s,n)=>s+n,0);}
+function p24mGoalMet(level,model){
+  if(level.goalType==='TILE_QUOTA') return p24mTileTotal(model.idCounts)>=level.tileGoal;
+  if(level.goalType==='OPEN_SEAL') return !!model.sealOpen;
+  const targets=level.winTargets||[];
+  if(targets.length){
+    if(level.targetRequiredCount) return targets.filter(t=>(model.idCounts[t.id]||0)>=t.need).length>=level.targetRequiredCount;
+    return targets.every(t=>(model.idCounts[t.id]||0)>=t.need);
+  }
+  return model.pairs>=level.pairGoal;
+}
+function p24kLegalMoves(model){
+  const out=[];
+  for(let r=0;r<model.level.size;r++) for(let c=0;c<model.level.size;c++){
+    const sim=p24kSimulateDrop(r,c,model.tiles,model.pieces,model.level,model.sealOpen,model.idCounts);
+    if(sim.legal) out.push({row:r,col:c});
+  }
+  return out;
+}
+function p24mPieceHasBakedSelfMatch(piece){
+  for(let i=0;i<piece.cells.length;i++) for(let j=i+1;j<piece.cells.length;j++){
+    const a=piece.cells[i], b=piece.cells[j];
+    const matches=a.id===b.id;
+    if(matches && Math.abs(a.dr-b.dr)+Math.abs(a.dc-b.dc)===1) return true;
+  }
+  return false;
+}
+
+/* =========================================================================
+   SHAPE ROSTER — matches exactly the 12 shapes P24M_LEVELS draws from.
+   ========================================================================= */
+const SHAPES={
+  DH:{label:'Domino H', ctor:'K_DOMINO_H', cells:[[0,0],[0,1]]},
+  DV:{label:'Domino V', ctor:'K_DOMINO_V', cells:[[0,0],[1,0]]},
+  I3H:{label:'I3 H', ctor:'P24M_I3H', cells:[[0,0],[0,1],[0,2]]},
+  I3V:{label:'I3 V', ctor:'P24M_I3V', cells:[[0,0],[1,0],[2,0]]},
+  L3RD:{label:'L3-RD', ctor:'P24M_L3', cells:[[0,0],[1,0],[1,1]]},
+  L3LD:{label:'L3-LD', ctor:'P24M_L3B', cells:[[0,1],[1,0],[1,1]]},
+  L3RU:{label:'L3-RU', ctor:'P24M_L3C', cells:[[0,0],[0,1],[1,0]]},
+  L3LU:{label:'L3-LU', ctor:'P24M_L3D', cells:[[0,0],[0,1],[1,1]]},
+  O4:{label:'O4', ctor:'P24M_O4', cells:[[0,0],[0,1],[1,0],[1,1]]},
+  T4:{label:'T4', ctor:'P24M_T4', cells:[[0,0],[0,1],[0,2],[1,1]]},
+  S4:{label:'S4', ctor:'P24M_S4', cells:[[0,1],[0,2],[1,0],[1,1]]},
+  L4:{label:'L4', ctor:'P24M_L4', cells:[[0,0],[1,0],[2,0],[2,1]]},
+  PLUS5:{label:'Plus5', ctor:'P24M_PLUS5', cells:[[0,1],[1,0],[1,1],[1,2],[2,1]]},
+  L5:{label:'L5', ctor:'P24M_L5', cells:[[0,0],[1,0],[2,0],[2,1],[2,2]]},
+};
+const FACES=['s1','c1','w1','s2','c2','w2','h1','h2'];
+const FACE_LABELS=['A','B','C','D','E','F','G','H'];
+/* One evenly-spaced hue per face so every UI surface (palette, board tags, piece tags,
+   ghost preview) uses the same color language for a given face instead of just a letter. */
+const FACE_COLORS=FACES.map((_,i)=>`hsl(${Math.round(i*360/FACES.length)},62%,55%)`);
+function faceColor(id){ const i=FACES.indexOf(id); return i>=0 ? FACE_COLORS[i] : '#3a2c1c'; }
+function faceLabel(id){ return FACE_LABELS[FACES.indexOf(id)]||id; }
+/* Real tile-face glyphs -- "mô phỏng trực tiếp bàn chơi" pass: reuses index.html's own
+   emoji-skin table verbatim (the "lotus" SKIN_FACES entry, Final Core/index.html ~line 2789)
+   so the board here reads like the actual game instead of abstract letter+hue swatches. Raw
+   ids map to suit+rank exactly like index.html's `T = id => ({suit:id[0], rank:+id.slice(1)})`
+   (index.html ~line 2865): s1/s2 -> suit s rank 1/2, etc. Only rank 1-2 are ever used by real
+   levels, but the table keeps its full 9-entry arrays for drop-in fidelity with index.html. */
+const FACE_EMOJI_BY_SUIT={
+  s:['🪷','🌸','🌺','🌼','🌷','🌹','💮','🏵️','🌻'],
+  c:['🌿','🍃','☘️','🌱','🎋','🌾','🍀','🌵','🌴'],
+  w:['🪷','🌷','🌸','🏵️','💮','🌺','🌼','🌹','🌻'],
+  h:['💧','🌙','☁️','✨','🌊','🍂','🌫️'],
+};
+function faceEmoji(id){
+  const suit=id[0], rank=(+id.slice(1))||1;
+  const pool=FACE_EMOJI_BY_SUIT[suit];
+  return pool ? pool[(rank-1+pool.length)%pool.length] : '❓';
+}
+
+/* =========================================================================
+   EDITOR STATE
+   ========================================================================= */
+let level={
+  title:'New Level', size:3, goalType:'TILE_QUOTA', pairGoal:1,
+  targetRequiredCount:0, winTargets:[], seals:[], permanents:[], sealRequiredDistinct:0,
+  // locks: MULTIPLE independent groups, matching the real P24M_LEVELS schema exactly
+  // (locks:[{cells,face,required}, ...]) -- several shipped levels (e.g. Lv36 "Roof Chain")
+  // now use 2+ groups in the same level, so a single flat lockCells/lockFace/lockRequired
+  // (the editor's old model) would silently drop every group past the first on re-save.
+  locks:[],
+  tiles:[], sequence:[], guideMoves:0, lesson:'', teach:'', solution:[],
+  moveLimit:0, boosterReroll:0, boosterHint:0,
+  queuePool:[], queueFallback:null, queueRerollBudget:10, queueSolveDepth:8,
+  randomShapes:[], randomFaces:[],
+};
+let activeLockGroup=0; // index into level.locks currently receiving painted cells from the "Khóa" board tool
+let tool={mode:'floor', face:'s1'};
+let mode='edit'; // 'edit' | 'play'
+let playModel=null;
+let recordedSolution=[];
+let hintCell=null; // {row,col} — live-solver suggestion, pulses the same .guide highlight guideMoves uses
+let draggingSeqIndex=null; // index into level.sequence currently being dragged (reorder or drag-onto-board)
+let draggingBoardTile=null; // {r,c,z,id} — an existing board tile currently being dragged to a new cell
+let rectDrag=null; // {startR,startC,curR,curC,tool,moved} — active seal/permanent rectangle drag
+let fileHandle=null;
+let allLevels=[]; // parsed raw level objects from the real P24M_LEVELS, index-aligned
+let currentLevelIndex=null; // null = editing a brand-new level; number = allLevels[i]
+const COMPOSER_SIZE=5; // free-form shape composer grid (dr/dc offsets 0..4) -- covers every preset SHAPES footprint with room to spare
+let shapeComposerCells=new Set(); // 'r_c' strings, the in-progress free-drawn polyomino before it's added to level.randomShapes
+let composerPaintMode=null; // true=painting cells on, false=painting off; set by the first cell of a drag, cleared on mouseup
+
+function $(id){ return document.getElementById(id); }
+function toast(msg){ const el=$('status'); el.textContent=msg; el.classList.add('on'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('on'),2200); }
+
+/* ---------------- palette / toolbar ---------------- */
+function renderPalette(){
+  const el=$('facePalette'); el.innerHTML='';
+  FACES.forEach((f,i)=>{
+    const b=document.createElement('div');
+    b.className='swatch'+(tool.face===f&&(tool.mode==='floor'||tool.mode==='roof')?' active':'');
+    b.textContent=faceEmoji(f);
+    b.title=`${FACE_LABELS[i]} (${f})`;
+    b.style.background='linear-gradient(155deg,#f6ecd8,#e6d6ae)';
+    b.onclick=()=>{ tool.face=f; if(tool.mode!=='floor'&&tool.mode!=='roof') tool.mode='floor'; syncToolButtons(); renderPalette(); };
+    el.appendChild(b);
+  });
+}
+function syncToolButtons(){
+  document.querySelectorAll('.toolbtn[data-tool]').forEach(b=>b.classList.toggle('active', b.dataset.tool===tool.mode));
+}
+document.querySelectorAll('.toolbtn[data-tool]').forEach(b=>{
+  b.addEventListener('click',()=>{ tool.mode=b.dataset.tool; syncToolButtons(); renderPalette(); });
+});
+
+/* ---------------- metadata form ---------------- */
+function renderGoalFields(){
+  const gt=$('fGoalType').value, el=$('goalFields'); el.innerHTML='';
+  if(gt==='PAIR_QUOTA'){
+    el.innerHTML=`<label>pairGoal</label><input id="fPairGoal" type="number" min="1" value="${level.pairGoal||1}">`;
+  } else if(gt==='TILE_QUOTA'){
+    el.innerHTML=`<label>tileGoal — tổng số mahjong cần phá (bất kỳ mặt nào)</label><input id="fTileGoal" type="number" min="1" value="${level.tileGoal||4}">
+      <div class="hint">Đếm số MAHJONG (không phải số cặp) đã bị phá, cộng dồn TẤT CẢ các mặt lại — khác TARGET_FACE (yêu cầu từng mặt cụ thể).</div>`;
+  } else if(gt==='TARGET_FACE'||gt==='BURIED_TARGET'){
+    el.innerHTML=`<label>winTargets (mỗi dòng: mặt,số lượng — vd s1,2)</label>
+      <textarea id="fWinTargets">${(level.winTargets||[]).map(t=>`${t.id},${t.need}`).join('\n')}</textarea>
+      ${gt==='TARGET_FACE'?`<label>targetRequiredCount (N-trên-M, để trống = cần tất cả)</label><input id="fReqCount" type="number" min="0" value="${level.targetRequiredCount||0}">`:''}
+      <div class="hint">${gt==='BURIED_TARGET'?'Nhớ đặt target dưới 1 lớp tile khác (roof che floor) ở bước 2.':''}</div>`;
+  } else if(gt==='OPEN_SEAL'){
+    el.innerHTML=`<div class="hint">Thắng ngay khi Seal mở — nhớ đặt sealRequiredDistinct &gt; 0 và vẽ ít nhất 1 ô Seal.</div>`;
+  }
+}
+$('fGoalType').addEventListener('change', ()=>{ renderGoalFields(); onDataChanged(); });
+// #goalFields is rebuilt from scratch (innerHTML=...) every time the goal type changes, so
+// its inputs (fPairGoal/fTileGoal/fWinTargets/fReqCount) can never keep a directly-attached
+// listener alive -- a delegated listener on the stable container catches all of them (present
+// and future) via bubbling instead of needing to re-wire each dynamically-created field.
+$('goalFields').addEventListener('input', onDataChanged);
+renderGoalFields();
+
+/* ---------------- lock groups (locks[]: multiple independent {cells,face,required}) -------- */
+function renderLockGroups(){
+  const el=$('lockGroups'); el.innerHTML='';
+  if(!level.locks.length){ el.innerHTML='<div class="hint">Chưa có nhóm Khóa nào.</div>'; return; }
+  level.locks.forEach((group,i)=>{
+    const card=document.createElement('div');
+    card.className='lockGroupCard'+(i===activeLockGroup?' active':'');
+    const faceOpts=FACES.map((f,fi)=>`<option value="${f}" ${group.face===f?'selected':''}>${FACE_LABELS[fi]} (${f})</option>`).join('');
+    card.innerHTML=`
+      <div class="row">
+        <label style="margin:0;flex:none;"><input type="radio" name="activeLock" ${i===activeLockGroup?'checked':''}> vẽ</label>
+        <span class="hint" style="flex:none;">Nhóm ${i+1} — ${group.cells.length} ô</span>
+        <button class="danger small" style="flex:none;" type="button">Xoá nhóm</button>
+      </div>
+      <div class="row">
+        <div><label style="margin:2px 0;">Mặt (face)</label><select class="lg-face">${faceOpts}</select></div>
+        <div><label style="margin:2px 0;">Cần bao nhiêu (required)</label><input class="lg-required" type="number" min="1" value="${group.required}"></div>
+      </div>`;
+    card.querySelector('input[type=radio]').addEventListener('change',()=>{ activeLockGroup=i; renderLockGroups(); renderBoard(); });
+    card.querySelector('button.danger').addEventListener('click',()=>{ removeLockGroup(i); });
+    card.querySelector('.lg-face').addEventListener('input', e=>{ group.face=e.target.value; onDataChanged(); });
+    card.querySelector('.lg-required').addEventListener('input', e=>{ group.required=Math.max(1,parseInt(e.target.value,10)||1); onDataChanged(); });
+    el.appendChild(card);
+  });
+}
+function addLockGroup(){
+  level.locks.push({cells:[], face:'s1', required:2});
+  activeLockGroup=level.locks.length-1;
+  renderLockGroups(); onDataChanged();
+}
+function removeLockGroup(i){
+  level.locks.splice(i,1);
+  if(activeLockGroup>=level.locks.length) activeLockGroup=Math.max(0,level.locks.length-1);
+  renderLockGroups(); onDataChanged();
+}
+$('btnAddLockGroup').addEventListener('click', addLockGroup);
+
+function pullMetaFromForm(){
+  level.title=$('fTitle').value||'Untitled';
+  level.size=Math.max(2,Math.min(6, parseInt($('fSize').value,10)||3));
+  level.goalType=$('fGoalType').value;
+  level.sealRequiredDistinct=parseInt($('fSealDistinct').value,10)||0;
+  // level.locks (array of {cells,face,required} groups) is mutated directly by the lock-group
+  // UI (addLockGroup/removeLockGroup/the face+required inputs rendered per group in
+  // renderLockGroups) -- nothing to pull from a single flat field here anymore.
+  level.guideMoves=parseInt($('fGuideMoves').value,10)||0;
+  level.moveLimit=parseInt($('fMoveLimit').value,10)||0;
+  level.boosterReroll=parseInt($('fBoosterReroll').value,10)||0;
+  level.boosterHint=parseInt($('fBoosterHint').value,10)||0;
+  level.queueRerollBudget=parseInt($('fQueueRerollBudget').value,10)||10;
+  level.queueSolveDepth=parseInt($('fQueueSolveDepth').value,10)||8;
+  level.lesson=$('fLesson').value||'';
+  level.teach=$('fTeach').value||'';
+  level.beatTag=$('fBeatTag').value||'';
+  level.tension=parseInt($('fTension').value,10)||0;
+  level.novelty=parseInt($('fNovelty').value,10)||0;
+  level.mastery=parseInt($('fMastery').value,10)||0;
+  if(level.goalType==='PAIR_QUOTA'){
+    level.pairGoal=parseInt(($('fPairGoal')||{}).value,10)||1;
+    level.winTargets=[]; level.targetRequiredCount=0;
+  } else if(level.goalType==='TILE_QUOTA'){
+    level.tileGoal=Math.max(1,parseInt(($('fTileGoal')||{}).value,10)||4);
+    level.winTargets=[]; level.targetRequiredCount=0;
+  } else if(level.goalType==='TARGET_FACE'||level.goalType==='BURIED_TARGET'){
+    const raw=(($('fWinTargets')||{}).value||'').trim();
+    level.winTargets = raw? raw.split('\n').map(l=>l.split(',')).filter(p=>p.length===2).map(([id,need])=>({id:id.trim(),need:parseInt(need,10)||1})) : [];
+    level.targetRequiredCount = level.goalType==='TARGET_FACE' ? (parseInt((($('fReqCount')||{}).value),10)||0) : 0;
+  }
+  // Beat-chart fields aren't part of the game's runtime schema, so they aren't written into
+  // P24M_LEVELS by genCode() -- but they DO need to survive switching the level picker, so
+  // mirror them back onto the in-memory allLevels[] entry for the level currently being edited.
+  if(currentLevelIndex!==null && allLevels[currentLevelIndex]){
+    Object.assign(allLevels[currentLevelIndex], {title:level.title, lesson:level.lesson, beatTag:level.beatTag, tension:level.tension, novelty:level.novelty, mastery:level.mastery});
+  }
+}
+['fTitle','fSize','fSealDistinct','fGuideMoves','fMoveLimit','fBoosterReroll','fBoosterHint','fQueueRerollBudget','fQueueSolveDepth','fLesson','fTeach','fBeatTag','fTension','fNovelty','fMastery'].forEach(id=>$(id).addEventListener('input',onDataChanged));
+
+/* ---------------- level picker: load an existing P24M_LEVELS entry into the editor ---------------- */
+function blankLevel(){
+  return {title:'New Level', size:3, goalType:'TILE_QUOTA', pairGoal:1, tileGoal:4, targetRequiredCount:0,
+    winTargets:[], seals:[], permanents:[], sealRequiredDistinct:0,
+    locks:[],
+    tiles:[], sequence:[],
+    guideMoves:0, moveLimit:0, boosterReroll:0, boosterHint:0,
+    queuePool:[], queueFallback:null, queueRerollBudget:10, queueSolveDepth:8,
+    randomShapes:[], randomFaces:[],
+    lesson:'', teach:'', solution:[], beatTag:'', tension:0, novelty:0, mastery:0};
+}
+function matchShapeKey(cells){
+  const norm=cells.map(c=>c.dr+'_'+c.dc).sort().join('|');
+  for(const [key,shape] of Object.entries(SHAPES)){
+    if(shape.cells.map(([dr,dc])=>dr+'_'+dc).sort().join('|')===norm) return key;
+  }
+  return 'DH'; // unrecognized shape (shouldn't happen for real levels) -- fall back so the UI doesn't break
+}
+function loadLevelIntoEditor(src){
+  level=JSON.parse(JSON.stringify({
+    title:src.title||'Untitled', size:src.size||3, goalType:src.goalType||'PAIR_QUOTA',
+    pairGoal:src.pairGoal||1, tileGoal:src.tileGoal||4, targetRequiredCount:src.targetRequiredCount||0,
+    winTargets:src.winTargets||[], seals:src.seals||[], permanents:src.permanents||[],
+    sealRequiredDistinct:src.sealRequiredDistinct||0,
+    tiles:src.tiles||[],
+    // Full locks[] array, every group preserved (see the `let level=` declaration comment
+    // for why this replaced the old single-flat-group model).
+    locks:(src.locks||[]).map(l=>({cells:(l.cells||[]).map(c=>[c[0],c[1]]), face:l.face||'s1', required:l.required||2})),
+    guideMoves:src.guideMoves||0, moveLimit:src.moveLimit||0,
+    boosterReroll:src.boosterReroll||0, boosterHint:src.boosterHint||0,
+    queueRerollBudget:src.queueRerollBudget||10, queueSolveDepth:src.queueSolveDepth||8,
+    lesson:src.lesson||'', teach:src.teach||'', solution:src.solution||[],
+    beatTag:src.beatTag||'', tension:src.tension||0, novelty:src.novelty||0, mastery:src.mastery||0,
+  }));
+  level.sequence=(src.sequence||[]).map(p=>({key:p.key, shapeKey:matchShapeKey(p.cells), cells:p.cells}));
+  level.queuePool=(src.queuePool||[]).map(entry=>({
+    piece:{key:entry.piece.key, shapeKey:matchShapeKey(entry.piece.cells), cells:entry.piece.cells},
+    weight:entry.weight||1,
+  }));
+  level.queueFallback=src.queueFallback
+    ? {key:src.queueFallback.key, shapeKey:matchShapeKey(src.queueFallback.cells), cells:src.queueFallback.cells}
+    : null;
+  level.randomShapes=(src.randomShapes||[]).map(s=>({cells:(s.cells||[]).map(([dr,dc])=>[dr,dc]), weight:s.weight||1}));
+  level.randomFaces=(src.randomFaces||[]).map(f=>({id:f.id, weight:f.weight||1}));
+  shapeComposerCells.clear();
+  mode='edit'; playModel=null; recordedSolution=[]; activeLockGroup=0;
+  $('fTitle').value=level.title; $('fSize').value=level.size; $('fGoalType').value=level.goalType;
+  renderGoalFields(); // reads level.pairGoal/winTargets/targetRequiredCount + $('fGoalType').value, so order matters
+  $('fSealDistinct').value=level.sealRequiredDistinct;
+  renderLockGroups();
+  $('fGuideMoves').value=level.guideMoves;
+  $('fMoveLimit').value=level.moveLimit||0;
+  $('fBoosterReroll').value=level.boosterReroll||0;
+  $('fBoosterHint').value=level.boosterHint||0;
+  $('fQueueRerollBudget').value=level.queueRerollBudget||10;
+  $('fQueueSolveDepth').value=level.queueSolveDepth||8;
+  $('fLesson').value=level.lesson;
+  $('fTeach').value=level.teach||'';
+  $('fBeatTag').value=level.beatTag; $('fTension').value=level.tension; $('fNovelty').value=level.novelty; $('fMastery').value=level.mastery;
+  syncModeButtons();
+  updateInjectButtonLabel();
+  renderQueuePoolList();
+  renderRandomShapesList();
+  renderRandomFacesList();
+  onDataChanged();
+}
+function populateLevelPicker(){
+  const sel=$('fLevelPicker');
+  sel.innerHTML='<option value="new">➕ Màn mới (New Level)</option>'+
+    allLevels.map((lv,i)=>`<option value="${i}">${i+1}. ${(lv.title||'(untitled)').replace(/</g,'&lt;')}</option>`).join('');
+}
+$('fLevelPicker').addEventListener('change',()=>{
+  const v=$('fLevelPicker').value;
+  if(v==='new'){ currentLevelIndex=null; loadLevelIntoEditor(blankLevel()); }
+  else{ currentLevelIndex=parseInt(v,10); loadLevelIntoEditor(allLevels[currentLevelIndex]); }
+});
+function updateInjectButtonLabel(){
+  const btn=$('btnInject');
+  btn.textContent = currentLevelIndex===null ? 'Thêm màn mới vào cuối P24M_LEVELS & Lưu'
+    : `Cập nhật màn ${currentLevelIndex+1} (${(allLevels[currentLevelIndex]||{}).title||''}) & Lưu`;
+}
+
+/* Reconstructs the real level array by evaluating the exact source text of P24M_LEVELS with
+   OUR OWN constructor functions supplied as arguments -- this gets back the identical raw
+   (pre-P24K1_FACE_MAP-remap) objects the game itself builds from that same source, without
+   needing a hand-written JS parser. Safe: this is the user's own project file, not arbitrary
+   untrusted code, evaluated locally with a fixed, known set of pure data-shape functions. */
+function parseLevelsFromSource(text){
+  const bounds=findArrayBounds(text,'const P24M_LEVELS=[');
+  if(!bounds) throw new Error('Không tìm thấy "const P24M_LEVELS=[" trong file này');
+  const arrayText=text.slice(bounds.openIdx, bounds.closeIdx+1);
+  const ctors={P24K_TILE,P24K_PIECE,K_DOMINO_H,K_DOMINO_V,P24M_STACK,P24M_STATION,P24M_CHAIN3,P24K_CHAIN,
+    P24M_L3,P24M_L3B,P24M_L3C,P24M_L3D,P24M_I3H,P24M_I3V,
+    P24M_O4,P24M_T4,P24M_S4,P24M_L4,P24M_PLUS5,P24M_L5};
+  const names=Object.keys(ctors);
+  const fn=new Function(...names, 'return ('+arrayText+');');
+  return fn(...names.map(n=>ctors[n]));
+}
+
+/* ---------------- board editing ---------------- */
+function tileAt(r,c,z){ return level.tiles.find(t=>t.r===r&&t.c===c&&t.z===z); }
+function setTile(r,c,z,id){
+  const existing=tileAt(r,c,z);
+  if(existing) existing.id=id; else level.tiles.push({id,r,c,z});
+}
+function clearCellCompletely(r,c){
+  level.tiles=level.tiles.filter(t=>!(t.r===r&&t.c===c));
+  level.seals=level.seals.filter(([sr,sc])=>!(sr===r&&sc===c));
+  level.permanents=level.permanents.filter(([pr,pc])=>!(pr===r&&pc===c));
+  level.locks.forEach(lock=>{ lock.cells=lock.cells.filter(([lr,lc])=>!(lr===r&&lc===c)); });
+}
+function isLockCell(r,c){ return level.locks.some(lock=>lock.cells.some(([lr,lc])=>lr===r&&lc===c)); }
+function lockGroupAt(r,c){ return level.locks.find(lock=>lock.cells.some(([lr,lc])=>lr===r&&lc===c)); }
+function onCellClick(r,c){
+  if(mode==='play'){ attemptPlay(r,c); return; }
+  if(tool.mode==='erase'){ clearCellCompletely(r,c); renderLockGroups(); }
+  else if(tool.mode==='seal'){
+    if(!level.seals.some(([sr,sc])=>sr===r&&sc===c)){
+      level.tiles=level.tiles.filter(t=>!(t.r===r&&t.c===c));
+      level.permanents=level.permanents.filter(([pr,pc])=>!(pr===r&&pc===c));
+      level.locks.forEach(lock=>{ lock.cells=lock.cells.filter(([lr,lc])=>!(lr===r&&lc===c)); });
+      level.seals.push([r,c]);
+      renderLockGroups();
+    } else level.seals=level.seals.filter(([sr,sc])=>!(sr===r&&sc===c));
+  } else if(tool.mode==='permanent'){
+    if(!level.permanents.some(([pr,pc])=>pr===r&&pc===c)){
+      level.tiles=level.tiles.filter(t=>!(t.r===r&&t.c===c));
+      level.seals=level.seals.filter(([sr,sc])=>!(sr===r&&sc===c));
+      level.locks.forEach(lock=>{ lock.cells=lock.cells.filter(([lr,lc])=>!(lr===r&&lc===c)); });
+      level.permanents.push([r,c]);
+      renderLockGroups();
+    } else level.permanents=level.permanents.filter(([pr,pc])=>!(pr===r&&pc===c));
+  } else if(tool.mode==='lock'){
+    if(!level.locks.length){ toast('Chưa có nhóm Khóa nào — bấm "+ Thêm nhóm Khóa" trước'); return; }
+    const group=level.locks[activeLockGroup]||level.locks[0];
+    if(!isLockCell(r,c)){
+      level.tiles=level.tiles.filter(t=>!(t.r===r&&t.c===c));
+      level.seals=level.seals.filter(([sr,sc])=>!(sr===r&&sc===c));
+      level.permanents=level.permanents.filter(([pr,pc])=>!(pr===r&&pc===c));
+      group.cells.push([r,c]);
+    } else {
+      const owner=lockGroupAt(r,c);
+      if(owner===group) group.cells=group.cells.filter(([lr,lc])=>!(lr===r&&lc===c));
+      // clicking a cell that belongs to a DIFFERENT group is a no-op here (rect-drag over it
+      // would be ambiguous too) -- switch the active group first if you meant to edit that one.
+    }
+    renderLockGroups();
+  } else if(tool.mode==='floor'||tool.mode==='roof'){
+    if(level.seals.some(([sr,sc])=>sr===r&&sc===c)||level.permanents.some(([pr,pc])=>pr===r&&pc===c)||isLockCell(r,c)) return;
+    const z = tool.mode==='floor'?0:1;
+    if(z===1 && !tileAt(r,c,0)){ toast('Roof cần có Floor bên dưới trước'); return; }
+    const existing=tileAt(r,c,z);
+    if(existing && existing.id===tool.face){ level.tiles=level.tiles.filter(t=>t!==existing); }
+    else setTile(r,c,z,tool.face);
+  }
+  onDataChanged();
+}
+
+/* ---------------- seal/permanent rectangle drag-select ---------------- */
+function cellFromPoint(x,y){
+  const el=document.elementFromPoint(x,y);
+  const cellEl=el&&el.closest?el.closest('#board .cell'):null;
+  if(!cellEl) return null;
+  return {r:parseInt(cellEl.dataset.r,10), c:parseInt(cellEl.dataset.c,10)};
+}
+function clearRectPreview(){ document.querySelectorAll('#board .cell.rectpreview').forEach(el=>el.classList.remove('rectpreview')); }
+function paintRectPreview(r1,c1,r2,c2){
+  clearRectPreview();
+  const rMin=Math.min(r1,r2), rMax=Math.max(r1,r2), cMin=Math.min(c1,c2), cMax=Math.max(c1,c2);
+  document.querySelectorAll('#board .cell').forEach(el=>{
+    const r=parseInt(el.dataset.r,10), c=parseInt(el.dataset.c,10);
+    if(r>=rMin&&r<=rMax&&c>=cMin&&c<=cMax) el.classList.add('rectpreview');
+  });
+}
+// toolMode: 'seal' | 'permanent' -- each keyed by its own flat level.X array, and painting
+// one over a cell always clears the others (a cell is exactly one of these). 'lock' is
+// handled separately below since it's a list of independent {cells,face,required} groups,
+// not one flat array.
+const RECT_TOOL_ARRAYS={seal:'seals', permanent:'permanents'};
+function applyRectTool(toolMode,r1,c1,r2,c2){
+  const rMin=Math.min(r1,r2), rMax=Math.max(r1,r2), cMin=Math.min(c1,c2), cMax=Math.max(c1,c2);
+  if(toolMode==='lock'){
+    if(!level.locks.length){ toast('Chưa có nhóm Khóa nào — bấm "+ Thêm nhóm Khóa" trước'); return; }
+    const group=level.locks[activeLockGroup]||level.locks[0];
+    const already=isLockCell(r1,c1) && lockGroupAt(r1,c1)===group;
+    const action=already?'remove':'add';
+    for(let r=rMin;r<=rMax;r++) for(let c=cMin;c<=cMax;c++){
+      if(action==='add'){
+        if(!isLockCell(r,c)){
+          level.tiles=level.tiles.filter(t=>!(t.r===r&&t.c===c));
+          level.seals=level.seals.filter(([sr,sc])=>!(sr===r&&sc===c));
+          level.permanents=level.permanents.filter(([pr,pc])=>!(pr===r&&pc===c));
+          group.cells.push([r,c]);
+        }
+      } else if(lockGroupAt(r,c)===group){
+        group.cells=group.cells.filter(([lr,lc])=>!(lr===r&&lc===c));
+      }
+    }
+    renderLockGroups();
+    return;
+  }
+  const key=RECT_TOOL_ARRAYS[toolMode]; if(!key) return;
+  const already=level[key].some(([r,c])=>r===r1&&c===c1);
+  const action=already?'remove':'add';
+  for(let r=rMin;r<=rMax;r++) for(let c=cMin;c<=cMax;c++){
+    if(action==='add'){
+      if(!level[key].some(([kr,kc])=>kr===r&&kc===c)){
+        level.tiles=level.tiles.filter(t=>!(t.r===r&&t.c===c));
+        Object.values(RECT_TOOL_ARRAYS).filter(k=>k!==key).forEach(otherKey=>{
+          level[otherKey]=level[otherKey].filter(([or,oc])=>!(or===r&&oc===c));
+        });
+        level.locks.forEach(lock=>{ lock.cells=lock.cells.filter(([lr,lc])=>!(lr===r&&lc===c)); });
+        level[key].push([r,c]);
+      }
+    } else {
+      level[key]=level[key].filter(([kr,kc])=>!(kr===r&&kc===c));
+    }
+  }
+}
+document.addEventListener('mousemove', e=>{
+  if(!rectDrag) return;
+  const hit=cellFromPoint(e.clientX,e.clientY);
+  if(!hit) return;
+  if(hit.r!==rectDrag.curR||hit.c!==rectDrag.curC) rectDrag.moved=true;
+  rectDrag.curR=hit.r; rectDrag.curC=hit.c;
+  paintRectPreview(rectDrag.startR,rectDrag.startC,rectDrag.curR,rectDrag.curC);
+});
+document.addEventListener('mouseup', ()=>{
+  if(!rectDrag) return;
+  clearRectPreview();
+  if(rectDrag.moved){
+    applyRectTool(rectDrag.tool, rectDrag.startR, rectDrag.startC, rectDrag.curR, rectDrag.curC);
+    onDataChanged();
+    renderLockGroups(); // rect-paint may have added/removed lock cells (own tool or absorbed by seal/permanent)
+  }
+  rectDrag=null;
+});
+
+/* ---------------- play-test ghost preview (hover + drag-over) ---------------- */
+function clearGhost(){
+  document.querySelectorAll('#board .cell').forEach(el=>{
+    el.classList.remove('ghost-valid','ghost-invalid');
+    el.querySelectorAll('.ghostFace').forEach(g=>g.remove());
+  });
+}
+function showGhost(r,c){
+  if(mode!=='play'||!playModel) return;
+  clearGhost();
+  const boardEl=$('board');
+  const sim=p24kSimulateDrop(r,c,playModel.tiles,playModel.pieces,playModel.level,playModel.sealOpen,playModel.idCounts);
+  if(sim.legal){
+    sim.placements.forEach(p=>{
+      const idx=p.r*level.size+p.c; const cellEl=boardEl.children[idx]; if(!cellEl) return;
+      cellEl.classList.add('ghost-valid');
+      const g=document.createElement('div'); g.className='ghostFace'; g.textContent=faceEmoji(p.id);
+      cellEl.appendChild(g);
+    });
+  } else {
+    const [br,bc]=sim.blockedAt||[r,c];
+    const idx=br*level.size+bc; const cellEl=boardEl.children[idx];
+    if(cellEl) cellEl.classList.add('ghost-invalid');
+  }
+}
+/* Edit-mode preview for dragging a sequence piece straight onto the board (no play model yet,
+   so legality is just bounds + seal/permanent, mirroring the floor/roof rules in onCellClick). */
+function showStampGhost(r,c,piece){
+  clearGhost();
+  const boardEl=$('board');
+  const placed=piece.cells.map(cell=>{
+    const rr=r+cell.dr, cc=c+cell.dc;
+    const oob = rr<0||cc<0||rr>=level.size||cc>=level.size;
+    const blocked = !oob && (level.seals.some(([sr,sc])=>sr===rr&&sc===cc)||level.permanents.some(([pr,pc])=>pr===rr&&pc===cc)||isLockCell(rr,cc));
+    const full = !oob && !blocked && tileAt(rr,cc,0) && tileAt(rr,cc,1);
+    return {rr,cc,id:cell.id,invalid:oob||blocked||full};
+  });
+  const anyInvalid=placed.some(p=>p.invalid);
+  placed.forEach(p=>{
+    if(p.rr<0||p.cc<0||p.rr>=level.size||p.cc>=level.size) return;
+    const idx=p.rr*level.size+p.cc; const cellEl=boardEl.children[idx]; if(!cellEl) return;
+    cellEl.classList.add(anyInvalid?'ghost-invalid':'ghost-valid');
+    if(!anyInvalid){ const g=document.createElement('div'); g.className='ghostFace'; g.textContent=faceEmoji(p.id); cellEl.appendChild(g); }
+  });
+}
+function stampPieceOnBoard(r,c,piece){
+  let skipped=0;
+  piece.cells.forEach(cell=>{
+    const rr=r+cell.dr, cc=c+cell.dc;
+    if(rr<0||cc<0||rr>=level.size||cc>=level.size){ skipped++; return; }
+    if(level.seals.some(([sr,sc])=>sr===rr&&sc===cc)||level.permanents.some(([pr,pc])=>pr===rr&&pc===cc)||isLockCell(rr,cc)){ skipped++; return; }
+    const hasFloor=tileAt(rr,cc,0), hasRoof=tileAt(rr,cc,1);
+    if(hasFloor&&hasRoof){ skipped++; return; }
+    setTile(rr,cc, hasFloor?1:0, cell.id);
+  });
+  toast(skipped? `Đã dán khối lên bàn (${skipped} ô bị bỏ qua vì đầy/Seal/ngoài biên)` : 'Đã dán khối lên bàn');
+}
+
+/* Move an existing floor/roof tile to another cell by drag. Landing layer follows the same
+   floor-first-then-roof rule as painting a fresh tile (z isn't preserved from the source). */
+function moveBoardTile(srcR,srcC,srcZ,id,dstR,dstC){
+  if(srcR===dstR&&srcC===dstC) return true;
+  if(level.seals.some(([sr,sc])=>sr===dstR&&sc===dstC)||level.permanents.some(([pr,pc])=>pr===dstR&&pc===dstC)||isLockCell(dstR,dstC)) return false;
+  const hasFloor=tileAt(dstR,dstC,0), hasRoof=tileAt(dstR,dstC,1);
+  if(hasFloor&&hasRoof) return false;
+  level.tiles=level.tiles.filter(t=>!(t.r===srcR&&t.c===srcC&&t.z===srcZ));
+  setTile(dstR,dstC, hasFloor?1:0, id);
+  return true;
+}
+function showMoveGhost(r,c){
+  clearGhost();
+  const boardEl=$('board');
+  const blocked=level.seals.some(([sr,sc])=>sr===r&&sc===c)||level.permanents.some(([pr,pc])=>pr===r&&pc===c)||isLockCell(r,c);
+  const isSource=draggingBoardTile.r===r&&draggingBoardTile.c===c;
+  const full=!isSource && tileAt(r,c,0) && tileAt(r,c,1);
+  const idx=r*level.size+c; const cellEl=boardEl.children[idx]; if(!cellEl) return;
+  const invalid=blocked||full;
+  cellEl.classList.add(invalid?'ghost-invalid':'ghost-valid');
+  if(!invalid){ const g=document.createElement('div'); g.className='ghostFace'; g.textContent=faceEmoji(draggingBoardTile.id); cellEl.appendChild(g); }
+}
+
+function renderBoard(){
+  const boardEl=$('board');
+  boardEl.style.gridTemplateColumns=`repeat(${level.size},64px)`;
+  boardEl.innerHTML='';
+  const guideCell = (mode==='play' && playModel)
+    ? ((level.guideMoves>playModel.queueIndex && level.solution[playModel.queueIndex]) || hintCell)
+    : null;
+  for(let r=0;r<level.size;r++) for(let c=0;c<level.size;c++){
+    const div=document.createElement('div'); div.className='cell';
+    div.dataset.r=r; div.dataset.c=c;
+    const isSeal=level.seals.some(([sr,sc])=>sr===r&&sc===c);
+    const isPerm=level.permanents.some(([pr,pc])=>pr===r&&pc===c);
+    const lockHere=lockGroupAt(r,c);
+    const lockCounts=(mode==='play'&&playModel)?playModel.idCounts:{};
+    const lockCur=lockHere?Math.min(lockHere.required,lockCounts[lockHere.face]||0):0;
+    const lockOpenNow=lockHere&&mode==='play'&&playModel&&lockCur>=lockHere.required;
+    if(isSeal && !(mode==='play'&&playModel&&playModel.sealOpen)) div.classList.add('seal');
+    if(isPerm) div.classList.add('permanent');
+    if(lockHere && !lockOpenNow){
+      div.classList.add('lock');
+      if(level.locks[activeLockGroup]===lockHere) div.classList.add('lock-active-group');
+      const lt=document.createElement('div'); lt.className='lockTag';
+      const icon=document.createElement('div'); icon.className='lt-icon';
+      icon.textContent=faceLabel(lockHere.face); icon.style.background=faceColor(lockHere.face); icon.style.color='#1b140f';
+      const cnt=document.createElement('div'); cnt.className='lt-count'; cnt.textContent=`${lockCur}/${lockHere.required}`;
+      lt.appendChild(icon); lt.appendChild(cnt); div.appendChild(lt);
+    }
+    if(guideCell && guideCell.row===r && guideCell.col===c) div.classList.add('guide');
+    let floorTile, roofTile;
+    if(mode==='play' && playModel){
+      floorTile=p24kTileAt(r,c,0,playModel.tiles); roofTile=p24kTileAt(r,c,1,playModel.tiles);
+    } else {
+      floorTile=tileAt(r,c,0); roofTile=tileAt(r,c,1);
+    }
+    if(floorTile){
+      const t=document.createElement('div'); t.className='floorTag'; t.textContent=faceEmoji(floorTile.id);
+      t.title=`${faceLabel(floorTile.id)} (${floorTile.id}) — Floor`;
+      if(mode==='edit'){
+        t.draggable=true; t.title+=' — Kéo để chuyển sang ô khác';
+        t.addEventListener('dragstart', e=>{
+          if(tool.mode==='seal'||tool.mode==='permanent'){ e.preventDefault(); return; }
+          e.stopPropagation(); draggingBoardTile={r,c,z:0,id:floorTile.id}; e.dataTransfer.setData('text/plain','board-tile');
+        });
+        t.addEventListener('dragend', ()=>{ draggingBoardTile=null; clearGhost(); });
+      }
+      div.appendChild(t);
+    }
+    if(roofTile){
+      const t=document.createElement('div'); t.className='roofTag'; t.textContent=faceEmoji(roofTile.id);
+      t.title=`${faceLabel(roofTile.id)} (${roofTile.id}) — Roof`;
+      if(mode==='edit'){
+        t.draggable=true; t.title+=' — Kéo để chuyển sang ô khác';
+        t.addEventListener('dragstart', e=>{
+          if(tool.mode==='seal'||tool.mode==='permanent'){ e.preventDefault(); return; }
+          e.stopPropagation(); draggingBoardTile={r,c,z:1,id:roofTile.id}; e.dataTransfer.setData('text/plain','board-tile');
+        });
+        t.addEventListener('dragend', ()=>{ draggingBoardTile=null; clearGhost(); });
+      }
+      div.appendChild(t);
+    }
+    div.onclick=()=>onCellClick(r,c);
+    div.addEventListener('mousedown', ()=>{
+      if(mode!=='edit'||(tool.mode!=='seal'&&tool.mode!=='permanent'&&tool.mode!=='lock')) return;
+      rectDrag={startR:r,startC:c,curR:r,curC:c,tool:tool.mode,moved:false};
+      paintRectPreview(r,c,r,c);
+    });
+    if(mode==='play'){
+      div.addEventListener('mouseenter', ()=>showGhost(r,c));
+      div.addEventListener('mouseleave', clearGhost);
+    }
+    div.addEventListener('dragover', e=>{
+      if(mode==='edit'&&draggingBoardTile){ e.preventDefault(); showMoveGhost(r,c); }
+      else if(mode==='edit'&&draggingSeqIndex!==null){ e.preventDefault(); showStampGhost(r,c, level.sequence[draggingSeqIndex]); }
+      else if(mode==='play'&&playModel){ e.preventDefault(); showGhost(r,c); }
+    });
+    div.addEventListener('dragleave', clearGhost);
+    div.addEventListener('drop', e=>{
+      if(mode==='edit'&&draggingBoardTile){
+        e.preventDefault();
+        const {r:sr,c:sc,z:sz,id}=draggingBoardTile;
+        const ok=moveBoardTile(sr,sc,sz,id,r,c);
+        if(!ok) toast('Không chuyển được vào ô đó (đầy hoặc bị chặn)');
+        clearGhost(); onDataChanged();
+      } else if(mode==='edit'&&draggingSeqIndex!==null){
+        e.preventDefault(); stampPieceOnBoard(r,c, level.sequence[draggingSeqIndex]); clearGhost(); onDataChanged();
+      } else if(mode==='play'&&playModel){
+        e.preventDefault(); clearGhost(); attemptPlay(r,c);
+      }
+    });
+    boardEl.appendChild(div);
+  }
+}
+
+/* ---------------- piece sequence editor ---------------- */
+let pendingPiece=null;
+function renderPieceMiniPreview(){
+  const shapeKey=$('fShape').value, shape=SHAPES[shapeKey];
+  if(!pendingPiece || pendingPiece.shapeKey!==shapeKey) pendingPiece={shapeKey, ids:shape.cells.map(()=>'s1')};
+  const maxR=Math.max(...shape.cells.map(c=>c[0]))+1, maxC=Math.max(...shape.cells.map(c=>c[1]))+1;
+  const el=$('pieceMiniPreview'); el.innerHTML='';
+  const grid=document.createElement('div'); grid.className='pieceMini';
+  grid.style.gridTemplateColumns=`repeat(${maxC},26px)`;
+  const cellMap={};
+  shape.cells.forEach(([dr,dc],i)=>{ cellMap[dr+'_'+dc]=i; });
+  for(let r=0;r<maxR;r++) for(let c=0;c<maxC;c++){
+    const idx=cellMap[r+'_'+c];
+    const mc=document.createElement('div');
+    if(idx===undefined){ mc.style.visibility='hidden'; }
+    else{
+      mc.className='mc'; mc.textContent=faceLabel(pendingPiece.ids[idx]);
+      mc.style.background=faceColor(pendingPiece.ids[idx]); mc.style.color='#1b140f';
+      mc.title='Click để đổi mặt: '+pendingPiece.ids[idx];
+      mc.onclick=()=>{ const cycle=FACES; const cur=cycle.indexOf(pendingPiece.ids[idx]); pendingPiece.ids[idx]=cycle[(cur+1)%cycle.length]; renderPieceMiniPreview(); };
+    }
+    grid.appendChild(mc);
+  }
+  el.appendChild(grid);
+}
+$('fShape').addEventListener('change', renderPieceMiniPreview);
+renderPieceMiniPreview();
+
+$('btnAddPiece').addEventListener('click',()=>{
+  const shape=SHAPES[pendingPiece.shapeKey];
+  const dest=$('fAddDestination').value;
+  const key=(dest==='sequence'?'p'+(level.sequence.length+1):dest==='pool'?'q'+(level.queuePool.length+1):'fallback');
+  const cells=shape.cells.map(([dr,dc],i)=>({dr,dc,id:pendingPiece.ids[i]}));
+  const piece={key, shapeKey:pendingPiece.shapeKey, cells};
+  if(dest==='sequence') level.sequence.push(piece);
+  else if(dest==='pool') level.queuePool.push({piece, weight:1});
+  else level.queueFallback=piece; // 'fallback' -- single slot, overwrites any previous one
+  pendingPiece=null; renderPieceMiniPreview();
+  if(dest==='pool') renderQueuePoolList();
+  onDataChanged();
+});
+
+function renderPieceList(){
+  const el=$('pieceList'); el.innerHTML='';
+  level.sequence.forEach((p,i)=>{
+    const row=document.createElement('div'); row.className='pieceRow'; row.draggable=true;
+    const handle=document.createElement('span'); handle.className='handle'; handle.textContent='⠿'; handle.title='Kéo để đổi thứ tự, hoặc kéo thả lên bàn để dán khối';
+    const label=document.createElement('b'); label.style.width='52px'; label.textContent=(SHAPES[p.shapeKey]||{label:p.key}).label;
+    const cellsWrap=document.createElement('div'); cellsWrap.className='cells';
+    p.cells.forEach(c=>{
+      const tag=document.createElement('span'); tag.className='cellTag'; tag.textContent=faceLabel(c.id);
+      tag.style.background=faceColor(c.id); tag.style.color='#1b140f';
+      cellsWrap.appendChild(tag);
+    });
+    const up=document.createElement('button'); up.className='small'; up.textContent='↑';
+    up.disabled=i===0; up.onclick=()=>{ [level.sequence[i-1],level.sequence[i]]=[level.sequence[i],level.sequence[i-1]]; onDataChanged(); };
+    const down=document.createElement('button'); down.className='small'; down.textContent='↓';
+    down.disabled=i===level.sequence.length-1; down.onclick=()=>{ [level.sequence[i+1],level.sequence[i]]=[level.sequence[i],level.sequence[i+1]]; onDataChanged(); };
+    const del=document.createElement('button'); del.className='small danger'; del.textContent='✕';
+    del.onclick=()=>{ level.sequence.splice(i,1); onDataChanged(); };
+    row.appendChild(handle); row.appendChild(label); row.appendChild(cellsWrap);
+    row.appendChild(up); row.appendChild(down); row.appendChild(del);
+    row.addEventListener('dragstart', e=>{ draggingSeqIndex=i; e.dataTransfer.setData('text/plain', String(i)); row.classList.add('dragging'); });
+    row.addEventListener('dragend', ()=>{ draggingSeqIndex=null; row.classList.remove('dragging'); clearGhost(); });
+    row.addEventListener('dragover', e=>{ if(draggingSeqIndex!==null){ e.preventDefault(); row.classList.add('drag-over'); } });
+    row.addEventListener('dragleave', ()=> row.classList.remove('drag-over'));
+    row.addEventListener('drop', e=>{
+      e.preventDefault(); row.classList.remove('drag-over');
+      const from=draggingSeqIndex;
+      if(from===null||from===i) return;
+      const [moved]=level.sequence.splice(from,1);
+      level.sequence.splice(i,0,moved);
+      onDataChanged();
+    });
+    el.appendChild(row);
+  });
+}
+
+function renderQueuePoolList(){
+  const el=$('queuePoolList'); el.innerHTML='';
+  if(!level.queuePool.length){ el.textContent='(trống — dùng sequence cố định như bình thường)'; return; }
+  level.queuePool.forEach((entry,i)=>{
+    const row=document.createElement('div'); row.className='pieceRow';
+    const label=document.createElement('b'); label.style.width='52px'; label.textContent=(SHAPES[entry.piece.shapeKey]||{label:entry.piece.key}).label;
+    const cellsWrap=document.createElement('div'); cellsWrap.className='cells';
+    entry.piece.cells.forEach(c=>{
+      const tag=document.createElement('span'); tag.className='cellTag'; tag.textContent=faceLabel(c.id);
+      tag.style.background=faceColor(c.id); tag.style.color='#1b140f';
+      cellsWrap.appendChild(tag);
+    });
+    const weight=document.createElement('input'); weight.type='number'; weight.min='1'; weight.value=entry.weight||1;
+    weight.title='Trọng số (weight) — số càng lớn càng dễ được rút'; weight.style.width='52px';
+    weight.addEventListener('input',()=>{ entry.weight=parseInt(weight.value,10)||1; onDataChanged(); });
+    const del=document.createElement('button'); del.className='small danger'; del.textContent='✕';
+    del.onclick=()=>{ level.queuePool.splice(i,1); renderQueuePoolList(); onDataChanged(); };
+    row.appendChild(label); row.appendChild(cellsWrap); row.appendChild(weight); row.appendChild(del);
+    el.appendChild(row);
+  });
+}
+function hasGenerativeMode(){ return !!(level.randomShapes&&level.randomShapes.length&&level.randomFaces&&level.randomFaces.length); }
+function renderQueueFallbackPreview(){
+  const el=$('queueFallbackPreview'); el.innerHTML='';
+  if(!level.queueFallback){
+    el.textContent = (level.queuePool.length||hasGenerativeMode()) ? '⚠️ Chưa đặt — bắt buộc nếu dùng Queue Pool hoặc Random Shapes×Faces' : '(chưa cần nếu không dùng Queue Pool / Random Shapes×Faces)';
+    return;
+  }
+  const row=document.createElement('div'); row.className='pieceRow';
+  const label=document.createElement('b'); label.style.width='52px'; label.textContent=(SHAPES[level.queueFallback.shapeKey]||{label:level.queueFallback.key}).label;
+  const cellsWrap=document.createElement('div'); cellsWrap.className='cells';
+  level.queueFallback.cells.forEach(c=>{
+    const tag=document.createElement('span'); tag.className='cellTag'; tag.textContent=faceLabel(c.id);
+    tag.style.background=faceColor(c.id); tag.style.color='#1b140f';
+    cellsWrap.appendChild(tag);
+  });
+  const del=document.createElement('button'); del.className='small danger'; del.textContent='✕';
+  del.onclick=()=>{ level.queueFallback=null; onDataChanged(); };
+  row.appendChild(label); row.appendChild(cellsWrap); row.appendChild(del);
+  el.appendChild(row);
+}
+
+/* ---------------- free-form shape composer + Random Shapes × Random Faces (generative) ---------------- */
+/* Built ONCE and then only ever has its 'on' class toggled in place -- rebuilding these
+   nodes (e.g. via innerHTML='') from inside their own mousedown/mouseenter handlers would
+   destroy the element the pointer is actively pressed on mid-gesture, which can make the
+   browser fail to deliver the matching mouseup to it (and, since our paint-mode reset is a
+   document-level mouseup listener, leave composerPaintMode stuck on -- confirmed via a
+   Chrome DevTools Protocol repro where the grid never received mouseup after a rebuild). */
+let shapeComposerBuilt=false;
+function renderShapeComposer(){
+  const el=$('shapeComposerGrid');
+  if(!shapeComposerBuilt){
+    el.innerHTML='';
+    el.style.gridTemplateColumns=`repeat(${COMPOSER_SIZE},28px)`;
+    for(let r=0;r<COMPOSER_SIZE;r++) for(let c=0;c<COMPOSER_SIZE;c++){
+      const key=r+'_'+c;
+      const cell=document.createElement('div');
+      cell.className='sc'; cell.dataset.r=r; cell.dataset.c=c;
+      cell.addEventListener('mousedown', e=>{
+        e.preventDefault();
+        composerPaintMode = !shapeComposerCells.has(key);
+        setComposerCell(cell,key,composerPaintMode);
+      });
+      cell.addEventListener('mouseenter', ()=>{ if(composerPaintMode!==null) setComposerCell(cell,key,composerPaintMode); });
+      el.appendChild(cell);
+    }
+    shapeComposerBuilt=true;
+  }
+  el.querySelectorAll('.sc').forEach(cell=>{
+    cell.classList.toggle('on', shapeComposerCells.has(cell.dataset.r+'_'+cell.dataset.c));
+  });
+}
+function setComposerCell(cellEl,key,on){
+  if(on) shapeComposerCells.add(key); else shapeComposerCells.delete(key);
+  cellEl.classList.toggle('on',on);
+}
+document.addEventListener('mouseup', ()=>{ composerPaintMode=null; });
+$('btnClearComposer').addEventListener('click', ()=>{ shapeComposerCells.clear(); renderShapeComposer(); });
+$('btnAddRandomShape').addEventListener('click', ()=>{
+  if(!shapeComposerCells.size){ toast('Vẽ ít nhất 1 ô trước khi thêm'); return; }
+  const cells=[...shapeComposerCells].map(k=>k.split('_').map(Number));
+  const minR=Math.min(...cells.map(c=>c[0])), minC=Math.min(...cells.map(c=>c[1]));
+  const normCells=cells.map(([r,c])=>[r-minR,c-minC]);
+  level.randomShapes.push({cells:normCells, weight:1});
+  shapeComposerCells.clear();
+  renderRandomShapesList();
+  onDataChanged();
+});
+/* Shape-only mini preview (no face/id — Random Shapes are pure cell layouts, faces are
+   picked independently per-cell at generation time), distinct from buildPieceGrid which
+   needs a face id per cell. */
+function buildShapeGrid(cells){
+  const maxR=Math.max(...cells.map(c=>c[0]))+1, maxC=Math.max(...cells.map(c=>c[1]))+1;
+  const grid=document.createElement('div'); grid.className='pieceMini';
+  grid.style.gridTemplateColumns=`repeat(${maxC},18px)`;
+  const set=new Set(cells.map(c=>c[0]+'_'+c[1]));
+  for(let r=0;r<maxR;r++) for(let c=0;c<maxC;c++){
+    const mc=document.createElement('div'); mc.style.width='18px'; mc.style.height='18px';
+    if(set.has(r+'_'+c)){ mc.className='mc'; mc.style.background='var(--jade)'; } else mc.style.visibility='hidden';
+    grid.appendChild(mc);
+  }
+  return grid;
+}
+function renderRandomShapesList(){
+  const el=$('randomShapesList'); el.innerHTML='';
+  if(!level.randomShapes.length){ el.textContent='(trống — dùng sequence/Queue Pool như bình thường)'; return; }
+  level.randomShapes.forEach((entry,i)=>{
+    const row=document.createElement('div'); row.className='pieceRow';
+    row.appendChild(buildShapeGrid(entry.cells));
+    const weight=document.createElement('input'); weight.type='number'; weight.min='1'; weight.value=entry.weight||1;
+    weight.title='Trọng số (weight) — số càng lớn càng dễ được rút'; weight.style.width='52px';
+    weight.addEventListener('input',()=>{ entry.weight=parseInt(weight.value,10)||1; onDataChanged(); });
+    const del=document.createElement('button'); del.className='small danger'; del.textContent='✕';
+    del.onclick=()=>{ level.randomShapes.splice(i,1); renderRandomShapesList(); onDataChanged(); };
+    row.appendChild(weight); row.appendChild(del);
+    el.appendChild(row);
+  });
+}
+function renderRandomFacesList(){
+  const el=$('randomFacesList'); el.innerHTML='';
+  FACES.forEach((f,i)=>{
+    const entry=level.randomFaces.find(e=>e.id===f);
+    const row=document.createElement('div'); row.className='row'; row.style.alignItems='center'; row.style.marginBottom='3px';
+    const chk=document.createElement('input'); chk.type='checkbox'; chk.style.flex='none'; chk.style.width='auto'; chk.checked=!!entry;
+    const label=document.createElement('span'); label.style.flex='none'; label.style.width='90px'; label.style.fontWeight='700';
+    label.textContent=FACE_LABELS[i]; label.style.color=faceColor(f); label.title=f;
+    const weight=document.createElement('input'); weight.type='number'; weight.min='1'; weight.value=entry?entry.weight||1:1;
+    weight.disabled=!entry; weight.style.width='52px'; weight.title='Trọng số (weight)';
+    chk.addEventListener('change',()=>{
+      if(chk.checked) level.randomFaces.push({id:f, weight:parseInt(weight.value,10)||1});
+      else level.randomFaces=level.randomFaces.filter(e=>e.id!==f);
+      renderRandomFacesList();
+      onDataChanged();
+    });
+    weight.addEventListener('input',()=>{
+      const e2=level.randomFaces.find(e=>e.id===f); if(e2) e2.weight=parseInt(weight.value,10)||1; onDataChanged();
+    });
+    row.appendChild(chk); row.appendChild(label); row.appendChild(weight);
+    el.appendChild(row);
+  });
+}
+
+/* ---------------- play-test mode ---------------- */
+$('btnEditMode').addEventListener('click',()=>{ mode='edit'; syncModeButtons(); onDataChanged(); });
+$('btnPlayMode').addEventListener('click',()=>{
+  if(!level.sequence.length && !(level.queuePool&&level.queuePool.length) && !hasGenerativeMode()){ toast('Cần ít nhất 1 khối trong sequence, Queue Pool, hoặc Random Shapes×Faces trước khi play-test'); return; }
+  mode='play'; startPlaytest(); syncModeButtons(); onDataChanged();
+});
+$('btnResetPlay').addEventListener('click', startPlaytest);
+$('btnTestReroll').addEventListener('click', useRerollInEditor);
+$('btnTestHint').addEventListener('click', useHintInEditor);
+function syncModeButtons(){
+  $('btnEditMode').classList.toggle('active', mode==='edit');
+  $('btnPlayMode').classList.toggle('active', mode==='play');
+  $('btnResetPlay').disabled = mode!=='play';
+}
+function startPlaytest(){
+  pullMetaFromForm();
+  playModel=p24kFreshModel(JSON.parse(JSON.stringify(level)));
+  playModel.movesLeft=level.moveLimit>0?level.moveLimit:Infinity;
+  playModel.boosterReroll=level.boosterReroll||0;
+  playModel.boosterHint=level.boosterHint||0;
+  playModel.lost=false;
+  recordedSolution=[]; hintCell=null;
+  renderQueuePreview(); renderSolutionList(); renderGoalLine(); renderTestBoosters();
+}
+function attemptPlay(r,c){
+  if(!playModel||playModel.lost) return;
+  const res=p24kModelDrop(playModel,r,c);
+  if(!res.legal){ toast('Không hợp lệ: '+res.sim.reason); flashBad(r,c); return; }
+  hintCell=null;
+  if(Number.isFinite(playModel.movesLeft)) playModel.movesLeft--;
+  recordedSolution.push({row:r,col:c});
+  if(!p24mGoalMet(level,playModel) && Number.isFinite(playModel.movesLeft) && playModel.movesLeft<=0){
+    playModel.lost=true; toast('Hết lượt — chưa đạt goal (thua theo moveLimit)');
+  }
+  renderQueuePreview(); renderSolutionList(); renderGoalLine(); renderBoard(); renderTestBoosters();
+  $('btnUseSolution').disabled = !p24mGoalMet(level, playModel);
+}
+function useRerollInEditor(){
+  if(!playModel||playModel.lost||!(playModel.boosterReroll>0)) return;
+  playModel.boosterReroll--; playModel.queueIndex++;
+  playModel.pieces=[p24kQueuePiece(0,playModel.level,playModel.queueIndex),p24kQueuePiece(1,playModel.level,playModel.queueIndex)];
+  hintCell=null;
+  renderQueuePreview(); renderTestBoosters();
+  toast('Đã đổi sang khối tiếp theo (không tốn lượt)');
+}
+function useHintInEditor(){
+  if(!playModel||playModel.lost||!(playModel.boosterHint>0)) return;
+  toast('Đang tìm gợi ý…');
+  const move=trySolveFromModel(playModel);
+  if(!move){ toast('Không tìm được gợi ý cho trạng thái hiện tại'); return; }
+  playModel.boosterHint--; hintCell=move;
+  renderBoard(); renderTestBoosters();
+  setTimeout(()=>{ if(hintCell===move){ hintCell=null; renderBoard(); } },4000);
+}
+/* Bounded DFS from the model AS-IS (already the live playtest state, unlike trySolve()
+   below which always starts from a fresh level) — backs the editor's Hint test button so
+   it stays correct even after the tester has deviated from level.solution or used Đổi khối. */
+function trySolveFromModel(model){
+  const maxNodes=50000,maxDepth=24;let nodes=0;const seen=new Set();
+  function keyOf(m){ return m.tiles.filter(t=>t.alive).map(t=>t.id+'@'+t.r+'_'+t.c+'_'+t.z).sort().join(',')+'|'+m.queueIndex; }
+  function dfs(m,depth,firstMove){
+    if(p24mGoalMet(m.level,m)) return firstMove;
+    if(depth>=maxDepth||nodes++>maxNodes) return null;
+    const key=keyOf(m); if(seen.has(key)) return null; seen.add(key);
+    for(const mv of p24kLegalMoves(m)){
+      const clone=JSON.parse(JSON.stringify(m));
+      const res=p24kModelDrop(clone,mv.row,mv.col);
+      if(!res.legal) continue;
+      const fm=firstMove||{row:mv.row,col:mv.col};
+      const found=dfs(clone,depth+1,fm);
+      if(found) return found;
+    }
+    return null;
+  }
+  return dfs(JSON.parse(JSON.stringify(model)),0,null);
+}
+function renderTestBoosters(){
+  const box=$('testBoosters'); if(!box) return;
+  const show=mode==='play'&&playModel&&(level.boosterReroll>0||level.boosterHint>0);
+  box.classList.toggle('hidden',!show);
+  if(!show) return;
+  const rBtn=$('btnTestReroll'), hBtn=$('btnTestHint');
+  if(rBtn){ rBtn.style.display=level.boosterReroll?'':'none'; rBtn.disabled=!playModel||playModel.lost||!(playModel.boosterReroll>0); rBtn.textContent=`🔄 Đổi khối (${playModel?playModel.boosterReroll:0})`; }
+  if(hBtn){ hBtn.style.display=level.boosterHint?'':'none'; hBtn.disabled=!playModel||playModel.lost||!(playModel.boosterHint>0); hBtn.textContent=`💡 Hint (${playModel?playModel.boosterHint:0})`; }
+}
+function flashBad(r,c){
+  renderBoard();
+  const idx=r*level.size+c;
+  const el=$('board').children[idx];
+  if(el){ el.classList.add('badplace'); setTimeout(()=>el.classList.remove('badplace'),400); }
+}
+function buildPieceGrid(cells){
+  const maxR=Math.max(...cells.map(c=>c.dr))+1, maxC=Math.max(...cells.map(c=>c.dc))+1;
+  const grid=document.createElement('div'); grid.className='pieceMini';
+  grid.style.gridTemplateColumns=`repeat(${maxC},22px)`;
+  const map={}; cells.forEach(c=>map[c.dr+'_'+c.dc]=c.id);
+  for(let r=0;r<maxR;r++) for(let c=0;c<maxC;c++){
+    const id=map[r+'_'+c];
+    const mc=document.createElement('div');
+    if(id===undefined){ mc.style.visibility='hidden'; }
+    else{
+      mc.className='mc'; mc.style.width='22px'; mc.style.height='22px';
+      mc.style.background=faceColor(id); mc.style.color='#1b140f';
+      mc.textContent=faceLabel(id);
+    }
+    grid.appendChild(mc);
+  }
+  return grid;
+}
+/* Trước đây khay Current/Next hiện y hệt lúc đang chơi ngay cả khi playModel.lost
+   (hoặc đã thắng) đã true -- click/kéo bị chặn ĐÚNG ở nơi xử lý đặt khối (xem
+   guard playModel.lost ở đầu hàm đặt khối), nhưng KHÔNG có tín hiệu thị giác
+   nào báo game đã kết thúc, nên nhìn như vẫn chơi tiếp được bình thường (report:
+   "màn hình thất bại" gây hiểu lầm còn chơi được). Giờ khay mờ + bỏ draggable
+   khi lost/won, khớp với việc thao tác thật sự đã bị khoá. */
+function renderQueuePreview(){
+  const curBox=$('curPiece'), nextBox=$('nextPiece');
+  curBox.innerHTML=''; nextBox.innerHTML='';
+  const gameOver=!!(playModel&&(playModel.lost||p24mGoalMet(level,playModel)));
+  curBox.classList.toggle('queue-gameover',gameOver);
+  nextBox.classList.toggle('queue-gameover',gameOver);
+  if(!playModel) return;
+  if(playModel.pieces[0]){
+    const grid=buildPieceGrid(playModel.pieces[0].cells);
+    if(!gameOver){
+      grid.classList.add('draggable-piece'); grid.draggable=true; grid.title='Kéo thả lên bàn để đặt khối này';
+      grid.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/plain','current-piece'); });
+    }
+    curBox.appendChild(grid);
+  } else curBox.textContent='—';
+  if(playModel.pieces[1]) nextBox.appendChild(buildPieceGrid(playModel.pieces[1].cells));
+  else nextBox.textContent='—';
+}
+function renderSolutionList(){
+  $('solutionList').textContent = recordedSolution.length ? recordedSolution.map(m=>`(${m.row},${m.col})`).join(' → ') : '(chưa có nước nào)';
+}
+/* Chip-based goal HUD -- "mô phỏng trực tiếp bàn chơi" pass: mirrors index.html's own
+   goal-strip (one .goal-chip per winTarget, icon+current/need, .met when done) instead of a
+   single plain-text line, so Play-test shows the same at-a-glance goal read the real game's
+   HUD does. Same aggregate-vs-per-chip split index.html's goalState() uses: OPEN_SEAL/
+   TILE_QUOTA/targetRequiredCount stay one aggregate number (that's what the real HUD shows
+   for those too), only a plain "every winTarget required" TARGET_FACE/BURIED_TARGET level
+   gets one chip per face. */
+function renderGoalLine(){
+  const el=$('goalLine');
+  if(mode!=='play'||!playModel){ el.innerHTML=''; el.textContent='Bấm ▶️ Play-test để thử màn ngay trong tool.'; el.className='goalline'; $('boardWrap').classList.remove('board-gameover'); return; }
+  const won=p24mGoalMet(level,playModel);
+  let bodyHTML='';
+  if(level.goalType==='TILE_QUOTA'){
+    const cur=p24mTileTotal(playModel.idCounts), need=level.tileGoal||1;
+    bodyHTML=`<span class="goal-chip${cur>=need?' met':''}">🀄 ${cur}<small>/${need}</small></span>`;
+  } else if(level.goalType==='OPEN_SEAL'){
+    const cur=Object.keys(playModel.idCounts).length, need=level.sealRequiredDistinct||0;
+    bodyHTML=`<span class="goal-chip${cur>=need?' met':''}">🔓 ${cur}<small>/${need}</small></span>`;
+  } else if(level.winTargets&&level.winTargets.length){
+    if(level.goalType==='TARGET_FACE' && level.targetRequiredCount){
+      const done=level.winTargets.filter(t=>(playModel.idCounts[t.id]||0)>=t.need).length;
+      bodyHTML=`<span class="goal-chip${done>=level.targetRequiredCount?' met':''}">🎯 ${done}<small>/${level.targetRequiredCount}</small></span>`
+        +level.winTargets.map(t=>{const c=playModel.idCounts[t.id]||0; return `<span class="goal-chip sub${c>=t.need?' met':''}">${faceEmoji(t.id)} ${c}<small>/${t.need}</small></span>`;}).join('');
+    } else {
+      bodyHTML=level.winTargets.map(t=>{const c=playModel.idCounts[t.id]||0; return `<span class="goal-chip${c>=t.need?' met':''}">${faceEmoji(t.id)} ${c}<small>/${t.need}</small></span>`;}).join('');
+    }
+  } else {
+    const cur=playModel.pairs, need=level.pairGoal||1;
+    bodyHTML=`<span class="goal-chip${cur>=need?' met':''}">🀫 ${cur}<small>/${need}</small></span>`;
+  }
+  if(Number.isFinite(playModel.movesLeft)) bodyHTML+=`<span class="goal-chip moves">⏳ ${Math.max(0,playModel.movesLeft)}</span>`;
+  const banner = won ? '🎉 THẮNG — ' : (playModel.lost ? '❌ HẾT LƯỢT — ' : '');
+  el.innerHTML = (banner?`<span class="goal-banner">${banner}</span>`:'') + bodyHTML;
+  el.className='goalline'+(won?' won':(playModel.lost?' lost':''));
+  $('boardWrap').classList.toggle('board-gameover', won||playModel.lost);
+}
+$('btnUseSolution').addEventListener('click',()=>{
+  level.solution=recordedSolution.slice();
+  toast('Đã lưu solution ('+level.solution.length+' nước)');
+  onDataChanged();
+});
+
+/* ---------------- validation (mirrors validate-level.mjs) ---------------- */
+function runValidation(){
+  const out=[];
+  function pass(name,detail){ out.push({name,state:'pass',detail}); }
+  function fail(name,detail){ out.push({name,state:'fail',detail}); }
+  function warn(name,detail){ out.push({name,state:'warn',detail}); }
+  function inBounds(r,c){ return r>=0&&c>=0&&r<level.size&&c<level.size; }
+
+  Number.isInteger(level.size)&&level.size>=2 ? pass('size hợp lệ') : fail('size hợp lệ',`size=${level.size}`);
+
+  const allLockCells=level.locks.flatMap(l=>l.cells);
+  let boundsOk=true;
+  level.seals.forEach(([r,c])=>{ if(!inBounds(r,c)) boundsOk=false; });
+  level.permanents.forEach(([r,c])=>{ if(!inBounds(r,c)) boundsOk=false; });
+  allLockCells.forEach(([r,c])=>{ if(!inBounds(r,c)) boundsOk=false; });
+  level.tiles.forEach(t=>{ if(!inBounds(t.r,t.c)) boundsOk=false; });
+  boundsOk ? pass('mọi ô đều trong bàn') : fail('mọi ô đều trong bàn','có seal/permanent/khóa/tile ngoài biên');
+
+  const overlap=level.seals.some(([sr,sc])=>level.permanents.some(([pr,pc])=>pr===sr&&pc===sc));
+  !overlap ? pass('seal không trùng permanent') : fail('seal không trùng permanent');
+  const lockOverlap=allLockCells.some(([lr,lc])=>level.seals.some(([sr,sc])=>sr===lr&&sc===lc)||level.permanents.some(([pr,pc])=>pr===lr&&pc===lc));
+  const lockCrossOverlap=level.locks.some((g1,i)=>level.locks.some((g2,j)=>j>i&&g1.cells.some(([r1,c1])=>g2.cells.some(([r2,c2])=>r1===r2&&c1===c2))));
+  if(level.locks.length){
+    !lockOverlap ? pass('khóa không trùng seal/permanent') : fail('khóa không trùng seal/permanent');
+    !lockCrossOverlap ? pass('các nhóm khóa không đè lên nhau') : fail('các nhóm khóa không đè lên nhau', '1 ô chỉ nên thuộc đúng 1 nhóm khóa');
+    level.locks.every(g=>g.required>0) ? pass('required > 0 ở mọi nhóm khóa') : fail('required > 0 ở mọi nhóm khóa', 'nhóm khóa với required=0 sẽ mở ngay từ đầu, vô nghĩa');
+    level.locks.every(g=>g.cells.length>0) ? pass('mọi nhóm khóa có ít nhất 1 ô') : warn('mọi nhóm khóa có ít nhất 1 ô', 'có nhóm khóa chưa vẽ ô nào trên bàn — sẽ không xuất hiện trong genCode');
+  }
+  if(level.queuePool&&level.queuePool.length){
+    level.queueFallback ? pass('Queue Pool có khối dự phòng (queueFallback)') : fail('Queue Pool có khối dự phòng (queueFallback)', 'bắt buộc, dùng khi hết queueRerollBudget lần thử mà không khối nào an toàn');
+  }
+  const hasShapes=level.randomShapes&&level.randomShapes.length, hasFaces=level.randomFaces&&level.randomFaces.length;
+  if(hasShapes||hasFaces){
+    (hasShapes&&hasFaces) ? pass('Random Shapes + Random Faces đều có (generative mode bật)')
+      : fail('Random Shapes + Random Faces đều có', 'cần điền CẢ 2 danh sách để bật generative mode — hiện chỉ có '+(hasShapes?'Random Shapes':'Random Faces'));
+  }
+  if(hasShapes&&hasFaces){
+    level.queueFallback ? pass('Generative mode có khối dự phòng (queueFallback)') : fail('Generative mode có khối dự phòng (queueFallback)', 'bắt buộc, dùng khi hết queueRerollBudget lần thử mà không khối nào an toàn');
+  }
+
+  const topNoSupport=level.tiles.some(t=>t.z===1 && !level.tiles.some(u=>u!==t&&u.r===t.r&&u.c===t.c&&u.z===0));
+  !topNoSupport ? pass('mọi roof tile có floor đỡ') : fail('mọi roof tile có floor đỡ','có roof không có floor bên dưới');
+
+  (level.sequence.length>=1||(level.queuePool&&level.queuePool.length>=1)||(hasShapes&&hasFaces)) ? pass('sequence, Queue Pool, hoặc Random Shapes×Faces không rỗng') : fail('sequence, Queue Pool, hoặc Random Shapes×Faces không rỗng');
+  level.sequence.forEach(p=>{
+    if(p24mPieceHasBakedSelfMatch(p)) warn('baked self-match', `${p.key} có 2 ô kề trùng mặt — auto-match ngay khi đặt (OK nếu cố ý cho tutorial 1 nước)`);
+  });
+  if(level.goalType==='TILE_QUOTA'){
+    (Number.isInteger(level.tileGoal)&&level.tileGoal>0) ? pass('tileGoal hợp lệ') : fail('tileGoal hợp lệ');
+  } else if(level.goalType==='OPEN_SEAL'){
+    (level.seals.length>0 && level.sealRequiredDistinct>0) ? pass('OPEN_SEAL có seal + sealRequiredDistinct') : fail('OPEN_SEAL có seal + sealRequiredDistinct');
+  } else if(level.winTargets&&level.winTargets.length){
+    if(level.goalType==='TARGET_FACE' && level.targetRequiredCount){
+      level.targetRequiredCount<=level.winTargets.length ? pass('targetRequiredCount ≤ số winTargets') : fail('targetRequiredCount ≤ số winTargets');
+    }
+  } else {
+    (Number.isInteger(level.pairGoal)&&level.pairGoal>0) ? pass('pairGoal hợp lệ') : fail('pairGoal hợp lệ');
+  }
+
+  // Giới hạn số loại mahjong tối đa mỗi màn (chốt 08/09/2026, xem
+  // Document/08-GDD-LEVEL-DESIGN.md §4) -- chỉ áp dụng cho TARGET_FACE/BURIED_TARGET, vì đó
+  // là 2 loại goal hiện winTargets thành chip riêng trên goal-strip.
+  if((level.goalType==='TARGET_FACE'||level.goalType==='BURIED_TARGET') && level.winTargets&&level.winTargets.length){
+    const combined = level.seals.length>0 || level.permanents.length>0 || level.locks.some(g=>g.cells.length>0);
+    const cap = combined ? 3 : 4;
+    const n = level.winTargets.length;
+    n<=cap ? pass(`số loại mahjong ≤ ${cap} (${combined?'có kết hợp Seal/Ô Chắn/Lock':'không kết hợp cơ chế khác'})`)
+      : warn(`số loại mahjong ≤ ${cap} (${combined?'có kết hợp Seal/Ô Chắn/Lock':'không kết hợp cơ chế khác'})`,
+        `đang có ${n} loại — vượt giới hạn khuyến nghị, goal-strip sẽ hiện quá nhiều chip cùng lúc. Cân nhắc bớt winTargets (quân thừa vẫn đặt/ghép bình thường trên bàn, chỉ không tính vào điều kiện thắng).`);
+  }
+
+  // Số nước dư tối thiểu (xem 08-GDD-LEVEL-DESIGN.md §5) -- chỉ tính được khi đã có solution.
+  if(level.moveLimit>0 && level.solution && level.solution.length){
+    const spare=level.moveLimit-level.solution.length;
+    spare>=2 ? pass(`lượt dư ≥ 2 (đang dư ${spare})`)
+      : warn(`lượt dư ≥ 2 (đang dư ${spare})`, spare<=0
+        ? 'màn "chính xác tuyệt đối, không có cơ hội thứ hai" kiểu Lv46 — chỉ giữ nếu đây LÀ chủ đích thiết kế, không phải vô tình.'
+        : `chỉ dư ${spare} nước — cân nhắc +1 moveLimit trừ khi đây là màn "đỉnh khó" cố ý siết chặt.`);
+  }
+
+  // solvability via recorded solution (if any)
+  if(level.solution && level.solution.length){
+    pullMetaFromForm();
+    const model=p24kFreshModel(JSON.parse(JSON.stringify(level)));
+    let ok=true, reason='';
+    for(const mv of level.solution){
+      const r=p24kModelDrop(model,mv.row,mv.col);
+      if(!r.legal){ ok=false; reason=r.sim.reason; break; }
+    }
+    if(ok && p24mGoalMet(level,model)) pass('solution đã ghi thắng được màn');
+    else fail('solution đã ghi thắng được màn', reason||'chưa đạt goal sau khi chạy hết solution');
+    if(level.moveLimit>0){
+      level.solution.length<=level.moveLimit
+        ? pass('solution nằm trong moveLimit')
+        : fail('solution nằm trong moveLimit', `solution dài ${level.solution.length} nước > moveLimit=${level.moveLimit} — người chơi thắng bằng đúng đường này sẽ hết lượt trước`);
+    }
+  } else {
+    warn('chưa có solution', 'vào Play-test, chơi thắng, rồi bấm "Dùng làm solution chính thức"');
+    if(level.moveLimit>0) warn('moveLimit chưa kiểm được', 'cần solution để so khớp với moveLimit');
+  }
+
+  const el=$('checks'); el.innerHTML='';
+  out.forEach(c=>{
+    const row=document.createElement('div'); row.className='check '+c.state;
+    row.innerHTML=`<span class="icon">${c.state==='pass'?'✓':c.state==='warn'?'!':'✕'}</span><span>${c.name}${c.detail?`<div class="detail">${c.detail}</div>`:''}</span>`;
+    el.appendChild(row);
+  });
+  return out.every(c=>c.state!=='fail');
+}
+
+/* ---------------- code generation ---------------- */
+function genCode(){
+  pullMetaFromForm();
+  const lines=[];
+  lines.push('{');
+  lines.push(`  title: ${JSON.stringify(level.title)},`);
+  lines.push(`  size: ${level.size},`);
+  lines.push(`  goalType: ${JSON.stringify(level.goalType)},`);
+  if(level.goalType==='PAIR_QUOTA') lines.push(`  pairGoal: ${level.pairGoal},`);
+  if(level.goalType==='TILE_QUOTA') lines.push(`  tileGoal: ${level.tileGoal},`);
+  if(level.winTargets&&level.winTargets.length) lines.push(`  winTargets: [${level.winTargets.map(t=>`{id:${JSON.stringify(t.id)},need:${t.need}}`).join(', ')}],`);
+  if(level.goalType==='TARGET_FACE'&&level.targetRequiredCount) lines.push(`  targetRequiredCount: ${level.targetRequiredCount},`);
+  if(level.seals.length) lines.push(`  seals: [${level.seals.map(s=>`[${s[0]},${s[1]}]`).join(', ')}],`);
+  if(level.permanents.length) lines.push(`  permanents: [${level.permanents.map(p=>`[${p[0]},${p[1]}]`).join(', ')}],`);
+  const nonEmptyLocks=(level.locks||[]).filter(l=>l.cells.length);
+  if(nonEmptyLocks.length) lines.push(`  locks: [${nonEmptyLocks.map(l=>`{ cells: [${l.cells.map(k=>`[${k[0]},${k[1]}]`).join(', ')}], face: ${JSON.stringify(l.face)}, required: ${l.required} }`).join(', ')}],`);
+  if(level.sealRequiredDistinct) lines.push(`  sealRequiredDistinct: ${level.sealRequiredDistinct},`);
+  lines.push(`  guideMoves: ${level.guideMoves},`);
+  if(level.moveLimit) lines.push(`  moveLimit: ${level.moveLimit},`);
+  if(level.boosterReroll) lines.push(`  boosterReroll: ${level.boosterReroll},`);
+  if(level.boosterHint) lines.push(`  boosterHint: ${level.boosterHint},`);
+  lines.push(`  lesson: ${JSON.stringify(level.lesson)},`);
+  lines.push(`  teach: ${JSON.stringify(level.teach||'')},`);
+  lines.push('  tiles: [');
+  level.tiles.forEach(t=>lines.push(`    P24K_TILE(${JSON.stringify(t.id)}, ${t.r}, ${t.c}, ${t.z}),`));
+  lines.push('  ],');
+  lines.push('  sequence: [');
+  level.sequence.forEach(p=>{
+    const shape=SHAPES[p.shapeKey];
+    const ids=p.cells.map(c=>JSON.stringify(c.id)).join(', ');
+    lines.push(`    ${shape.ctor}(${JSON.stringify(p.key)}, ${ids}),`);
+  });
+  lines.push('  ],');
+  if(level.queuePool&&level.queuePool.length){
+    lines.push('  queuePool: [');
+    level.queuePool.forEach(entry=>{
+      const shape=SHAPES[entry.piece.shapeKey];
+      const ids=entry.piece.cells.map(c=>JSON.stringify(c.id)).join(', ');
+      lines.push(`    { piece: ${shape.ctor}(${JSON.stringify(entry.piece.key)}, ${ids}), weight: ${entry.weight||1} },`);
+    });
+    lines.push('  ],');
+  }
+  if(level.randomShapes&&level.randomShapes.length){
+    lines.push(`  randomShapes: [${level.randomShapes.map(s=>`{ cells: [${s.cells.map(c=>`[${c[0]},${c[1]}]`).join(', ')}], weight: ${s.weight||1} }`).join(', ')}],`);
+  }
+  if(level.randomFaces&&level.randomFaces.length){
+    lines.push(`  randomFaces: [${level.randomFaces.map(f=>`{ id: ${JSON.stringify(f.id)}, weight: ${f.weight||1} }`).join(', ')}],`);
+  }
+  const usesRandomMode=(level.queuePool&&level.queuePool.length)||(level.randomShapes&&level.randomShapes.length&&level.randomFaces&&level.randomFaces.length);
+  if(usesRandomMode){
+    if(level.queueFallback){
+      const shape=SHAPES[level.queueFallback.shapeKey];
+      const ids=level.queueFallback.cells.map(c=>JSON.stringify(c.id)).join(', ');
+      lines.push(`  queueFallback: ${shape.ctor}(${JSON.stringify(level.queueFallback.key)}, ${ids}),`);
+    }
+    lines.push(`  queueRerollBudget: ${level.queueRerollBudget||10},`);
+    lines.push(`  queueSolveDepth: ${level.queueSolveDepth||8},`);
+  }
+  lines.push(`  solution: [${(level.solution||[]).map(m=>`{ row: ${m.row}, col: ${m.col} }`).join(', ')}],`);
+  lines.push('},');
+  return lines.join('\n');
+}
+
+/* ---------------- top-level refresh ---------------- */
+function onDataChanged(){
+  if(mode==='edit') pullMetaFromForm();
+  renderBoard();
+  // renderLockGroups() is deliberately NOT called here (unlike renderBoard/renderPieceList
+  // etc.) -- it fully rebuilds the lock-group cards' DOM, which would steal focus out of
+  // whichever field the user is mid-typing-in (e.g. "required") since onDataChanged fires on
+  // every keystroke everywhere. It's called explicitly instead: after board painting
+  // (onCellClick/applyRectTool touch a lock cell) and after add/remove group.
+  // Same reasoning applies to renderQueuePoolList/renderRandomShapesList/renderRandomFacesList
+  // below -- their own weight <input>s call onDataChanged() on every keystroke (need to, since
+  // validation/exportCode below DO depend on weight), so rebuilding here would steal focus out
+  // of the very field being typed in (confirmed: activeElement becomes <body> after 1 digit).
+  // Called explicitly instead, only from actions that actually need a DOM rebuild (add/delete/
+  // checkbox-toggle), never from a weight-value edit.
+  renderPieceList();
+  renderQueueFallbackPreview();
+  renderShapeComposer();
+  renderQueuePreview();
+  renderSolutionList();
+  renderGoalLine();
+  renderTestBoosters();
+  const ok=runValidation();
+  $('exportCode').value=genCode();
+  $('btnInject').disabled = !fileHandle || !ok;
+  if(fileHandle) updateInjectButtonLabel();
+}
+
+/* ---------------- export actions ---------------- */
+$('btnCopy').addEventListener('click', async ()=>{
+  try{ await navigator.clipboard.writeText($('exportCode').value); toast('Đã copy vào clipboard'); }
+  catch(e){ toast('Copy thất bại — chọn thủ công trong ô textarea'); }
+});
+$('btnDownload').addEventListener('click', ()=>{
+  const blob=new Blob([$('exportCode').value],{type:'text/javascript'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=(level.title||'level').replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'.js';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+});
+
+/* ---------------- direct file injection (File System Access API) ---------------- */
+$('btnPickFile').addEventListener('click', async ()=>{
+  if(!window.showOpenFilePicker){ toast('Trình duyệt này không hỗ trợ — dùng Copy/Download thay thế'); return; }
+  try{
+    const [handle]=await window.showOpenFilePicker({types:[{description:'HTML',accept:{'text/html':['.html']}}]});
+    fileHandle=handle;
+    const file=await handle.getFile();
+    const text=await file.text();
+    try{
+      allLevels=parseLevelsFromSource(text);
+      populateLevelPicker();
+      $('fileInfo').textContent=`Đã chọn: ${file.name} (${(file.size/1024).toFixed(0)} KB) — đọc được ${allLevels.length} level có sẵn`;
+    }catch(parseErr){
+      allLevels=[]; populateLevelPicker();
+      $('fileInfo').textContent=`Đã chọn: ${file.name} — KHÔNG đọc được danh sách level có sẵn (${parseErr.message}). Vẫn thêm được level mới.`;
+    }
+    $('btnInject').disabled=false;
+    updateInjectButtonLabel();
+    onDataChanged();
+  }catch(e){ if(e.name!=='AbortError') toast('Không mở được file: '+e.message); }
+});
+
+/* Shared bracket/string/comment-aware scan step used by both findArrayBounds and
+   findTopLevelObjectRanges. The real index.html has // and /* *​/ comments scattered right
+   inside the level data (e.g. a parenthetical aside in a Level 2 comment) — without skipping
+   those, a bracket-like character inside a comment desyncs the depth count just like one
+   inside a string would. Returns the index to resume scanning from after handling position i;
+   callers should `i = advance(...) - 1` before the loop's own i++ if a comment was skipped,
+   or just use this as a drop-in replacement for the per-character dispatch. */
+function scanStep(text, i, state){
+  const ch=text[i];
+  if(state.inStr){
+    if(state.esc){ state.esc=false; } else if(ch==='\\'){ state.esc=true; } else if(ch===state.inStr){ state.inStr=null; }
+    return i;
+  }
+  if(ch==='/' && text[i+1]==='/'){ const nl=text.indexOf('\n',i); return nl===-1? text.length : nl; }
+  if(ch==='/' && text[i+1]==='*'){ const end=text.indexOf('*/',i+2); return end===-1? text.length : end+1; }
+  if(ch==="'"||ch==='"'||ch==='`'){ state.inStr=ch; return i; }
+  if(ch==='['||ch==='{'||ch==='('){ state.depth++; state.lastOpen=ch; return i; }
+  if(ch===']'||ch==='}'||ch===')'){ state.depth--; state.lastClose=ch; return i; }
+  return i;
+}
+
+function findArrayBounds(text, marker){
+  const startIdx=text.indexOf(marker);
+  if(startIdx===-1) return null;
+  const openIdx=startIdx+marker.length-1; // index of the '['
+  const state={depth:0, inStr:null, esc:false};
+  let i=openIdx;
+  for(; i<text.length; i++){
+    state.lastClose=null;
+    i=scanStep(text, i, state);
+    if(state.lastClose && state.depth===0) break;
+  }
+  return {openIdx, closeIdx:i};
+}
+
+/* Finds each top-level {...} object directly inside the array (depth==1 relative to the
+   array's own '['), skipping over anything nested deeper (a level's own winTargets/tiles/
+   sequence arrays, etc.), over bracket-like characters inside string literals, AND inside
+   // or /* *​/ comments. Index i in the returned list corresponds exactly to allLevels[i] /
+   the level picker's option values, since both are built by walking P24M_LEVELS in the same
+   left-to-right order. */
+function findTopLevelObjectRanges(text, openIdx, closeIdx){
+  const ranges=[]; const state={depth:0, inStr:null, esc:false}; let objStart=-1;
+  for(let i=openIdx; i<=closeIdx; i++){
+    state.lastOpen=null; state.lastClose=null;
+    const depthBefore=state.depth;
+    i=scanStep(text, i, state);
+    if(state.lastOpen==='{' && depthBefore===1) objStart=i;
+    if(state.lastClose==='}' && state.depth===1) ranges.push({start:objStart, end:i});
+  }
+  return ranges;
+}
+
+$('btnInject').addEventListener('click', async ()=>{
+  if(!fileHandle) return;
+  const ok=runValidation();
+  if(!ok){ toast('Còn lỗi FAIL ở mục kiểm tra — sửa trước khi chèn'); return; }
+  try{
+    const file=await fileHandle.getFile();
+    const text=await file.text();
+    const bounds=findArrayBounds(text,'const P24M_LEVELS=[');
+    if(!bounds){ toast('Không tìm thấy "const P24M_LEVELS=[" trong file này — chọn đúng index.html chưa?'); return; }
+    const code=genCode();
+    let newText;
+    if(currentLevelIndex===null){
+      const before=text.slice(0,bounds.closeIdx), after=text.slice(bounds.closeIdx);
+      // insert right before the closing ']' of the array, with a newline for readability
+      newText = before + '\n  ' + code + '\n' + after;
+    } else {
+      const ranges=findTopLevelObjectRanges(text, bounds.openIdx, bounds.closeIdx);
+      const target=ranges[currentLevelIndex];
+      if(!target){ toast('Không khớp được vị trí màn trong file (file có thể đã đổi từ lúc Load) — Load lại rồi thử lại'); return; }
+      const codeNoTrailingComma=code.replace(/,\s*$/,''); // replacing in place: the surrounding comma already exists
+      newText = text.slice(0,target.start) + codeNoTrailingComma + text.slice(target.end+1);
+    }
+    const writable=await fileHandle.createWritable();
+    await writable.write(newText);
+    await writable.close();
+    toast(currentLevelIndex===null ? 'Đã thêm level mới vào cuối P24M_LEVELS và lưu file!' : `Đã cập nhật màn ${currentLevelIndex+1} và lưu file!`);
+  }catch(e){ toast('Lỗi khi ghi file: '+e.message); }
+});
+
+/* ---------------- CSV sheet integration ---------------- */
+function csvEscape(v){ v=String(v??''); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
+function csvParseLine(line){
+  const out=[]; let cur='', inQ=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(inQ){
+      if(ch==='"'){ if(line[i+1]==='"'){ cur+='"'; i++; } else inQ=false; }
+      else cur+=ch;
+    } else {
+      if(ch==='"') inQ=true;
+      else if(ch===','){ out.push(cur); cur=''; }
+      else cur+=ch;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+function parseCsv(text){
+  const lines=text.replace(/\r\n/g,'\n').split('\n').filter(l=>l.length);
+  const header=csvParseLine(lines[0]);
+  return lines.slice(1).map(l=>{
+    const cells=csvParseLine(l), row={};
+    header.forEach((h,i)=>row[h.trim()]=cells[i]);
+    return row;
+  });
+}
+$('btnExportCsv').addEventListener('click',()=>{
+  const rows=allLevels.map((lv,i)=>[i+1, lv.title, Math.floor(i/10)+1, lv.goalType, lv.size, lv.lesson, lv.beatTag||'', lv.tension||0, lv.novelty||0, lv.mastery||0]);
+  const header=['Index','Title','Chapter','GoalType','Size','Lesson','BeatTag','Tension','Novelty','Mastery'];
+  const csv=[header, ...rows].map(r=>r.map(csvEscape).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='mahjong-x-block-levels.csv';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),2000);
+});
+$('btnImportCsvBtn').addEventListener('click',()=>$('fImportCsv').click());
+$('fImportCsv').addEventListener('change', async (e)=>{
+  const file=e.target.files[0]; if(!file) return;
+  try{
+    const rows=parseCsv(await file.text());
+    let updated=0;
+    rows.forEach(row=>{
+      const idx=parseInt(row.Index,10)-1;
+      if(!allLevels[idx]) return;
+      if(row.Title) allLevels[idx].title=row.Title;
+      if(row.Lesson!==undefined) allLevels[idx].lesson=row.Lesson;
+      if(row.BeatTag!==undefined) allLevels[idx].beatTag=row.BeatTag;
+      if(row.Tension!==undefined) allLevels[idx].tension=parseInt(row.Tension,10)||0;
+      if(row.Novelty!==undefined) allLevels[idx].novelty=parseInt(row.Novelty,10)||0;
+      if(row.Mastery!==undefined) allLevels[idx].mastery=parseInt(row.Mastery,10)||0;
+      updated++;
+    });
+    populateLevelPicker();
+    if(currentLevelIndex!==null && allLevels[currentLevelIndex]){
+      $('fLevelPicker').value=String(currentLevelIndex);
+      loadLevelIntoEditor(allLevels[currentLevelIndex]); // refresh form in case it was in the CSV too
+    }
+    toast(`Đã nhập CSV — cập nhật ${updated} màn (title/lesson/beat-chart)`);
+  }catch(err){ toast('Lỗi đọc CSV: '+err.message); }
+  e.target.value='';
+});
+
+/* ---------------- beat chart export ---------------- */
+// Same 7-component formula as Document/Mahjong_x_Block_Beatchart.xlsx (sheet "Công thức"),
+// kept byte-for-byte identical so a score computed here matches the one in the spreadsheet
+// for the same level data (see Document/08-GDD-LEVEL-DESIGN.md §3). Replaces an older,
+// unrelated ad-hoc formula this function used before the beat-chart formula existed.
+const GOAL_TYPE_WEIGHT={TILE_QUOTA:0, OPEN_SEAL:1, TARGET_FACE:2, BURIED_TARGET:4};
+function difficultyBreakdown(lv){
+  const size=lv.size||3, solLen=(lv.solution||[]).length;
+  const spare = lv.moveLimit ? (lv.moveLimit-solLen) : 0;
+  const distinctFaces=new Set([...(lv.tiles||[]).map(t=>t.id), ...(lv.sequence||[]).flatMap(p=>p.cells.map(c=>c.id))]).size;
+  const largestBlock=Math.max(0, ...(lv.sequence||[]).map(p=>(p.cells||[]).length), 0);
+  const c1=size*size/4;
+  const c2=solLen;
+  const c3=Math.max(0,3-spare)*1.5;
+  const c4=distinctFaces*1.2;
+  const c5=(lv.seals||[]).length*2 + (lv.permanents||[]).length*2 + (lv.locks||[]).length*3;
+  const c6=largestBlock*0.5;
+  const c7=GOAL_TYPE_WEIGHT[lv.goalType]??0;
+  return {c1,c2,c3,c4,c5,c6,c7, total:c1+c2+c3+c4+c5+c6+c7, spare, distinctFaces, largestBlock};
+}
+function computeDifficultyScore(lv){ return difficultyBreakdown(lv).total; }
+$('btnExportBeatChart').addEventListener('click',()=>{
+  if(!allLevels.length){ toast('Chưa load level nào — Chọn file index.html… ở mục 0 trước'); return; }
+  const breakdowns=allLevels.map(difficultyBreakdown);
+  const rows=allLevels.map((lv,i)=>{
+    const b=breakdowns[i];
+    const delta = i===0? 0 : Math.abs(b.total-breakdowns[i-1].total);
+    return [i+1, lv.title, Math.floor(i/10)+1, lv.beatTag||'', lv.tension||0, lv.novelty||0, lv.mastery||0,
+      b.c1.toFixed(2), b.c2, b.c3.toFixed(2), b.c4.toFixed(2), b.c5.toFixed(2), b.c6.toFixed(2), b.c7,
+      b.total.toFixed(2), delta.toFixed(2), delta>1.5?'⚠ spike':''];
+  });
+  const header=['Level','Title','Chapter','BeatTag','Tension','Novelty','Mastery',
+    '① CoBan','② KeHoach','③ DoChat','④ MatQuan','⑤ CoChe','⑥ Khoi','⑦ MucTieu',
+    'DifficultyScore','DeltaFromPrev','Flag'];
+  const csv=[header, ...rows].map(r=>r.map(csvEscape).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='mahjong-x-block-beat-chart.csv';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),2000);
+  toast('Đã xuất beat chart CSV (khớp công thức 7 thành phần trong Beatchart.xlsx)');
+});
+
+/* ---------------- AI level generation/editing ---------------- */
+function shapesPromptBlock(){
+  return Object.entries(SHAPES).map(([key,s])=>`- ${key} (${s.label}, ${s.cells.length} ô): offsets ${JSON.stringify(s.cells)}`).join('\n');
+}
+const AI_SYSTEM_PROMPT = `Bạn là AI thiết kế màn chơi cho game xếp hình "Mahjong x Block" (bàn 2 lớp trọng lực, khớp theo mảnh polyomino).
+
+LUẬT ENGINE (bắt buộc tuân thủ chính xác):
+- Bàn NxN (N=2..6), mỗi ô có tối đa 2 lớp: floor (z=0) và roof (z=1). Roof ở 1 ô chỉ tồn tại nếu floor cùng ô đó đã có tile.
+- Người chơi lần lượt đặt các khối trong "sequence" đúng thứ tự (hết thì lặp lại từ đầu). Mỗi khối có hình dạng cố định (danh sách bên dưới), mỗi ô con mang 1 "mặt" trong 8 mặt: s1,c1,w1,s2,c2,w2,h1,h2 (8 mặt chỉ là định danh để khớp, không khác nhau về luật).
+- Khi đặt khối tại 1 ô neo: mỗi ô con rơi vào floor nếu floor ô đó còn trống, hoặc vào roof nếu floor đã có tile và roof còn trống; nếu roof cũng đã có tile thì vị trí đó KHÔNG hợp lệ. Ô đang bị Seal (chưa mở) hoặc là Ô Chắn (permanent) luôn chặn đặt, kể cả ngoài biên bàn cũng không hợp lệ.
+- Sau khi đặt, các tile "lộ ra" (ở roof, hoặc ở floor mà ô đó không có roof) liền kề trực giao (không chéo), CÙNG mặt và CÙNG lớp z sẽ tự nổ theo nhóm (>=2 tile). Nổ có thể lộ tile bên dưới và tile đó lại tiếp tục được xét nổ dây chuyền.
+- goalType:
+  - PAIR_QUOTA: cộng dồn "pairs" suốt màn (mỗi nhóm nổ k tile tính k-1 pairs) cho tới khi đạt pairGoal.
+  - TILE_QUOTA: cộng dồn tổng số TILE đã từng nổ, gộp CHUNG mọi mặt lại (không phân biệt mặt nào) cho tới khi đạt tileGoal — khác PAIR_QUOTA (đếm theo cụm/pairs, không theo tile) và khác TARGET_FACE (không yêu cầu mặt cụ thể). Dùng cho màn mở đầu, chỉ dạy thao tác đặt/khớp khối, chưa cần phân biệt mặt.
+  - TARGET_FACE: winTargets là mảng [{id,need}] — mỗi mục cần đủ số TILE (không phải pairs) của mặt đó đã từng nổ; nếu targetRequiredCount>0 thì chỉ cần đạt đủ N-trên-M mục tiêu đó, không cần tất cả.
+  - BURIED_TARGET: điều kiện thắng giống TARGET_FACE, nhưng nên đặt tile mục tiêu ở floor bị 1 roof khác che lên trên để tăng độ khó.
+  - OPEN_SEAL: thắng ngay khi tổng số MẶT KHÁC NHAU đã từng nổ (ở bất kỳ đâu trên bàn) đạt sealRequiredDistinct — không cần điều kiện nào khác.
+- seals: mảng [[r,c],...] — luôn chặn đặt tới khi mở (dùng được như chướng ngại cho MỌI goalType, không chỉ OPEN_SEAL). permanents: mảng [[r,c],...] — chặn vĩnh viễn, không bao giờ mở.
+- locks: mảng [{cells:[[r,c],...], face, required}] — "ô khóa": mỗi ô trong cells bị chặn đặt (như seal) tới khi tổng số TILE mặt "face" đã từng nổ ở BẤT KỲ ĐÂU trên bàn (đếm y hệt TARGET_FACE, không phải riêng ô đó) đạt đủ "required"; dùng được với MỌI goalType, độc lập hoàn toàn với winTargets/pairGoal/tileGoal. Engine hỗ trợ nhiều nhóm lock độc lập, nhưng editor hiện chỉ author được TỐI ĐA 1 nhóm/màn — nếu trả về nhiều nhóm, chỉ nhóm đầu tiên được giữ lại, nên chỉ dùng 0 hoặc 1 phần tử trong mảng này.
+- Danh sách hình khối — "ids" phải có ĐÚNG số lượng bằng số ô của shapeKey, theo đúng thứ tự offset:
+${shapesPromptBlock()}
+
+YÊU CẦU THIẾT KẾ:
+- Bám sát mô tả của designer (chủ đề, độ khó, cơ chế muốn nhấn mạnh).
+- Màn PHẢI giải được — tự suy luận kỹ 1 chuỗi nước đi hợp lệ trước khi chốt board+sequence (tool sẽ tự chạy solver kiểm tra lại sau).
+- KHÔNG cần tự tạo "solution" — chỉ cần board (tiles), seals/permanents/sealRequiredDistinct nếu dùng, và sequence khối.
+- title ngắn gọn tiếng Việt; lesson là 1 câu ngắn mô tả bài học/cơ chế màn dạy cho người chơi (có thể để trống "").
+- Field không áp dụng với goalType đã chọn thì để rỗng/0 (vd goalType khác TARGET_FACE/BURIED_TARGET thì winTargets=[]).
+- notes: giải thích ngắn gọn (1-3 câu) bạn đã thiết kế màn này ra sao để đáp ứng mô tả.`;
+const AI_LEVEL_SCHEMA = {
+  type:'object',
+  properties:{
+    title:{type:'string'},
+    size:{type:'integer', minimum:2, maximum:6},
+    goalType:{type:'string', enum:['PAIR_QUOTA','TILE_QUOTA','TARGET_FACE','OPEN_SEAL','BURIED_TARGET']},
+    pairGoal:{type:'integer', minimum:0},
+    tileGoal:{type:'integer', minimum:0},
+    winTargets:{type:'array', items:{type:'object', properties:{id:{type:'string',enum:FACES}, need:{type:'integer',minimum:1}}, required:['id','need'], additionalProperties:false}},
+    targetRequiredCount:{type:'integer', minimum:0},
+    sealRequiredDistinct:{type:'integer', minimum:0},
+    locks:{type:'array', items:{type:'object', properties:{cells:{type:'array',items:{type:'array',items:{type:'integer'},minItems:2,maxItems:2}}, face:{type:'string',enum:FACES}, required:{type:'integer',minimum:1}}, required:['cells','face','required'], additionalProperties:false}},
+    seals:{type:'array', items:{type:'array', items:{type:'integer'}, minItems:2, maxItems:2}},
+    permanents:{type:'array', items:{type:'array', items:{type:'integer'}, minItems:2, maxItems:2}},
+    guideMoves:{type:'integer', minimum:0},
+    lesson:{type:'string'},
+    tiles:{type:'array', items:{type:'object', properties:{id:{type:'string',enum:FACES}, r:{type:'integer'}, c:{type:'integer'}, z:{type:'integer',enum:[0,1]}}, required:['id','r','c','z'], additionalProperties:false}},
+    sequence:{type:'array', items:{type:'object', properties:{shapeKey:{type:'string', enum:Object.keys(SHAPES)}, ids:{type:'array', items:{type:'string', enum:FACES}}}, required:['shapeKey','ids'], additionalProperties:false}},
+    notes:{type:'string'},
+  },
+  required:['title','size','goalType','pairGoal','tileGoal','winTargets','targetRequiredCount','sealRequiredDistinct','locks','seals','permanents','guideMoves','lesson','tiles','sequence','notes'],
+  additionalProperties:false,
+};
+function currentLevelAsAiInput(){
+  pullMetaFromForm();
+  return {title:level.title, size:level.size, goalType:level.goalType, pairGoal:level.pairGoal,
+    tileGoal:level.tileGoal||0,
+    targetRequiredCount:level.targetRequiredCount, winTargets:level.winTargets, seals:level.seals,
+    locks:level.locks.filter(l=>l.cells.length).map(l=>({cells:l.cells, face:l.face, required:l.required})),
+    permanents:level.permanents,
+    sealRequiredDistinct:level.sealRequiredDistinct, guideMoves:level.guideMoves,
+    lesson:level.lesson, tiles:level.tiles,
+    sequence:level.sequence.map(p=>({shapeKey:p.shapeKey, ids:p.cells.map(c=>c.id)}))};
+}
+/* Raw HTTP fetch (no SDK) with the documented direct-browser-access opt-in header -- this is a
+   zero-dependency single HTML file, so a bundler-only npm SDK isn't an option here. Tries the
+   strict json_schema output first; if the account/model rejects output_config.format specifically,
+   falls back to a fenced ```json instruction + regex extraction rather than failing outright. */
+async function callClaudeForLevel(key, systemPrompt, userContent){
+  const headers={'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'};
+  let resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST', headers, body:JSON.stringify({
+    model:'claude-opus-5', max_tokens:16000, thinking:{type:'adaptive'},
+    output_config:{effort:'high', format:{type:'json_schema', schema:AI_LEVEL_SCHEMA}},
+    system:systemPrompt, messages:[{role:'user', content:userContent}],
+  })});
+  let json=await resp.json();
+  if(!resp.ok){
+    const msg=(json.error&&json.error.message)||('HTTP '+resp.status);
+    if(!/output_config|schema/i.test(msg)) throw new Error(msg);
+    const fallbackSystem=systemPrompt+'\n\nTRẢ LỜI: CHỈ 1 khối mã ```json chứa đúng object theo đúng các field đã mô tả, không thêm chữ nào khác ngoài khối mã đó.';
+    resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST', headers, body:JSON.stringify({
+      model:'claude-opus-5', max_tokens:16000, thinking:{type:'adaptive'}, output_config:{effort:'high'},
+      system:fallbackSystem, messages:[{role:'user', content:userContent}],
+    })});
+    json=await resp.json();
+    if(!resp.ok) throw new Error((json.error&&json.error.message)||('HTTP '+resp.status));
+  }
+  const textBlock=(json.content||[]).find(b=>b.type==='text');
+  if(!textBlock) throw new Error('Claude không trả về nội dung text (có thể bị refusal) — thử lại hoặc đổi mô tả.');
+  const m=textBlock.text.match(/```json\s*([\s\S]*?)```/) || textBlock.text.match(/(\{[\s\S]*\})/);
+  return JSON.parse(m ? m[1] : textBlock.text);
+}
+function applyAiLevel(ai){
+  const size=Math.max(2,Math.min(6,parseInt(ai.size,10)||3));
+  const inBounds=(r,c)=>Number.isInteger(r)&&Number.isInteger(c)&&r>=0&&c>=0&&r<size&&c<size;
+  const tiles=(ai.tiles||[]).filter(t=>t&&FACES.includes(t.id)&&(t.z===0||t.z===1)&&inBounds(t.r,t.c));
+  const seals=(ai.seals||[]).filter(s=>Array.isArray(s)&&inBounds(s[0],s[1]));
+  const permanents=(ai.permanents||[]).filter(p=>Array.isArray(p)&&inBounds(p[0],p[1])&&!seals.some(s=>s[0]===p[0]&&s[1]===p[1]));
+  const sequence=(ai.sequence||[]).map((p,i)=>{
+    const shape=SHAPES[p.shapeKey]||SHAPES.DH;
+    const ids=(Array.isArray(p.ids)?p.ids:[]).filter(id=>FACES.includes(id));
+    while(ids.length<shape.cells.length) ids.push('s1');
+    ids.length=shape.cells.length;
+    return {key:'p'+(i+1), cells:shape.cells.map(([dr,dc],idx)=>({dr,dc,id:ids[idx]}))};
+  });
+  const winTargets=(ai.winTargets||[]).filter(t=>t&&FACES.includes(t.id)).map(t=>({id:t.id,need:Math.max(1,parseInt(t.need,10)||1)}));
+  // Keep EVERY lock group the AI returned (level.locks now supports multiple independent
+  // groups, same as the real game schema) instead of truncating to just the first.
+  const locks=(ai.locks||[])
+    .filter(l=>l&&Array.isArray(l.cells)&&FACES.includes(l.face))
+    .map(l=>({cells:l.cells.filter(c=>Array.isArray(c)&&inBounds(c[0],c[1])), face:l.face, required:Math.max(1,parseInt(l.required,10)||2)}))
+    .filter(l=>l.cells.length);
+  const src={
+    title:(ai.title||'AI Level').toString().slice(0,80), size,
+    goalType:['TILE_QUOTA','TARGET_FACE','OPEN_SEAL','BURIED_TARGET','PAIR_QUOTA'].includes(ai.goalType)?ai.goalType:'TILE_QUOTA',
+    pairGoal:Math.max(1,parseInt(ai.pairGoal,10)||1),
+    tileGoal:Math.max(1,parseInt(ai.tileGoal,10)||4),
+    targetRequiredCount:Math.max(0,parseInt(ai.targetRequiredCount,10)||0),
+    winTargets, seals, permanents,
+    locks,
+    sealRequiredDistinct:Math.max(0,parseInt(ai.sealRequiredDistinct,10)||0),
+    tiles, sequence,
+    guideMoves:Math.max(0,parseInt(ai.guideMoves,10)||0),
+    lesson:(ai.lesson||'').toString(), solution:[],
+    beatTag:level.beatTag||'', tension:level.tension||0, novelty:level.novelty||0, mastery:level.mastery||0,
+  };
+  loadLevelIntoEditor(src);
+  $('aiNotes').textContent = ai.notes ? ('Ghi chú từ AI: '+ai.notes) : '';
+}
+/* Bounded DFS reusing the exact same engine functions play-test uses, so "solved" here means
+   genuinely solvable in the real simulation, not just structurally valid. Best-effort only --
+   gives up past a node/depth budget rather than guaranteeing an answer either way. */
+function trySolve(lvl){
+  const maxNodes=120000, maxDepth=Math.min(30, lvl.sequence.length+6);
+  let nodes=0; const seen=new Set();
+  function keyOf(m){ return m.tiles.filter(t=>t.alive).map(t=>t.id+'@'+t.r+'_'+t.c+'_'+t.z).sort().join(',')+'|'+m.queueIndex; }
+  function dfs(model, moves){
+    if(p24mGoalMet(lvl, model)) return moves;
+    if(moves.length>=maxDepth || nodes++>maxNodes) return null;
+    const key=keyOf(model); if(seen.has(key)) return null; seen.add(key);
+    for(const mv of p24kLegalMoves(model)){
+      const clone=JSON.parse(JSON.stringify(model));
+      const res=p24kModelDrop(clone, mv.row, mv.col);
+      if(!res.legal) continue;
+      const found=dfs(clone, moves.concat([{row:mv.row,col:mv.col}]));
+      if(found) return found;
+    }
+    return null;
+  }
+  return dfs(p24kFreshModel(lvl), []);
+}
+function autoSolveAndReport(){
+  const path=trySolve(JSON.parse(JSON.stringify(level)));
+  if(path){ level.solution=path; toast('✓ Auto-solver tìm được lời giải ('+path.length+' nước) — đã lưu vào solution'); }
+  else toast('⚠ Auto-solver không tìm được lời giải trong giới hạn tìm kiếm — vào Play-test để tự kiểm tra thủ công');
+  onDataChanged();
+}
+async function aiGenerateLevel(){
+  const key=$('fAiKey').value.trim();
+  if(!key){ toast('Cần nhập Anthropic API key'); return; }
+  localStorage.setItem('mxb_editor_anthropic_key', key);
+  const desc=$('fAiDesc').value.trim();
+  if(!desc){ toast('Mô tả màn chơi còn trống'); return; }
+  const userContent = $('fAiUseCurrent').checked
+    ? `Level đang chỉnh (JSON, hãy SỬA theo yêu cầu bên dưới rồi trả về TOÀN BỘ level mới):\n${JSON.stringify(currentLevelAsAiInput())}\n\nYêu cầu chỉnh sửa: ${desc}`
+    : `Thiết kế 1 màn chơi mới theo mô tả sau:\n${desc}`;
+  $('btnAiGenerate').disabled=true; $('aiNotes').textContent='';
+  toast('Đang gọi Claude để thiết kế màn...');
+  try{
+    const aiLevel=await callClaudeForLevel(key, AI_SYSTEM_PROMPT, userContent);
+    applyAiLevel(aiLevel);
+    toast('Đã áp dụng level từ AI — đang tự tìm lời giải...');
+    setTimeout(autoSolveAndReport, 30);
+  }catch(e){
+    toast('Lỗi gọi AI: '+e.message);
+  }finally{
+    $('btnAiGenerate').disabled=false;
+  }
+}
+$('fAiKey').value = localStorage.getItem('mxb_editor_anthropic_key') || '';
+$('btnAiGenerate').addEventListener('click', aiGenerateLevel);
+
+/* ---------------- init ---------------- */
+renderPalette(); syncToolButtons(); syncModeButtons(); renderLockGroups();
+renderQueuePoolList(); renderRandomShapesList(); renderRandomFacesList();
+onDataChanged();
+</script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>02 · Mahjong Collapse</title><link rel="stylesheet" href="./common.css">
+<style>
+:root{--accent:#b84b3b}.collapse-board{grid-template-columns:repeat(8,1fr);max-width:470px;margin:auto;background:#46302b}.collapse-board .cell{cursor:default}.collapse-board .cell.ghost{background:rgba(255,255,255,.18);border:1px dashed rgba(255,255,255,.32)}.collapse-board .cell.active{background:#fff8e9;box-shadow:0 0 0 2px #d67964 inset}.controls{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:16px auto 0;max-width:470px}.control{border:1px solid var(--line);background:#ebe5d9;border-radius:12px;padding:12px 4px;font-weight:900;cursor:pointer}.control.drop{background:var(--accent);color:#fff;border-color:transparent}.next-box{display:flex;justify-content:center;min-height:38px;margin-top:8px}
+</style></head>
+<body><div class="shell">
+<nav class="game-nav"><a class="back-link" href="./index.html"><span>←</span> Tất cả prototype</a><div class="game-index">02 / 06 · FALL & CHAIN</div></nav>
+<main class="game-layout">
+<aside class="info-panel"><p class="kicker">RƠI KHỐI + DÂY CHUYỀN</p><h1>Mahjong<br>Collapse</h1><p class="intro">Các cụm quân rơi từ trên xuống. Sau mỗi lần ghép, trọng lực dồn bàn lại và có thể tự tạo thêm chuỗi phá mới.</p>
+<div class="rules"><h2>LUẬT THỬ NGHIỆM</h2><ol><li>Dùng ← → để di chuyển, ↻ để xoay và ↓ để thả nhanh.</li><li>Ba quân giống nhau liền kề hoặc một hàng đầy sẽ bị phá.</li><li>Quân phía trên rơi xuống. Mỗi chain liên tiếp nhân thêm điểm.</li></ol></div>
+<div class="legend"><span>Match 3</span><span>Gravity chain</span><span>Tăng tốc dần</span></div><div class="feedback"><strong>Câu hỏi test:</strong> Chain reaction có tạo cảm giác “đã tay” hơn việc tự chọn vị trí như Block Blast không?</div></aside>
+<section class="game-panel"><div class="stats"><div class="stat"><small>ĐIỂM</small><strong id="score">0</strong></div><div class="stat"><small>CHAIN</small><strong id="chain">×0</strong></div><div class="stat"><small>TỐC ĐỘ</small><strong id="speed">1</strong></div></div>
+<div class="board-wrap"><div id="board" class="board collapse-board"></div><div id="overlay" class="overlay"><div class="modal"><div class="modal-icon">筒</div><h2>Bàn đã đầy</h2><p id="end-copy"></p><button id="again">Thả lại từ đầu</button></div></div></div>
+<div id="message" class="message">Ghép ba quân giống nhau để tạo chain</div><div class="offers-label">KHỐI TIẾP THEO</div><div id="next" class="next-box"></div>
+<div class="controls"><button class="control" id="left" aria-label="Sang trái">←</button><button class="control" id="rotate" aria-label="Xoay">↻</button><button class="control" id="right" aria-label="Sang phải">→</button><button class="control drop" id="drop" aria-label="Thả nhanh">↓ Thả</button></div>
+<div class="action-row"><button class="action secondary" id="pause">Tạm dừng</button><button class="action" id="restart">Ván mới</button></div><p class="mobile-hint">Máy tính: phím mũi tên, Space để thả nhanh.</p></section>
+</main></div><script src="./common.js"></script><script>
+(() => {
+const R=10,C=8,$=s=>document.querySelector(s); let board,active,next,timer,score,chain,locked,busy,over,paused,speed;
+const shapes=[[[0,0],[0,1]],[[0,0],[1,0]],[[0,0],[0,1],[0,2]],[[0,0],[1,0],[1,1]],[[0,0],[0,1],[1,0]],[[0,0],[0,1],[1,1]],[[0,0],[0,1],[1,0],[1,1]]];
+function make(){const cells=shapes[MJ.rand(shapes.length)].map(x=>[...x]);return{cells,tiles:MJ.correlatedTiles(cells.length),x:Math.floor((C-(Math.max(...cells.map(p=>p[1]))+1))/2),y:0};}
+function start(){clearInterval(timer);board=Array.from({length:R},()=>Array(C).fill(null));[[9,0],[9,3],[9,6],[8,1],[8,5],[7,3]].forEach(([r,c])=>board[r][c]=MJ.randomTile());score=0;chain=0;locked=0;busy=false;over=false;paused=false;speed=1;next=make();spawn();schedule();render();}
+function schedule(){clearInterval(timer);timer=setInterval(()=>{if(!busy&&!over&&!paused)stepDown();},Math.max(310,820-speed*55));}
+function spawn(){active=next;next=make();active.y=0;if(collides(active.cells,active.x,active.y)){gameOver();}render();}
+function collides(cells,x,y){return cells.some(([r,c])=>{const rr=y+r,cc=x+c;return cc<0||cc>=C||rr>=R||(rr>=0&&board[rr][cc]);});}
+function move(dx,dy){if(busy||over||paused)return false;if(!collides(active.cells,active.x+dx,active.y+dy)){active.x+=dx;active.y+=dy;render();return true;}if(dy===1)lock();return false;}
+function stepDown(){move(0,1)}
+function rotate(){if(busy||over||paused)return;let cells=active.cells.map(([r,c])=>[c,-r]);const minR=Math.min(...cells.map(p=>p[0])),minC=Math.min(...cells.map(p=>p[1]));cells=cells.map(([r,c])=>[r-minR,c-minC]);for(const kick of [0,-1,1,-2,2])if(!collides(cells,active.x+kick,active.y)){active.cells=cells;active.x+=kick;render();return;}MJ.toast("Không đủ chỗ để xoay");}
+function hardDrop(){if(busy||over||paused)return;let n=0;while(!collides(active.cells,active.x,active.y+1)){active.y++;n++;}score+=n;lock();}
+function lock(){if(busy)return;active.cells.forEach(([r,c],i)=>{const rr=active.y+r,cc=active.x+c;if(rr>=0)board[rr][cc]=active.tiles[i];});locked++;speed=1+Math.floor(locked/8);schedule();busy=true;resolve();}
+function findClear(){const set=new Set();let groups=0,lines=0;for(let r=0;r<R;r++)if(board[r].every(Boolean)){lines++;for(let c=0;c<C;c++)set.add(`${r},${c}`);}const scan=arr=>{let i=0;while(i<arr.length){if(!arr[i].id){i++;continue;}let j=i+1;while(j<arr.length&&arr[j].id===arr[i].id)j++;if(j-i>=3){groups++;for(let k=i;k<j;k++)set.add(arr[k].key);}i=j;}};for(let r=0;r<R;r++)scan(board[r].map((id,c)=>({id,key:`${r},${c}`})));for(let c=0;c<C;c++)scan(board.map((row,r)=>({id:row[c],key:`${r},${c}`})));return{set,groups,lines};}
+async function resolve(){chain=0;while(true){const found=findClear();if(!found.set.size)break;chain++;score+=(found.set.size*12+found.groups*80+found.lines*120)*chain;$("#message").textContent=`CHAIN ×${chain} · ${found.set.size} quân`;render();found.set.forEach(key=>{const[r,c]=key.split(",");document.querySelector(`[data-r="${r}"][data-c="${c}"]`)?.classList.add("clearing")});await wait(280);found.set.forEach(key=>{const[r,c]=key.split(",").map(Number);board[r][c]=null});gravity();render();await wait(190);}if(!chain)$("#message").textContent="Khối đã khóa · chưa có match";busy=false;spawn();}
+function gravity(){for(let c=0;c<C;c++){const values=[];for(let r=R-1;r>=0;r--)if(board[r][c])values.push(board[r][c]);for(let r=R-1,i=0;r>=0;r--,i++)board[r][c]=values[i]||null;}}
+function ghostY(){let y=active.y;while(!collides(active.cells,active.x,y+1))y++;return y;}
+function render(){if(!board)return;$("#score").textContent=score.toLocaleString("vi-VN");$("#chain").textContent=`×${chain}`;$("#speed").textContent=speed;const el=$("#board");el.innerHTML="";const activeMap=new Map(),ghostMap=new Map();if(active&&!over){const gy=ghostY();active.cells.forEach(([r,c],i)=>{activeMap.set(`${active.y+r},${active.x+c}`,active.tiles[i]);ghostMap.set(`${gy+r},${active.x+c}`,active.tiles[i]);});}for(let r=0;r<R;r++)for(let c=0;c<C;c++){const key=`${r},${c}`,id=board[r][c]||activeMap.get(key);const d=document.createElement("div");d.className="cell"+(id?" filled":"")+(activeMap.has(key)?" active":"")+(!id&&ghostMap.has(key)?" ghost":"");d.dataset.r=r;d.dataset.c=c;d.innerHTML=MJ.face(id);el.append(d);}$("#next").innerHTML=MJ.renderMini(next);$("#pause").textContent=paused?"Tiếp tục":"Tạm dừng";}
+function gameOver(){over=true;clearInterval(timer);$("#end-copy").textContent=`Bạn đạt ${score.toLocaleString("vi-VN")} điểm. Chain cao nhất xuất hiện khi trọng lực tự nối các nhóm.`;$("#overlay").classList.add("show");}
+function wait(ms){return new Promise(r=>setTimeout(r,ms))}
+$("#left").onclick=()=>move(-1,0);$("#right").onclick=()=>move(1,0);$("#rotate").onclick=rotate;$("#drop").onclick=hardDrop;$("#restart").onclick=()=>{$("#overlay").classList.remove("show");start()};$("#again").onclick=$("#restart").onclick;$("#pause").onclick=()=>{if(over)return;paused=!paused;$("#message").textContent=paused?"Đã tạm dừng":"Tiếp tục thả khối";render()};
+addEventListener("keydown",e=>{if(["ArrowLeft","ArrowRight","ArrowDown","ArrowUp"," "].includes(e.key))e.preventDefault();if(e.key==="ArrowLeft")move(-1,0);if(e.key==="ArrowRight")move(1,0);if(e.key==="ArrowDown")move(0,1);if(e.key==="ArrowUp")rotate();if(e.key===" ")hardDrop();});start();
+})();
+</script></body></html>
