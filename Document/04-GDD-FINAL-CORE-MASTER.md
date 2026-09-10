@@ -1,6 +1,6 @@
 # GDD — Mahjong × Block: "Final Core" (24K-1 Top Match Same-Layer)
 *Bản viết lại toàn diện — thay thế bản 2026-08-24.*
-*Ngày cập nhật: 2026-09-09 · Nguồn duy nhất: `Final Core/index.html` (live build) — mọi số liệu dưới đây verify trực tiếp từ code đang chạy (self-test 31/31 xanh) và dữ liệu 50 level thật, không suy diễn.*
+*Ngày cập nhật: 2026-09-11 · Nguồn duy nhất: `Final Outputs/index.html` (live build — thư mục đổi tên từ `Final Core` sau đợt đưa dự án lên Git) — mọi số liệu dưới đây verify trực tiếp từ code đang chạy (self-test 31/31 xanh) và dữ liệu 50 level thật, không suy diễn.*
 
 > **Vì sao viết lại toàn bộ thay vì sửa từng phần**: kể từ bản 08-24, game đã đổi quy mô (30→50 level), đổi kiến trúc booster, và có thêm 3 hệ thống hoàn toàn mới (Kinh tế Xu, Nhiệm vụ & Điểm Danh, Chủ Đề) không tồn tại lúc đó. Một số nguyên tắc từng "đã chốt" trong bản cũ (không move limit, không booster, không hiển thị điểm số, Ads-only/không IAP) **đã bị đảo ngược có chủ đích** qua nhiều đợt làm việc song song. Mục 13 liệt kê đầy đủ các đảo ngược này để không ai vô tình coi bản 08-24 là còn hiệu lực.
 
@@ -92,6 +92,8 @@ Không đổi cấu trúc cơ bản so với bản cũ (`title`, `size`, `goalTy
 ### 3.10 Onboarding lần đầu *(đảo ngược so với bản 08-24)*
 
 **Không còn** màn tutorial riêng ngoài `P24M_LEVELS` truy cập qua nút "?" — nút này (`#btn-help`) đã bị **ẩn hẳn** trong code hiện tại (`btnHelp.style.display='none'`). Onboarding giờ nằm **hoàn toàn bên trong Level 1 thật**: 1 bàn tay nhấp nháy (`__guideHandEl`/`p24kUpdateGuideHand`) chỉ đúng ô cần kéo khối tới, dựa trên `guideMoves`/`solution` của chính Level 1 — không có overlay giải thích luật, không có caption chữ, không có màn "TUTORIAL COMPLETE" riêng.
+
+*Đã verify lại bằng Chrome thật (không chỉ đọc code): `getComputedStyle` xác nhận `display:none`, `getBoundingClientRect` = 0, và một cú click thật kiểu Puppeteer (đòi hỏi phần tử phải hiển thị, giống 1 ngón tay chạm màn hình) thất bại với "Node is either not clickable or not an Element" — nút và overlay HELP cũ (chữ luật "Match 2 & Phá Ấn" lỗi thời) hoàn toàn không thể chạm tới được bởi người chơi thật, dù đoạn code gắn sự kiện cho nó vẫn còn tồn tại (chưa dọn, chỉ tốn parse-time chứ không lộ ra người chơi).*
 
 ### 3.11 Level Select & Chapter
 
