@@ -1,27 +1,44 @@
 # GDD — Mahjong × Block: "Final Core" (24K-1 Top Match Same-Layer)
-*Bản viết lại toàn diện — thay thế bản 2026-08-24.*
 *Ngày cập nhật: 2026-09-11 · Nguồn duy nhất: `Final Outputs/index.html` (live build — thư mục đổi tên từ `Final Core` sau đợt đưa dự án lên Git) — mọi số liệu dưới đây verify trực tiếp từ code đang chạy (self-test 31/31 xanh) và dữ liệu 50 level thật, không suy diễn.*
 
-> **Vì sao viết lại toàn bộ thay vì sửa từng phần**: kể từ bản 08-24, game đã đổi quy mô (30→50 level), đổi kiến trúc booster, và có thêm 3 hệ thống hoàn toàn mới (Kinh tế Xu, Nhiệm vụ & Điểm Danh, Chủ Đề) không tồn tại lúc đó. Một số nguyên tắc từng "đã chốt" trong bản cũ (không move limit, không booster, không hiển thị điểm số, Ads-only/không IAP) **đã bị đảo ngược có chủ đích** qua nhiều đợt làm việc song song. Mục 13 liệt kê đầy đủ các đảo ngược này để không ai vô tình coi bản 08-24 là còn hiệu lực.
+**Cách đọc tài liệu này:** tài liệu chia làm 4 phần theo vai trò — mỗi phần tự đứng được, không bắt buộc đọc tuần tự. Mục 0 (elevator pitch + đảo ngược so với bản cũ) nên đọc trước dù bạn ở vai trò nào.
+
+| Phần | Dành cho | Nội dung |
+|---|---|---|
+| [A](#phần-a--game-designer) | Game Designer | Core loop, mechanics, curriculum, độ khó, Điểm, Kinh tế Xu, Nhiệm vụ/Điểm Danh — *cái gì* và *vì sao* |
+| [B](#phần-b--lập-trình-viên--engineer) | Lập trình viên / Engineer | Kiến trúc file, schema dữ liệu, self-test, nợ kỹ thuật — *code nằm ở đâu, sửa thế nào cho an toàn* |
+| [C](#phần-c--hoạ-sĩ--âm-thanh) | Hoạ sĩ / Âm thanh | Bảng màu, nguyên tắc Dùng/Tránh, việc art còn dở dang |
+| [D](#phần-d--producer--quản-lý-dự-án) | Producer / Quản lý dự án | Hiện trạng, số liệu, việc tồn đọng, roadmap |
 
 ---
 
-## 1. Elevator pitch
+## 0. Đọc trước khi dùng — Elevator pitch & các đảo ngược so với bản 08-24
+
+### 0.1 Elevator pitch
 
 Một câu đố kéo-thả (drag-and-drop) 1-thao-tác trên bàn cờ 2 tầng, dùng mặt quân Mahjong làm vật liệu ghép: người chơi thả một khối nhiều-ô (polyomino) xuống bàn, mỗi ô của khối tự rơi vào tầng thấp nhất còn trống của cột đó; hai quân **cùng mặt, cùng tầng, kề nhau, và đang lộ mặt (không bị che)** sẽ Match và biến mất, kéo theo quân ở trên rơi xuống tạo hiệu ứng dây chuyền (cascade). Vì tầng mái do chính người chơi chủ động chồng lên, việc **che một quân để "khoá" nó rồi tự tay lộ lại đúng lúc** trở thành một quyết định chiến thuật thật — cơ chế lõi này **không đổi** từ bản đầu tiên.
 
-## 2. Thẩm mỹ
+### 0.2 Vì sao có bản viết lại này
 
-Vẫn theo mạch **"Hành Trình Qua Vườn Trúc"**: Nguyệt Môn ở Main Menu → cổng tre ở Level Select → bàn trà gỗ lúc chơi. Vật liệu hình ảnh: gỗ tối, tre trúc, giấy màu ngà, ngọc bích (`jade`), đồng cổ làm viền/accent. Nguyên tắc tránh vẫn giữ: không rồng, không đèn lồng đỏ lớn, không hoa văn vàng đặc, không hiệu ứng jackpot/pháo hoa/coin — kể cả ở các màn hình kinh tế mới (Cửa hàng, Chủ Đề) đều tuân theo cùng bảng màu gỗ/ngọc/đồng, không có hiệu ứng "rương/mở hộp" kiểu casino.
+Kể từ bản 08-24, game đã đổi quy mô (30→50 level), đổi kiến trúc booster, và có thêm 3 hệ thống hoàn toàn mới (Kinh tế Xu, Nhiệm vụ & Điểm Danh, Chủ Đề). Một số nguyên tắc từng "đã chốt" đã bị **đảo ngược có chủ đích** qua nhiều đợt làm việc song song — không phải lỗi lệch spec:
 
-**Mới từ bản 08-24**: Main Menu giờ có thêm 1 cụm icon góc trên (cài đặt / Cửa hàng / Chủ Đề / Nhiệm vụ) và 1 khung hiện số Xu — vẫn theo đúng vật liệu gỗ/đồng, không dùng khung neon hay badge sặc sỡ.
+| Nguyên tắc "đã chốt" trong bản 08-24 | Thực tế hiện tại |
+|---|---|
+| "Không giới hạn nước đi" | Move Limit tồn tại thật, 1–10 tuỳ màn (A1.6) |
+| "Không vật phẩm hỗ trợ (booster)" | Booster là cơ chế thật, kho dùng chung + mua gói (A1.7) |
+| "Không hiển thị điểm số" | Điểm hiện trực tiếp trong HUD (A3) |
+| "Monetization đã chốt: Ads-only, không IAP" | Có thêm 1 hệ kinh tế Xu + Cửa hàng cosmetic song song với Ads (A4) — không phải IAP tiền thật, nhưng là 1 currency loop đầy đủ mà bản 08-24 không có |
+| "Quy mô đã chốt: 30 level / 3 chương hiển thị" | 50 level / 5 chương |
+| Tutorial riêng ngoài `P24M_LEVELS`, qua nút "?" | Đã gỡ, onboarding gộp hẳn vào Level 1 thật (A1.9) |
+| "Không thêm cơ chế lõi mới" (phạm vi Tuần 3–4 cũ) | Lock, Điểm, Kinh tế Xu, Nhiệm vụ, Chủ Đề đều thêm sau mốc đó |
 
 ---
 
-## 3. CORE GAMEPLAY
+## PHẦN A — GAME DESIGNER
 
-### 3.1 Vòng lặp chính
+### A1. Core Gameplay
 
+**A1.1 Vòng lặp chính**
 ```
 Nhìn bàn 2 tầng (floor z0 / roof z1) + khối hiện tại + khối kế tiếp
         ↓
@@ -31,185 +48,153 @@ Quân cùng mặt · cùng tầng · liền kề · đang LỘ (không bị che)
         ↓
 Quân phía trên rơi tiếp (gravity) → có thể lộ ra quân mới → Match tiếp (cascade wave 2, 3...)
         ↓
-Đạt goal của màn (mục 3.8) → Thắng → cộng Điểm + Xu → mở màn kế
+Đạt goal của màn (A1.8) → Thắng → cộng Điểm + Xu → mở màn kế
 ```
+Người chơi được **chủ động chồng khối lên quân có sẵn để che nó lại** — biến việc "che" thành một nước cờ hoãn binh có chủ đích.
 
-Người chơi không chỉ ghép quân lộ sẵn — họ được **chủ động chồng khối lên quân có sẵn để che nó lại**, biến việc "che" thành một nước cờ hoãn binh có chủ đích.
+**A1.2 Bàn & quân** — Bàn vuông 2×2 đến 6×6 tuỳ level. 2 tầng floor (`z0`)/roof (`z1`), mỗi cột tối đa 2 vị trí xếp chồng. 6 mặt Mahjong chính + mặt phụ dùng riêng cho vài combo.
 
-### 3.2 Bàn & quân
+**A1.3 Khối (piece)** — Polyomino 2–5 ô (domino/tromino/tetromino/pentomino). Guard chống "baked self-match", **trừ Level 1** (cố ý cho cú chạm đầu tiên luôn thắng ngay).
 
-- Bàn vuông, kích thước theo từng level — dao động **2×2 đến 6×6** trong suốt 50 level.
-- 2 tầng: floor (`z0`) và roof (`z1`). Mỗi ô cột chỉ có tối đa 2 vị trí xếp chồng.
-- 6 mặt Mahjong chính dùng xuyên suốt, cộng mặt phụ dùng riêng cho vài combo đặc biệt.
+**A1.4 Match & Cascade** — Match hợp lệ: cùng mặt + cùng tầng + liền kề trực giao + cả hai đang lộ. Nhóm 3–4 quân clear cùng lúc 1 wave. Cao độ "pop" tăng dần theo wave trong cùng 1 lượt đặt.
 
-### 3.3 Khối (piece)
-
-Polyomino 2–5 ô: domino, tromino, tetromino, pentomino. Guard chống "baked self-match" (không cho khối tự có sẵn 1 match miễn phí), **trừ Level 1** — cố ý dùng domino cùng mặt để cú chạm đầu tiên luôn thắng ngay.
-
-### 3.4 Luật Match & Cascade
-
-- Match hợp lệ khi: cùng mặt quân + cùng tầng + liền kề trực giao + cả hai đang **lộ**.
-- Nhóm 3–4 quân cùng mặt liền kề clear cùng lúc trong 1 wave.
-- Wave clear → gravity → có thể lộ match mới → cascade tự động. Cao độ tiếng "pop" tăng dần theo từng wave trong cùng 1 lượt đặt.
-
-### 3.5 Ô đặc biệt (3 loại — Lock là cơ chế mới nhất)
+**A1.5 Ô đặc biệt (3 loại — Lock là mới nhất)**
 
 | Cơ chế | Cách mở | Có ở |
 |---|---|---|
-| **Phong Ấn (Seal)** | Match đủ N mặt quân **khác nhau** (không tính lặp cùng mặt) | 21/50 màn |
-| **Ô Chắn (Permanent)** | Không bao giờ mở — buộc định tuyến vòng qua | 26/50 màn |
-| **Lock** *(mới)* | Gắn với **đúng 1 mặt quân cụ thể** + số lượng yêu cầu hiển thị sẵn cho người chơi (khác Seal ở chỗ Seal đếm số mặt *khác nhau*, Lock đếm số lần khớp *đúng 1 mặt*) | Lv9, Lv22, Lv36 |
+| Phong Ấn (Seal) | Match đủ N mặt **khác nhau** | 21/50 màn |
+| Ô Chắn (Permanent) | Không bao giờ mở, buộc định tuyến | 26/50 màn |
+| Lock | Gắn với **đúng 1 mặt cụ thể** + số lượng hiển thị sẵn (khác Seal ở chỗ đếm số lần khớp 1 mặt, không phải số mặt khác nhau) | Lv9, Lv22, Lv36 |
 
-Seal mở kèm animation "nứt vỡ" + chuông riêng; Ô Chắn dùng thanh gỗ/dây thừng vật lý (không phải khoá xám + 🔒).
+**A1.6 Move Limit** *(đảo ngược so với 08-24)* — Giới hạn số lượt đặt khối, dao động **1–10** tuỳ màn. Hết lượt chưa đạt goal → thua, tự restart màn đó. Lượt dư ảnh hưởng Điểm (A3) và Xu (A4).
 
-### 3.6 Move Limit *(đảo ngược so với bản 08-24 — xem mục 13)*
+**A1.7 Booster** *(đảo ngược so với 08-24 — kiến trúc mới)* — Đổi khối + Hint là **1 kho lượt dùng chung xuyên suốt cả game**, không reset theo màn. Bắt đầu **5 lượt/loại**; mua thêm qua Cửa hàng: **gói 5 lượt/100 Xu**. **Level 1 luôn khoá booster** dù kho còn bao nhiêu — giữ tinh thần "cú chạm đầu không cần trợ giúp".
 
-Mỗi màn có thể giới hạn số lượt đặt khối (`moveLimit`, dao động **1–10** tuỳ màn trong dữ liệu 50 level hiện tại). Hết lượt mà chưa đạt goal → thua, tự restart lại đúng màn. Lượt dư khi thắng ảnh hưởng trực tiếp tới Điểm (mục 5) và Xu (mục 6).
+**A1.8 Goal type (4 loại)**
 
-### 3.7 Booster — kiến trúc mới: 1 kho dùng chung, không còn cấp riêng theo màn
-
-Trước đây booster (nếu có) được cấp lại mỗi màn. **Từ vài đợt cập nhật gần nhất**, Đổi khối và Hint là **1 kho lượt dùng chung xuyên suốt cả game**, không reset khi qua màn:
-
-- Người chơi mới bắt đầu có sẵn **5 lượt mỗi loại**.
-- Mua thêm qua Cửa hàng: **gói 5 lượt / 100 Xu** (= 20 Xu/lượt), nạp thẳng vào kho chung.
-- **Level 1 luôn khoá booster** (không cho dùng), dù kho có bao nhiêu lượt — giữ đúng tinh thần "cú chạm đầu tiên luôn thắng ngay, không cần trợ giúp".
-
-### 3.8 Goal type (điều kiện thắng — 4 loại, verify tại `goalState()`/`levelWon()`)
-
-| `goalType` | Ý nghĩa | Số màn dùng |
+| `goalType` | Ý nghĩa | Số màn |
 |---|---|---|
-| `TILE_QUOTA` *(đổi tên từ `PAIR_QUOTA`)* | Đạt đủ số quân/cặp Match | 5 |
-| `TARGET_FACE` | N-trên-M: hoàn thành đủ `targetRequiredCount` trong `winTargets`, không cần tất cả | 32 |
+| `TILE_QUOTA` | Đạt đủ số quân/cặp Match | 5 |
+| `TARGET_FACE` | N-trên-M: đủ `targetRequiredCount` trong `winTargets`, không cần tất cả | 32 |
 | `OPEN_SEAL` | Thắng ngay khi Seal mở | 6 |
-| `BURIED_TARGET` | Target bị chôn dưới 1 chồng quân, phải dọn quân che trước | 7 |
+| `BURIED_TARGET` | Target bị chôn dưới quân, phải dọn trước | 7 |
 
-`TARGET_FACE` là loại goal chủ đạo (32/50 màn) — không phải `TILE_QUOTA` đơn giản như thiết kế ban đầu.
+`TARGET_FACE` là loại chủ đạo (32/50 màn), không phải quota đơn giản.
 
-### 3.9 Cấu trúc dữ liệu 1 level (`P24M_LEVELS[i]`)
+**A1.9 Onboarding lần đầu** *(đảo ngược so với 08-24)* — Không còn tutorial riêng qua nút "?" (đã ẩn hẳn, xem B4). Onboarding nằm **hoàn toàn trong Level 1 thật**: 1 bàn tay nhấp nháy chỉ đúng ô cần kéo tới, dựa trên `guideMoves`/`solution` của chính Level 1.
 
-Không đổi cấu trúc cơ bản so với bản cũ (`title`, `size`, `goalType`, `winTargets`, `seals`/`permanents`, `sequence`, `guideMoves`, `solution` tự-verify) — **cộng thêm** trường cho Lock (`locks`) và `sealRequiredDistinct` giờ cũng thấy giá trị **2** ở một số màn (trước đây bắt đầu từ 1).
+**A1.10 Luồng Thắng/Thua** — Thắng: banner `LEVEL N COMPLETE` + dòng phụ **`Điểm N · chuỗi ×N · +N Xu`**. Thua: banner lỗi + tỉ lệ tiến độ, tự restart. Âm thanh WebAudio riêng cho từng sự kiện, hỗ trợ Reduced Motion.
 
-### 3.10 Onboarding lần đầu *(đảo ngược so với bản 08-24)*
-
-**Không còn** màn tutorial riêng ngoài `P24M_LEVELS` truy cập qua nút "?" — nút này (`#btn-help`) đã bị **ẩn hẳn** trong code hiện tại (`btnHelp.style.display='none'`). Onboarding giờ nằm **hoàn toàn bên trong Level 1 thật**: 1 bàn tay nhấp nháy (`__guideHandEl`/`p24kUpdateGuideHand`) chỉ đúng ô cần kéo khối tới, dựa trên `guideMoves`/`solution` của chính Level 1 — không có overlay giải thích luật, không có caption chữ, không có màn "TUTORIAL COMPLETE" riêng.
-
-*Đã verify lại bằng Chrome thật (không chỉ đọc code): `getComputedStyle` xác nhận `display:none`, `getBoundingClientRect` = 0, và một cú click thật kiểu Puppeteer (đòi hỏi phần tử phải hiển thị, giống 1 ngón tay chạm màn hình) thất bại với "Node is either not clickable or not an Element" — nút và overlay HELP cũ (chữ luật "Match 2 & Phá Ấn" lỗi thời) hoàn toàn không thể chạm tới được bởi người chơi thật, dù đoạn code gắn sự kiện cho nó vẫn còn tồn tại (chưa dọn, chỉ tốn parse-time chứ không lộ ra người chơi).*
-
-### 3.11 Level Select & Chapter
-
-50 level chia đều **5 chương × 10 level**. Vào Level Select tự nhảy vào chương chứa level xa nhất đã mở khoá, 2 mũi tên lật chương tự ẩn ở biên. Không còn 2 cách nhóm song song như bản cũ — nhóm hiển thị và nhóm sư phạm giờ trùng nhau (5×10 vừa đúng 5 chương thiết kế).
-
-### 3.12 Luồng Thắng / Thua & phản hồi
-
-- **Thắng**: banner `LEVEL N COMPLETE` hiện kèm dòng phụ **`Điểm N · chuỗi ×N · +N Xu`** *(đảo ngược so với bản 08-24 — xem mục 13)*, tự chuyển màn kế sau ~1.5s.
-- **Thua**: banner tiêu đề lỗi + tỉ lệ tiến độ, tự restart màn đó.
-- Timing chuỗi resolve, âm thanh WebAudio riêng cho từng sự kiện (đặt/Match/Reveal/Seal/Thắng/Thua), và hỗ trợ Reduced Motion — **không đổi** so với bản cũ.
-
-### 3.13 Lưới an toàn kỹ thuật (self-test, chạy mỗi lần load)
-
-**31 assertion** chạy tự động, bao gồm: đủ 50 level, mọi `solution` giải được và tự-verify, mọi Seal tự mở được trong chính solution của nó, mọi `TARGET_FACE` có `targetRequiredCount` hợp lệ, cơ chế Match/cascade/gravity đúng thiết kế, **cộng 3 assertion kinh tế mới** (`economy_default_skins_free`, `economy_prices_positive`, `economy_floor_affords_cheapest_skin_by_level30` — xem mục 6.4). Wild/Joker và Nứt/Crack (2 cơ chế từng có self-test riêng) đã bị **gỡ bỏ hoàn toàn** khỏi game trong đợt dọn dead-code gần nhất — 2 assertion tương ứng cũng đã gỡ theo.
-
----
-
-## 4. Nội dung: 50 level / 5 chương
+### A2. Nội dung: 50 level / 5 chương
 
 | Chương | Level | Trọng tâm |
 |---|---|---|
 | C1 — Nền tảng | 1–10 | Core loop: đặt, Match, che–lộ 2 tầng |
 | C2 — Phong Ấn | 11–20 | Giới thiệu Seal, tăng dần `sealRequiredDistinct` |
-| C3 — Ô Chắn | 21–30 | Ô khoá vĩnh viễn, dạy định tuyến; **Lv30 là màn khó nhất toàn game** |
+| C3 — Ô Chắn | 21–30 | Ô khoá vĩnh viễn; **Lv30 là màn khó nhất toàn game** |
 | C4 — Kết hợp | 31–40 | Seal + Ô Chắn cùng lúc, **giới thiệu Lock** (Lv36) |
 | C5 — Mastery | 41–50 | Tổng hợp toàn bộ luật, Lv50 là bài thi cuối |
 
-**Đường cong độ khó** (đo bằng công thức 7 thành phần: cỡ bàn + số nước lời giải + độ chật + số mặt quân + cơ chế đặc biệt + khối lớn nhất + độ phức tạp mục tiêu — chi tiết trong `Mahjong_x_Block_Beatchart.xlsx`): nhịp **sawtooth** rõ ràng, mỗi đầu chương đều "thở" sau đỉnh khó của chương trước. Điểm thấp nhất 7.9 (Lv1), cao nhất 50/50 (Lv30). Điểm cần lưu ý: Lv49→50 dốc khá đứng (13.6→40.9), có thể cần 1 màn đệm nếu muốn mượt hơn.
+**Đường cong độ khó** (7 thành phần: cỡ bàn + số nước lời giải + độ chật + số mặt quân + cơ chế đặc biệt + khối lớn nhất + độ phức tạp mục tiêu — chi tiết `Mahjong_x_Block_Beatchart.xlsx`): nhịp **sawtooth** — mỗi đầu chương "thở" sau đỉnh khó chương trước. Thấp nhất 7.9 (Lv1), cao nhất 50/50 (Lv30). **Cần chú ý**: Lv49→50 dốc khá đứng (13.6→40.9) — có thể cần màn đệm.
 
----
+### A3. Hệ thống Điểm (Score)
 
-## 5. Hệ thống Điểm (Score) — mới, không có trong bản 08-24
+Hiện trực tiếp trong HUD ("ĐIỂM", cập nhật sống). Công thức = điểm nền (theo cỡ khối/nhóm match) + 3 lớp:
 
-`S.score` giờ **hiển thị trực tiếp trong HUD** (nhãn "ĐIỂM", cập nhật sống trong lúc chơi) *(đảo ngược so với bản 08-24)*. Công thức gồm 3 lớp cộng vào điểm nền có sẵn (theo cỡ khối/nhóm match):
+1. **Hệ số chuỗi**: mỗi wave cascade trong 1 lượt nhân thêm điểm — wave1=×1, mỗi wave sâu +0.25, chặn ×2.
+2. **Streak liên tiếp**: lượt nào cũng match thì lượt sau +15×(số lượt liên tiếp, chặn ở 10); đặt hụt reset về 0.
+3. **Bonus lượt dư**: 1 lần lúc thắng, +25/lượt dư.
 
-1. **Hệ số chuỗi (chain multiplier)**: mỗi wave cascade trong cùng 1 lượt đặt nhân thêm điểm match của wave đó — wave 1 = ×1, mỗi wave sâu hơn +0.25, chặn ở ×2.
-2. **Streak liên tiếp**: lượt đặt nào cũng ra match thì lượt sau +15×(số lượt liên tiếp, chặn ở 10); đặt hụt (0 match) reset về 0.
-3. **Bonus lượt dư**: cộng 1 lần lúc thắng, +25/lượt còn dư.
+Không đổi luật thắng/thua (`S.pairs`/`levelWon()`) — Điểm là lớp thưởng cảm giác thuần tuý.
 
-Không ảnh hưởng `S.pairs`/`levelWon()` — Điểm là lớp thưởng cảm giác, không đổi luật thắng/thua.
+### A4. Kinh tế Xu (Economy)
 
----
-
-## 6. Kinh tế Xu (Economy) — hoàn toàn mới, không có trong bản 08-24
-
-### 6.1 Nguồn thu (Source)
-
-Thắng màn **lần đầu** (chơi lại màn cũ luôn ra 0 Xu — chặn cày) cho:
-
+**Nguồn thu**: thắng màn **lần đầu** (chơi lại = 0 Xu, chặn cày):
 ```
-sàn = round(10 × ln(màn + 2))          // ~11 Xu ở màn 1 → ~40 Xu ở màn 50
+sàn = round(10 × ln(màn + 2))     // ~11 Xu (màn 1) → ~40 Xu (màn 50)
 + lượt dư × 2
-+ 15 nếu không dùng booster nào trong màn (S.boosterStart>0 && không đổi)
++ 15 nếu không dùng booster nào trong màn
 × 2 nếu là màn chốt chương (10/20/30/40/50)
 ```
+Tổng cả đời chơi 50 màn: **1,725 (tệ nhất) – 2,739 (tối ưu)**. Công thức Excel sống (đổi hệ số/offset, tự tính lại) ở `Mahjong_x_Block_SourceSink.xlsx`.
 
-Tổng Xu cả đời chơi 50 màn: **1,725 (tệ nhất) – 2,739 (tối ưu)**. Chi tiết công thức Excel sống (đổi hệ số/offset, cả bảng tự tính lại) ở `Mahjong_x_Block_SourceSink.xlsx`.
+**Sink — Cửa hàng**: 24 món trả phí — 11 skin quân (895–2,265 Xu), 10 skin bàn (1,195–2,150 Xu), gói booster (100 Xu/5 lượt). Mỗi món preview thật + mô tả 3 ngôn ngữ.
 
-### 6.2 Sink — Cửa hàng (Shop)
+**Chủ đích cân bằng**: skin rẻ nhất (895 Xu) phải luôn đủ mua ở màn 30 kể cả người chơi tệ nhất (899 Xu tới màn 30 — sát nút có chủ đích). Đánh đổi: skin đắt nhất là mục tiêu dài hơi, không ai mua hết được cả 24 món trong 1 lượt chơi (tổng catalogue: 33,590 Xu).
 
-24 món có giá, chia 2 loại:
+### A5. Nhiệm vụ & Điểm Danh
 
-- **12 skin quân bài** (1 miễn phí + 11 trả phí, **895–2,265 Xu**).
-- **11 skin bàn cờ** (1 miễn phí + 10 trả phí, **1,195–2,150 Xu**).
-- Mỗi món có preview thật (render bằng đúng `tileHTML()`/CSS bàn dùng trong game, không phải ảnh chụp giả) + tên/mô tả 3 ngôn ngữ (vi/en/zh).
+**Nhiệm vụ hằng ngày**: mỗi ngày chọn ngẫu nhiên **có seed theo ngày** (mọi người chơi cùng ngày thấy cùng đề) 3/6 nhiệm vụ: thắng 1 màn, ghép 6 cặp, dùng 1 booster, phá 1 Seal, thắng không dùng booster, chuỗi cascade ≥2 wave. Thưởng: 20–30 Xu hoặc 1 Đổi khối+1 Hint. Mốc phụ trong ngày: hoàn thành 1/2/3 nhiệm vụ → +15 Xu / +25 Xu+1 Đổi khối / +40 Xu+1 Đổi khối+1 Hint.
 
-Booster **không còn** bán theo bậc nâng cấp vĩnh viễn (kiến trúc cũ mình từng xây đã bị thay) — giờ bán dưới dạng **gói nạp thêm vào kho chung** (mục 3.7).
+**Điểm Danh — 30 ngày, không phải streak**: là **bộ đếm cộng dồn không bao giờ reset** dù bỏ lỡ ngày. Thắng ≥1 màn trong ngày mở khoá nút nhận; bấm nhận mới tăng ngày (30→1 quay vòng). Thưởng: 10 Xu (ngày 1–9)/15 (10–19)/20 (20–29), +1 Đổi khối mỗi 5 ngày; mốc lớn: **ngày 10 = 60 Xu+3+3**, **ngày 20 = 100 Xu+5+5**, **ngày 30 = 200 Xu+8+8**.
 
-### 6.3 Chủ đích cân bằng
+Cả 2 tab cộng thẳng vào Xu/kho booster có sẵn — không tạo currency/kho vật phẩm riêng.
 
-Mốc neo: **skin rẻ nhất (895 Xu) phải luôn đủ mua ở màn 30, kể cả người chơi tệ nhất** (luôn dùng hết booster, 0 lượt dư mỗi màn → 899 Xu tới màn 30). Đánh đổi đã chấp nhận: skin đắt nhất (2,265 Xu) là mục tiêu dài hơi — người chơi tối ưu cả 50 màn cũng chỉ đủ mua 1–2 món đắt, không mua hết được cả 24 món (tổng giá cả catalogue: 33,590 Xu).
+### A6. Chủ Đề (Wardrobe) — phân biệt với Cửa Hàng
 
-### 6.4 Tự kiểm tra (self-test)
-
-3 assertion kinh tế chạy mỗi lần load: giá skin mặc định = 0, mọi giá trả phí > 0, và **`economy_floor_affords_cheapest_skin_by_level30`** — tính trực tiếp từ `P24M_LEVELS`/`TILE_SKINS`/`BOARD_SKINS` hiện tại, tự báo đỏ nếu ai đổi giá/công thức làm phá vỡ mốc 6.3.
+Modal riêng, dùng chung dữ liệu skin nhưng khác vai trò: **Cửa Hàng** = duyệt + mua bằng Xu. **Chủ Đề** = tủ đồ chỉ để **trang bị** cái đã sở hữu, không hiện giá — bấm skin chưa mở khoá sẽ đóng modal và nhảy sang Cửa Hàng (tránh mua nhầm).
 
 ---
 
-## 7. Nhiệm vụ & Điểm Danh (Quest / Check-in) — hoàn toàn mới
+## PHẦN B — LẬP TRÌNH VIÊN / ENGINEER
 
-Truy cập qua nút riêng ở Main Menu (`#btn-quest-open`), 2 tab:
+### B1. Kiến trúc file
 
-### 7.1 Nhiệm vụ hằng ngày
+1 file HTML tự chứa (`Final Outputs/index.html`, ~6.9MB, không build step, không bundler). Nhiều "lớp" IIFE nối tiếp nhau (menu, level-select, prototype cũ, game engine) chia sẻ scope qua closure.
 
-Mỗi ngày (theo lịch máy), hệ thống chọn **ngẫu nhiên có seed theo ngày** (mọi người chơi cùng ngày thấy cùng 3 nhiệm vụ, không lệch nhau) 3/6 nhiệm vụ trong kho: thắng 1 màn, ghép 6 cặp, dùng 1 booster, phá 1 Seal, thắng không dùng booster, tạo chuỗi cascade ≥2 wave. Thưởng mỗi nhiệm vụ: **20–30 Xu** hoặc **1 Đổi khối + 1 Hint**. Có thêm mốc thưởng phụ trong ngày: hoàn thành 1/2/3 nhiệm vụ → +15 Xu / +25 Xu+1 Đổi khối / +40 Xu+1 Đổi khối+1 Hint.
+**⚠️ Quy tắc bắt buộc trước khi sửa bất kỳ hàm nào**: nhiều hàm bị **gán lại nhiều lần bằng tên trùng** dạng `name=function(){}` (không `let/const`) ở các lớp sau — **định nghĩa cuối cùng xuất hiện trong file mới là bản đang chạy thật**. Luôn `grep` toàn file trước khi sửa để tìm mọi định nghĩa trùng tên, và chạy `window.__digest24k1.selfTest()` trong console ngay sau khi sửa. Đừng tin việc đọc code ở 1 vị trí là đủ — đã có trường hợp thực tế 1 session khác suýt xoá nhầm `emptyBoard` vì tưởng nó chết, hoá ra vẫn được `startLevel=` (bản cuối) gọi.
 
-### 7.2 Điểm Danh — 30 ngày, **không phải streak**
+**Ví dụ cụ thể đã xác minh (có thể lỗi thời nếu code đổi tiếp)**: nút `#btn-help` vẫn có `addEventListener` gắn từ lớp prototype cũ (mở overlay luật lỗi thời "Match 2 & Phá Ấn"), nhưng lớp cuối cùng set `btnHelp.style.display='none'` sau đó — verify bằng Puppeteer thật: `getComputedStyle`/`getBoundingClientRect` xác nhận ẩn hẳn, 1 click thật thất bại với "Node is either not clickable". Kết luận: code đó **chết về mặt trải nghiệm người chơi** dù vẫn tồn tại (tốn parse-time, không tốn gì khác) — an toàn để dọn tiếp.
 
-Khác điểm danh kiểu "mất chuỗi nếu bỏ lỡ 1 ngày" thường thấy — đây là **bộ đếm cộng dồn không bao giờ reset** dù bỏ lỡ ngày nào. Thắng ≥1 màn trong ngày mở khoá nút nhận; bấm nhận mới thật sự tăng ngày (30→1 quay vòng). Thưởng: 10 Xu (ngày 1–9) / 15 Xu (10–19) / 20 Xu (20–29), +1 Đổi khối mỗi 5 ngày, và 3 mốc lớn: **ngày 10 = 60 Xu+3 Đổi khối+3 Hint**, **ngày 20 = 100 Xu+5+5**, **ngày 30 = 200 Xu+8+8**.
+### B2. Cấu trúc dữ liệu
 
-Cả 2 tab đều cộng thẳng vào Xu/kho booster có sẵn — không tạo thêm loại tiền tệ hay kho vật phẩm riêng.
+**1 level (`P24M_LEVELS[i]`)**: `title`, `size`, `goalType`, `winTargets`, `seals`/`permanents`/`locks`, `sealRequiredDistinct` (giờ có giá trị 2, trước chỉ từ 1), `sequence`, `guideMoves`, `solution` (tự-verify).
+
+**localStorage keys đang dùng**: `mxb_level_unlocked`, `mxb_coins`, `mxb_owned_tileskins`/`mxb_owned_boardskins`, `mxb_active_tileskin`/`mxb_active_boardskin`, `mxb_booster_reroll`/`mxb_booster_hint`, `mxb_quest_state` (`{date, quests[], milestoneClaims[]}`), `mxb_checkin_state` (`{day, lastClaimDate, lastWinDate}`).
+
+**Hàm/API quan trọng** (không đầy đủ, chỉ những cái hay cần đụng tới): `computeWinCoins()`, `getBoosterReroll/Hint()`/`setBoosterReroll/Hint()`, `buyBoosterPack()`, `buyTileSkin()`/`buyBoardSkin()`, `pickDailyQuests()`/`addQuestProgress()`/`claimQuest()`, `claimCheckin()`/`checkinReward()`, `renderThemePicker()`, `window.__digest24k1` (debug/test hook: `selfTest()`, `LEVELS`, `place()`, `startLevel()`).
+
+### B3. Lưới an toàn kỹ thuật (self-test — 31 assertion, chạy mỗi lần load)
+
+Bao gồm: đủ 50 level, mọi `solution` giải được và tự-verify, mọi Seal tự mở trong chính solution của nó, mọi `TARGET_FACE` có `targetRequiredCount` hợp lệ, Match/cascade/gravity đúng thiết kế, cộng 3 assertion kinh tế (`economy_default_skins_free`, `economy_prices_positive`, `economy_floor_affords_cheapest_skin_by_level30`). Wild/Joker và Nứt/Crack (từng có self-test riêng) đã **gỡ bỏ hoàn toàn** cùng 2 assertion tương ứng.
+
+### B4. Tình trạng dọn dead-code
+
+Đang **tiếp diễn qua nhiều phiên làm việc song song**, chưa có mốc hoàn tất chính thức. Đã gỡ: lớp prototype "24K V2" (win/lose/startLevel/goalState cũ — từng tốn ~1.6s parse/exec trên CPU mobile throttle + 4 AudioContext trùng lặp), Wild/Joker, Nứt/Crack, vài helper piece-generation chết hẳn (`cellsOf`, `needIds`, `boardFreq`, `pickId`). Một số hàm bị rút gọn thành stub 1 dòng nhưng **giữ nguyên tên** vì có chỗ khác bare-reassign vào chúng hoặc 1 object literal debug cũ tham chiếu shorthand tới — xoá tên sẽ vỡ `"use strict"`. `#btn-help` + overlay HELP cũ: xác nhận chết về UX (xem B1), an toàn dọn tiếp khi cần.
+
+**Quy trình khi dọn tiếp**: làm từng bước nhỏ, chạy `selfTest()` + thử đặt 1 quân thật sau MỖI bước, không gộp nhiều thay đổi rồi test 1 lần — cách này đã bắt được lỗi "X is not defined" ngay lập tức thay vì phải debug ngược.
 
 ---
 
-## 8. Chủ Đề (Wardrobe) — phân biệt với Cửa Hàng
+## PHẦN C — HOẠ SĨ / ÂM THANH
 
-Modal riêng (`#theme-ov`, nút `#btn-theme`) — **khác Cửa hàng dù dùng chung dữ liệu skin**:
+### C1. Định hướng thẩm mỹ
 
-- **Cửa Hàng** = duyệt + **mua** bằng Xu.
-- **Chủ Đề** = tủ đồ **chỉ để trang bị** những gì đã sở hữu — không hiện giá. Bấm vào skin đã mở khoá → trang bị ngay. Bấm vào skin chưa mở khoá → đóng modal và **nhảy thẳng sang Cửa Hàng** (tránh mua nhầm ngay trong màn "thử đồ").
+**"Hành Trình Qua Vườn Trúc"**: Nguyệt Môn (Main Menu) → cổng tre (Level Select) → bàn trà gỗ (Gameplay). Vật liệu: gỗ tối, tre trúc, giấy màu ngà, ngọc bích (`jade`), đồng cổ làm viền/accent.
+
+### C2. Nguyên tắc Dùng / Tránh
+
+| DÙNG | TRÁNH |
+|---|---|
+| Gỗ tối, tre trúc, giấy màu ngà | Rồng, đèn lồng đỏ lớn |
+| Ngọc bích, đồng cổ làm viền/accent | Hoa văn vàng đặc |
+| Zen: tương phản mạnh, ít chuyển động cùng lúc | Hiệu ứng jackpot/pháo hoa/coin — **áp dụng cả cho màn hình kinh tế mới** (Cửa hàng/Chủ Đề/Nhiệm vụ): không hiệu ứng rương/mở hộp kiểu casino |
+| Hỗ trợ Reduced Motion đầy đủ | Màn Thắng/Thua có pháo hoa/coin/3-sao/phủ đỏ toàn màn |
+| 1 màn hình = 1 hành động chính | — |
+
+**Âm thanh**: mỗi sự kiện (đặt khối/Match/Reveal/Seal mở/Thắng/Thua) có 1 âm WebAudio tổng hợp riêng, không dùng file âm thanh ngoài.
+
+### C3. Việc art còn dở dang (cần biết trước khi bắt tay vào)
+
+- Đồng bộ art pass giữa các màn hình phụ (Cửa hàng/Chủ Đề/Nhiệm vụ) với gameplay chính — có collaborator đang làm dở phần palette tối→sáng cho modal Chủ Đề.
+- Đợt tối ưu hiệu năng gần nhất đã đổi 1 số animation từ `box-shadow` sang `transform:scale` (đỡ tốn paint trên di động: door-handle pulse, seal/lock glow, hud-moves warning) — nếu chỉnh lại các animation này, **ưu tiên `transform`/`opacity` thay vì `box-shadow`/`filter`** để giữ hiệu năng đã tối ưu, trừ khi có lý do hình ảnh thật sự cần.
+- Khung `#app-frame` dùng đơn vị `svh` (không phải `dvh`) có chủ đích — để tránh khung 16:9 co giãn theo animation ẩn/hiện thanh địa chỉ trình duyệt di động. Nếu thêm CSS layout mới phụ thuộc chiều cao viewport, dùng `svh` cho nhất quán.
 
 ---
 
-## 9. Art & Audio direction (cập nhật)
+## PHẦN D — PRODUCER / QUẢN LÝ DỰ ÁN
 
-- Palette, nguyên tắc "Zen = rõ ràng không mờ nhạt", bộ âm WebAudio riêng cho từng sự kiện — **không đổi**.
-- **Ràng buộc "phải bỏ" của bản 08-24 nay chỉ còn áp dụng một phần**: đã bỏ hẳn tên kỹ thuật (`24K`, `Floor-only Queue`) khỏi UI, khoá vẫn dùng thanh gỗ/dây thừng vật lý — **nhưng Score giờ hiện trong HUD, booster giờ là cơ chế thật có UI riêng** (mục 5, 3.7). Màn Thắng/Thua vẫn không pháo hoa/coin/3-sao/phủ đỏ toàn màn — nguyên tắc thẩm mỹ "không jackpot" áp dụng cả cho các màn kinh tế mới (Cửa hàng/Chủ Đề/Nhiệm vụ) dùng đúng vật liệu gỗ/ngọc/đồng, không hiệu ứng rương/mở hộp kiểu casino.
-
-## 10. Kiến trúc kỹ thuật (cập nhật)
-
-- Vẫn 1 file HTML tự chứa, không build step, không bundler.
-- **Đang trong đợt dọn dead-code lớn** (thực hiện qua nhiều phiên làm việc song song): đã gỡ hoàn toàn lớp prototype "24K V2" (win/lose/startLevel/goalState... bị shadow từ lâu nhưng vẫn chạy code khởi tạo lúc parse, gây phí ~1.6s trên CPU mobile throttle + 4 AudioContext trùng lặp), gỡ Wild/Joker và Nứt/Crack. Quy tắc vẫn giữ: khi có hàm bị gán lại nhiều lần bằng `name=function(){}` không `let/const`, **định nghĩa cuối cùng trong file mới là bản đang chạy thật** — luôn quét toàn file và chạy `window.__digest24k1.selfTest()` trước/sau khi sửa.
-- Tiến trình lưu qua nhiều khoá `localStorage`: `mxb_level_unlocked`, `mxb_coins`, `mxb_owned_tileskins`/`mxb_owned_boardskins`, `mxb_active_tileskin`/`mxb_active_boardskin`, `mxb_booster_reroll`/`mxb_booster_hint`, `mxb_quest_state`, `mxb_checkin_state`.
-- Harness Node.js độc lập (`engine-core.mjs`/`validate-level.mjs`) vẫn dùng được để giải/verify level hàng loạt ngoài trình duyệt.
-
-## 11. Hiện trạng dự án
+### D1. Hiện trạng dự án
 
 | | |
 |---|---|
@@ -221,26 +206,26 @@ Modal riêng (`#theme-ov`, nút `#btn-theme`) — **khác Cửa hàng dù dùng 
 | Nhiệm vụ & Điểm Danh | Hoàn chỉnh |
 | Chủ Đề (wardrobe) | Hoàn chỉnh |
 | Ads (interstitial + rewarded) | Lớp no-op sẵn sàng cắm SDK thật, chưa chọn platform phát hành |
-| Dọn dead-code | Đang tiếp diễn (nhiều phiên song song), chưa có mốc hoàn tất chính thức |
+| Quản lý mã nguồn | Đã đưa lên Git (1 commit "Push Project to Git"), thư mục đổi tên `Final Core`→`Final Outputs` |
+| Dọn dead-code | Đang tiếp diễn (nhiều phiên song song), chưa có mốc hoàn tất |
+| Tối ưu hiệu năng mobile | Đang có 1 đợt WIP chưa commit (animation, viewport unit, haptic timing) |
 
-## 12. Việc tồn đọng / cần xác nhận
+### D2. Việc tồn đọng / cần xác nhận
 
-- **Playtest thật** để đối chiếu đường cong độ khó lý thuyết (mục 4) với cảm giác chơi thật, đặc biệt đoạn Lv49→50.
-- Theo dõi % người chơi mua được cosmetic đầu tiên trước khi hết Chương 1, để tinh chỉnh lại nếu công thức Xu quá hào phóng/keo kiệt so với thiết kế.
-- Đồng bộ art pass giữa các màn hình phụ (Cửa hàng/Chủ Đề/Nhiệm vụ) với gameplay chính — một collaborator đang làm dở phần này (palette tối→sáng cho modal Chủ Đề).
-- Đợt dọn dead-code đang diễn ra song song — nên re-run self-test sau mỗi đợt trước khi coi bản build là ổn định.
+- **Playtest thật** để đối chiếu đường cong độ khó lý thuyết (A2) với cảm giác chơi thật, đặc biệt đoạn Lv49→50.
+- Theo dõi % người chơi mua được cosmetic đầu tiên trước khi hết Chương 1, để tinh chỉnh công thức Xu nếu quá hào phóng/keo kiệt.
+- Đồng bộ art pass các màn hình phụ (xem C3).
+- Đợt dọn dead-code + đợt tối ưu hiệu năng đang chạy song song — nên re-run self-test sau mỗi đợt trước khi coi bản build ổn định.
 - Chưa chốt platform phát hành → chưa cắm SDK ads thật.
 
-## 13. Đảo ngược so với bản GDD 08-24 (đọc kỹ trước khi dùng bản cũ làm tham chiếu)
+### D3. Roadmap ngắn hạn
 
-| Nguyên tắc "đã chốt" trong bản 08-24 | Thực tế hiện tại |
-|---|---|
-| "Không giới hạn nước đi" | Move Limit tồn tại thật, 1–10 tuỳ màn (mục 3.6) |
-| "Không vật phẩm hỗ trợ (booster)" | Booster là cơ chế thật, kho dùng chung + mua gói (mục 3.7) |
-| "Không hiển thị điểm số" | Điểm hiện trực tiếp trong HUD (mục 5) |
-| "Monetization đã chốt: Ads-only, không IAP" | Có hẳn 1 hệ kinh tế Xu + Cửa hàng cosmetic song song với Ads (mục 6) — không phải IAP tiền thật, nhưng là 1 currency loop đầy đủ mà bản 08-24 không hề có |
-| "Quy mô đã chốt: 30 level / 3 chương hiển thị" | 50 level / 5 chương |
-| Tutorial riêng ngoài `P24M_LEVELS`, truy cập qua nút "?" | Đã gỡ, onboarding gộp hẳn vào Level 1 thật (mục 3.10) |
-| "Không thêm cơ chế lõi mới" (phạm vi Tuần 3–4) | Lock, Điểm, Kinh tế Xu, Nhiệm vụ, Chủ Đề đều là cơ chế mới thêm sau mốc đó |
+1. Playtest thật vòng cuối (đối chiếu D2).
+2. Cân bằng lại Kinh tế Xu theo dữ liệu playtest nếu cần.
+3. Hoàn thiện art pass các màn hình phụ.
+4. Chốt platform phát hành → cắm SDK ads thật.
+5. Đóng gói bản phát hành.
 
-Không có bằng chứng nào cho thấy các đảo ngược này là ngoài ý muốn — mỗi thay đổi đều đi kèm self-test riêng và được nhiều phiên làm việc xác nhận độc lập. Coi đây là **quyết định thiết kế đã cập nhật**, không phải lỗi lệch khỏi spec cũ.
+### D4. Lịch sử thay đổi lớn
+
+Xem mục 0.2 (bảng đảo ngược so với bản 08-24) — đây là những quyết định **đã áp dụng và có self-test xác nhận**, không phải đề xuất.
