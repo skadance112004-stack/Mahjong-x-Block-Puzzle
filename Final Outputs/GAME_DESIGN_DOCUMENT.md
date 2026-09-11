@@ -74,17 +74,18 @@ Mỗi level khai báo đúng 1 trong 4 `goalType`. Thống kê thực tế trên
 Hàm `p24kCellBlocked()` kiểm tra theo đúng thứ tự ưu tiên sau (ô có thể bị chặn bởi nhiều lý do cùng lúc):
 
 1. **Ô Chắn / Permanent (`level.permanents`)** — chặn vĩnh viễn, không bao giờ mở, không phụ thuộc điều kiện gì. Dạy khái niệm "định tuyến quanh vật cản" (routing).
-2. **Phong Ấn / Seal (`level.seals`, mở qua `sealRequiredDistinct`)** — chặn cho tới khi người chơi đã Match đủ N **mặt khác nhau** (không phải N quân — lặp lại cùng 1 mặt không tính thêm tiến độ) trong TOÀN BỘ level, tính dồn qua mọi lượt/mọi wave. Mở đúng 1 lần, chỉ sau khi 1 cascade đã settle hoàn toàn (không mở giữa chừng 1 wave). Dùng chung 1 bộ đếm `S.targetCounts` với goal `TARGET_FACE`, không cần sổ sách riêng.
-3. **Khóa / Lock (`level.locks`, mỗi entry `{cells, face, required}`)** — giống Phong Ấn nhưng **theo từng NHÓM Ô riêng biệt**, gắn với ĐÚNG 1 mặt cụ thể + số lượng cần, hiển thị rõ ràng trên ô (không mờ như Seal). Dùng lại luôn bộ đếm `targetCounts` sẵn có, không cần state mới.
-   - Dùng trong đúng **3 level**: Level 9 ("Two Match Stations", khoá mặt `c1`), Level 22 ("Two-Cell Notch", khoá mặt `s1`), Level 36 ("Roof Chain", khoá mặt `h1`).
+2. **Phong Ấn / Seal (`level.seals`, mở qua `sealRequiredDistinct`)** — **[Đổi luật 11/09/2026]** chặn cho tới khi người chơi đã Match đủ N **mặt khác nhau** (không phải N quân) mà mỗi match đó phải xảy ra **KỀ SÁT ít nhất 1 ô Seal** (một ô trong nhóm match có ít nhất 1 hàng-xóm trực tiếp — trên/dưới/trái/phải — là ô Seal), không còn tính match xảy ra bất kỳ đâu trên bàn như trước nữa. Lý do đổi: luật cũ khiến Seal không khác gì goal `TARGET_FACE` phụ — người chơi chỉ cần ghép đủ N mặt bất kỳ ở bất kỳ đâu, không tạo ra quyết định không gian nào riêng. Luật mới buộc người chơi phải chủ động đưa quân TỚI GẦN ô Seal để mở nó, biến Seal thành 1 ràng buộc không gian thật sự. Theo dõi bằng bộ đếm RIÊNG `S.sealAdjacentCounts` (tách khỏi `S.targetCounts` của goal `TARGET_FACE`, vì 2 khái niệm "khác nhau" giờ đã khác nhau: toàn bàn vs. kề sát Seal). Vẫn mở đúng 1 lần, chỉ sau khi 1 cascade đã settle hoàn toàn.
+   - **Hệ quả khi thiết kế màn**: không thể tự do đặt seed/piece dùng để mở Seal ở bất kỳ đâu trên bàn nữa — phải đặt (hoặc dẫn 1 match tới) ô liền kề Seal. Toàn bộ 21 màn dùng Seal tại thời điểm đổi luật đã được rà soát lại (xem `08-GDD-LEVEL-DESIGN.md` §7 mục 8 cho quy trình cụ thể); 4 trong số đó không còn giữ được Seal có ý nghĩa sau khi đổi CẢ luật lẫn thứ tự dạy cơ chế (mục 5 dưới) nên đã được thiết kế lại thành Permanent thuần — còn lại **17 màn dùng Seal**.
+3. **Khóa / Lock (`level.locks`, mỗi entry `{cells, face, required}`)** — giống Phong Ấn (luật CŨ, trước 11/09/2026 — Khóa KHÔNG đổi theo luật kề-sát mới) nhưng **theo từng NHÓM Ô riêng biệt**, gắn với ĐÚNG 1 mặt cụ thể + số lượng cần, hiển thị rõ ràng trên ô (không mờ như Seal). Dùng lại luôn bộ đếm `targetCounts` sẵn có, không cần state mới.
+   - Dùng trong **16 level**: Lv9 (Ch1), Lv12 (Ch2), toàn bộ Lv31-40 (Ch4), và Lv41/43/44/48 (Ch5) — không còn chỉ 3 level như ghi chú cũ; số ô Khóa từng màn xem cột "Lock" trong `Final Outputs/Mahjong_x_Block_Beatchart.xlsx`.
 
 Bảng phân biệt nhanh 3 loại chặn:
 
 | Cơ chế | Điều kiện mở | Phạm vi | Mở lại được? |
 |---|---|---|---|
 | Ô Chắn | Không bao giờ mở | Ô đơn | Không |
-| Phong Ấn | N mặt khác nhau (toàn level) | Cả nhóm seal cùng lúc | 1 lần, vĩnh viễn sau đó |
-| Khóa | N quân của 1 mặt cụ thể | Từng nhóm ô riêng | 1 lần/nhóm, vĩnh viễn sau đó |
+| Phong Ấn | N mặt khác nhau, mỗi match phải KỀ SÁT 1 ô seal | Cả nhóm seal cùng lúc | 1 lần, vĩnh viễn sau đó |
+| Khóa | N quân của 1 mặt cụ thể (không cần kề sát) | Từng nhóm ô riêng | 1 lần/nhóm, vĩnh viễn sau đó |
 
 ## 5. Nội dung 50 level
 
@@ -92,8 +93,10 @@ Bảng phân biệt nhanh 3 loại chặn:
 - **Đường cong dạy (lesson):** mỗi level có field `lesson` (mô tả bài học bằng tiếng Anh, dùng nội bộ/debug) và tuỳ chọn `teach` (mô tả ngắn cho người chơi). Không có mô tả cơ chế bằng lời trong overlay bắt đầu/thắng/thua nữa — việc DẠY hoàn toàn dựa vào bàn tay hướng dẫn (`guideMoves`, chỉ Level 1) và tự chơi mà hiểu.
 - **Chỉ Level 1** có `guideMoves>0` (bàn tay 👆 hướng dẫn chạm đúng ô) — mọi level khác đặt `guideMoves:0` (đã cố ý gỡ bỏ auto-guide highlight khỏi mọi level trừ Lv1).
 - **Phân bố goalType theo 50 level:** xem bảng mục 3.
-- **Lộ trình chương (đọc từ tiêu đề + lesson thực tế):**
-  - **Ch1 (Lv1-10):** nền tảng — 1 khối/lượt, gravity 2 tầng, đọc Current/Next, giới thiệu mặt thứ 4/5, giới thiệu Phong Ấn (từ Lv11 thật ra — xem dưới, ranh giới không tuyệt đối trùng mốc 10).
+- **Lộ trình chương (đọc từ tiêu đề + lesson thực tế; đổi thứ tự 11/09/2026 theo yêu cầu người dùng — Ô Chắn dạy TRƯỚC Phong Ấn, ngược lại thứ tự cũ):**
+  - **Ch1 (Lv1-10):** nền tảng — 1 khối/lượt, gravity 2 tầng, đọc Current/Next, giới thiệu mặt thứ 4/5.
+  - **Ch2 (Lv11-20):** giới thiệu Ô Chắn (Permanent) — cơ chế đơn giản hơn ("ô này không bao giờ mở"), dạy trước.
+  - **Ch3 (Lv21-30):** giới thiệu Phong Ấn (Seal, luật kề-sát mới) — cơ chế phức tạp hơn (ngưỡng N mặt khác nhau + ràng buộc không gian), dạy sau khi người chơi đã quen "vật cản".
   - Thực tế mốc chương chỉ là "cứ 10 level một nhóm" để hiển thị số ("màn X/50"), KHÔNG còn quyết định nội dung dạy — nội dung dạy trải không đều  - 
 - **Độ khó biến thiên:** `moveLimit` dao động 1–8; kích thước bàn 2×2 đến 6×6; số mặt mục tiêu tới 6 mặt cùng lúc (Lv47, Lv50).
 
