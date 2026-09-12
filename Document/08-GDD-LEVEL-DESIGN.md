@@ -10,10 +10,12 @@ nhiều đợt playtest/feedback thật, và quy trình an toàn khi sửa/thêm
 thuẫn với `04-GDD-FINAL-CORE-MASTER.md` (bản 30-level, đã cũ) thì tài liệu này và
 `GAME_DESIGN_DOCUMENT.md` thắng.*
 
-*Cập nhật lần cuối: 11/09/2026, sau đợt "đổi luật Seal sang kề-sát" + "đổi thứ tự dạy Ô Chắn/
-Phong Ấn" (cả 2 theo yêu cầu người dùng — xem `GAME_DESIGN_DOCUMENT.md` mục 4 cho chi tiết
-luật Seal mới). Bản 08/09/2026 trước đó vẫn đúng cho mọi phần không nhắc tới Seal/thứ tự
-chương bên dưới.*
+*Cập nhật lần cuối: 11/09/2026, sau 3 đợt liên tiếp cùng ngày: (1) "đổi luật Seal sang kề-sát",
+(2) "đổi thứ tự dạy Ô Chắn/Phong Ấn" (cả 2 theo yêu cầu người dùng — xem
+`GAME_DESIGN_DOCUMENT.md` mục 4 cho chi tiết luật Seal mới), và (3) thêm chi tiết "Nước thắng
+thật" vào sheet "Level Difficulty" + sheet "Economy" mới (Xu/Booster theo màn, mục 9 dưới) vào
+`Beatchart.xlsx`. Bản 08/09/2026 trước đó vẫn đúng cho mọi phần không nhắc tới Seal/thứ tự
+chương/Economy bên dưới.*
 
 ---
 
@@ -101,6 +103,16 @@ Tính từng màn bằng 7 thành phần cộng lại (định nghĩa đầy đ�
 | ⑤ | Cơ chế | `Seal×2 + Ô Chắn×2 + Lock×3` | Lock nặng nhất vì luôn gắn với ngưỡng 1 mặt cụ thể |
 | ⑥ | Khối | `Khối lớn nhất trong hàng đợi × 0.5` | Khối nhiều ô hơn = khó tìm chỗ đặt hợp lệ |
 | ⑦ | Mục tiêu | `TILE_QUOTA=0 · OPEN_SEAL=1 · TARGET_FACE=2 · BURIED_TARGET=4` | Trọng số theo độ phức tạp bản chất của loại goal |
+
+**[Mới 11/09/2026] Chi tiết bổ sung — "Nước thắng thật" / "Nước chết sau thắng"**: 2 cột mới
+trong sheet "Level Difficulty" (chèn ngay sau "Nước lời giải"), tính bằng cách replay từng
+`solution` qua `debug.freshModel`/`debug.modelDrop` và check điều kiện thắng đúng theo
+`goalType` sau MỖI nước (giống hệt `levelWon()` thật) — không suy luận, đọc trực tiếp từ engine.
+Đây KHÔNG phải 1 thành phần của công thức điểm khó (vẫn dùng `solution.length` cho ② như cũ,
+xem mục 7.2 lý do) mà là chi tiết CHẨN ĐOÁN: cho biết đúng "nước chết" phía sau điểm thắng thật
+là bao nhiêu (safety-net pattern, mục 7.3) — 24/50 màn hiện có ít nhất 1 nước chết, dài nhất là
+Lv23 "Use The Freed Cell" (6/11 nước là nước chết, hoàn toàn cho mục đích phá Seal trang trí,
+không ảnh hưởng goal `TARGET_FACE` thật của màn).
 
 **Mức độ** (Dễ/Vừa/Khó/Rất khó) chia theo **tứ phân vị thật** của 50 điểm hiện tại — luôn tính
 lại mỗi khi có màn thay đổi, không dùng ngưỡng số cố định. Tại thời điểm viết tài liệu này (sau
@@ -280,7 +292,48 @@ theo mô tả sau thay vì tìm file cũ:
 
 ---
 
-## 9. Tài liệu liên quan
+## 9. Economy — Xu & Booster theo màn
+
+**[Mới 11/09/2026, theo yêu cầu người dùng]** Sheet mới **"Economy"** trong
+`Final Outputs/Mahjong_x_Block_Beatchart.xlsx`. Phạm vi CỐ Ý thu hẹp đúng 2 thứ người chơi THẬT
+SỰ nhận được: **Xu kiếm được** và **Booster nhận được** — không đụng tới giá Cửa hàng, danh
+sách skin, hay bất kỳ phần "chi tiêu" nào khác của economy (những phần đó đã có sẵn đầy đủ ở
+`GAME_DESIGN_DOCUMENT.md` mục 7, không lặp lại ở đây).
+
+**Bảng "Xu theo màn"** — tính lại chính xác công thức `computeWinCoins()` (`index.html`) cho cả
+50 màn, ở 2 kịch bản biên:
+- **Xu Tối Đa**: chơi tới đúng "Nước thắng thật" rồi dừng (tối đa hoá lượt dư), không dùng
+  Booster nào, cộng dồn đủ mọi bonus.
+- **Xu Tệ Nhất**: dùng hết Booster + không còn lượt dư nào (vẫn được Xu Sàn vì màn vẫn thắng).
+
+Cả 2 kịch bản đều nhân đôi đúng ở màn 10/20/30/40/50. **Validate chéo với
+`GAME_DESIGN_DOCUMENT.md` mục 7.1**: cộng dồn Xu Tệ Nhất tới đúng Lv30 = **899 Xu**, khớp
+CHÍNH XÁC với câu "người chơi tệ nhất... vẫn gom đủ ~899 Xu tới màn 30 — đúng bằng giá skin rẻ
+nhất" — xác nhận công thức trong sheet đúng với engine thật, không phải số ước lượng.
+
+**Lưu ý quan trọng khi đọc cột "Xu +Lượt dư"**: tính theo **Nước thắng thật** (mục 3 ở trên),
+KHÔNG phải `Nước lời giải`/`solution.length` — 1 người chơi dừng ngay khi thắng (không chơi hết
+`solution` tác giả soạn, kể cả phần "nước chết") luôn được lượt dư nhiều hơn hoặc bằng người
+chơi hết cả `solution`, nên Xu tối đa trong sheet là con số ĐÚNG cho người chơi thật, không phải
+con số nếu tính nhầm theo `solution.length`.
+
+**Bảng "Nguồn Booster" — KHÔNG theo từng màn**: khác với Xu (tính được chính xác theo từng màn
+qua `computeWinCoins()`), Booster (Đổi khối/Hint) đến từ Nhiệm vụ hàng ngày + Điểm danh 30 ngày
++ mua ở Cửa hàng — **không có màn nào tự nó phát Booster cả**. Vì vậy bảng này liệt kê từng
+NGUỒN (không phải từng màn) — xem chi tiết đầy đủ ở `GAME_DESIGN_DOCUMENT.md` mục 8.
+
+> ⚠️ **Phát hiện khi làm sheet này**: cột "Đổi khối"/"Hint" đã có sẵn từ trước trong sheet "Level
+> Difficulty" (field `level.boosterReroll`/`level.boosterHint` trong data màn) **không phản ánh
+> Booster thật người chơi nhận được** — đây là field CÒN SÓT LẠI từ 1 thiết kế cũ (cấp Booster
+> riêng theo từng level), đã bị thay bằng kho dùng chung từ trước, và `index.html` có hẳn 1
+> comment xác nhận việc này ("Booster giờ đọc từ kho DÙNG CHUNG toàn game (không còn theo
+> level.boosterReroll/..."). 2 cột đó vẫn giữ trong sheet "Level Difficulty" để không phá cấu
+> trúc đang có, nhưng **đừng dùng chúng để suy luận Booster người chơi nhận được** — dùng đúng
+> bảng "Nguồn Booster" trong sheet "Economy" mới này.
+
+---
+
+## 10. Tài liệu liên quan
 
 - `puzzle-design-6-muc-tieu 1.md` — triết lý gốc (6 pillar/bổ sung), đặc biệt §3 (trục độ khó)
   và §4 (aesthetic/thẩm mỹ ASMR) là nền tảng cho mọi quy tắc ở tài liệu này.
@@ -293,7 +346,10 @@ theo mô tả sau thay vì tìm file cũ:
   trong đó có thể chỉ nội dung nay đã đổi chỗ, quy đổi bằng ±10 tương ứng chiều di chuyển.
 - `Final Outputs/Mahjong_x_Block_Beatchart.xlsx` — số liệu sống, luôn là nguồn số chính xác nhất
   tại bất kỳ thời điểm nào (tài liệu này chỉ trích một vài con số làm ví dụ, có thể lệch so
-  với xlsx nếu có màn được sửa sau ngày cập nhật ở đầu tài liệu).
+  với xlsx nếu có màn được sửa sau ngày cập nhật ở đầu tài liệu). 3 sheet: "Đường cong độ khó"
+  (biểu đồ), "Level Difficulty" (7 thành phần điểm khó + chi tiết Nước thắng thật/Lock/Seal/Ô
+  Chắn từng màn), "Công thức" (định nghĩa công thức + ngưỡng tứ phân vị), và từ 11/09/2026 thêm
+  "Economy" (Xu/Booster theo màn, mục 9 ở trên).
 
 *Nguồn: `Final Outputs/index.html` (`P24M_LEVELS` qua `window.__digest24k1`) +
 `Final Outputs/Mahjong_x_Block_Beatchart.xlsx`, đối chiếu 2 vòng playtest feedback thật (08/09/2026)

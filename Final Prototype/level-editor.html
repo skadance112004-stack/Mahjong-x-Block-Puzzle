@@ -570,7 +570,11 @@ function faceLabel(id){ return FACE_LABELS[FACES.indexOf(id)]||id; }
 const FACE_EMOJI_BY_SUIT={
   s:['🪷','🌸','🌺','🌼','🌷','🌹','💮','🏵️','🌻'],
   c:['🌿','🍃','☘️','🌱','🎋','🌾','🍀','🌵','🌴'],
-  w:['🪷','🌷','🌸','🏵️','💮','🌺','🌼','🌹','🌻'],
+  // w[0] was '🪷', identical to s[0] -- rank-1 's' and 'w' tiles (the two faces actually
+  // used by real levels alongside rank-2) rendered with the SAME icon (report: "A và C
+  // trùng hình"). Swapped with w[3] ('🏵️', otherwise only ever reached at the unused
+  // rank-4 slot) so every rank-1/2 face across all 4 suits is now visually distinct.
+  w:['🏵️','🌷','🌸','🪷','💮','🌺','🌼','🌹','🌻'],
   h:['💧','🌙','☁️','✨','🌊','🍂','🌫️'],
 };
 function faceEmoji(id){
@@ -691,6 +695,11 @@ function addLockGroup(){
 }
 function removeLockGroup(i){
   level.locks.splice(i,1);
+  // Removing a group BEFORE the active one shifts every later group's index down by one;
+  // the old clamp only caught activeLockGroup going out of bounds, so deleting group 0 while
+  // group 1 was active silently left activeLockGroup=1 pointing at whatever used to be group 2
+  // (or nothing, with just 2 groups) instead of the group the user was actually still on.
+  if(i<activeLockGroup) activeLockGroup--;
   if(activeLockGroup>=level.locks.length) activeLockGroup=Math.max(0,level.locks.length-1);
   renderLockGroups(); onDataChanged();
 }
@@ -1078,7 +1087,7 @@ function renderBoard(){
       if(level.locks[activeLockGroup]===lockHere) div.classList.add('lock-active-group');
       const lt=document.createElement('div'); lt.className='lockTag';
       const icon=document.createElement('div'); icon.className='lt-icon';
-      icon.textContent=faceLabel(lockHere.face); icon.style.background=faceColor(lockHere.face); icon.style.color='#1b140f';
+      icon.textContent=faceEmoji(lockHere.face); icon.style.background=faceColor(lockHere.face); icon.style.color='#1b140f';
       const cnt=document.createElement('div'); cnt.className='lt-count'; cnt.textContent=`${lockCur}/${lockHere.required}`;
       lt.appendChild(icon); lt.appendChild(cnt); div.appendChild(lt);
     }
@@ -1095,7 +1104,15 @@ function renderBoard(){
       if(mode==='edit'){
         t.draggable=true; t.title+=' — Kéo để chuyển sang ô khác';
         t.addEventListener('dragstart', e=>{
-          if(tool.mode==='seal'||tool.mode==='permanent'){ e.preventDefault(); return; }
+          // 'lock' was missing here (only seal/permanent were excluded) even though it's been
+          // a paintable board tool since the multi-group Khóa feature was added -- clicking a
+          // cell that already has a floor/roof tile let the browser's native HTML5 drag-and-drop
+          // win the gesture instead of a plain click (the tag is `draggable=true` a few lines up),
+          // silently swallowing the click and the lock paint with it. Matches the reported bug:
+          // only Khóa affected (seal/permanent were already protected), completely silent (no
+          // error, no toast -- onCellClick's lock branch just never ran), real mouse only (a
+          // scripted zero-movement click doesn't cross the browser's native drag threshold).
+          if(tool.mode==='seal'||tool.mode==='permanent'||tool.mode==='lock'){ e.preventDefault(); return; }
           e.stopPropagation(); draggingBoardTile={r,c,z:0,id:floorTile.id}; e.dataTransfer.setData('text/plain','board-tile');
         });
         t.addEventListener('dragend', ()=>{ draggingBoardTile=null; clearGhost(); });
@@ -1108,7 +1125,15 @@ function renderBoard(){
       if(mode==='edit'){
         t.draggable=true; t.title+=' — Kéo để chuyển sang ô khác';
         t.addEventListener('dragstart', e=>{
-          if(tool.mode==='seal'||tool.mode==='permanent'){ e.preventDefault(); return; }
+          // 'lock' was missing here (only seal/permanent were excluded) even though it's been
+          // a paintable board tool since the multi-group Khóa feature was added -- clicking a
+          // cell that already has a floor/roof tile let the browser's native HTML5 drag-and-drop
+          // win the gesture instead of a plain click (the tag is `draggable=true` a few lines up),
+          // silently swallowing the click and the lock paint with it. Matches the reported bug:
+          // only Khóa affected (seal/permanent were already protected), completely silent (no
+          // error, no toast -- onCellClick's lock branch just never ran), real mouse only (a
+          // scripted zero-movement click doesn't cross the browser's native drag threshold).
+          if(tool.mode==='seal'||tool.mode==='permanent'||tool.mode==='lock'){ e.preventDefault(); return; }
           e.stopPropagation(); draggingBoardTile={r,c,z:1,id:roofTile.id}; e.dataTransfer.setData('text/plain','board-tile');
         });
         t.addEventListener('dragend', ()=>{ draggingBoardTile=null; clearGhost(); });
@@ -1164,7 +1189,7 @@ function renderPieceMiniPreview(){
     const mc=document.createElement('div');
     if(idx===undefined){ mc.style.visibility='hidden'; }
     else{
-      mc.className='mc'; mc.textContent=faceLabel(pendingPiece.ids[idx]);
+      mc.className='mc'; mc.textContent=faceEmoji(pendingPiece.ids[idx]);
       mc.style.background=faceColor(pendingPiece.ids[idx]); mc.style.color='#1b140f';
       mc.title='Click để đổi mặt: '+pendingPiece.ids[idx];
       mc.onclick=()=>{ const cycle=FACES; const cur=cycle.indexOf(pendingPiece.ids[idx]); pendingPiece.ids[idx]=cycle[(cur+1)%cycle.length]; renderPieceMiniPreview(); };
@@ -1198,7 +1223,7 @@ function renderPieceList(){
     const label=document.createElement('b'); label.style.width='52px'; label.textContent=(SHAPES[p.shapeKey]||{label:p.key}).label;
     const cellsWrap=document.createElement('div'); cellsWrap.className='cells';
     p.cells.forEach(c=>{
-      const tag=document.createElement('span'); tag.className='cellTag'; tag.textContent=faceLabel(c.id);
+      const tag=document.createElement('span'); tag.className='cellTag'; tag.textContent=faceEmoji(c.id);
       tag.style.background=faceColor(c.id); tag.style.color='#1b140f';
       cellsWrap.appendChild(tag);
     });
@@ -1234,7 +1259,7 @@ function renderQueuePoolList(){
     const label=document.createElement('b'); label.style.width='52px'; label.textContent=(SHAPES[entry.piece.shapeKey]||{label:entry.piece.key}).label;
     const cellsWrap=document.createElement('div'); cellsWrap.className='cells';
     entry.piece.cells.forEach(c=>{
-      const tag=document.createElement('span'); tag.className='cellTag'; tag.textContent=faceLabel(c.id);
+      const tag=document.createElement('span'); tag.className='cellTag'; tag.textContent=faceEmoji(c.id);
       tag.style.background=faceColor(c.id); tag.style.color='#1b140f';
       cellsWrap.appendChild(tag);
     });
@@ -1258,7 +1283,7 @@ function renderQueueFallbackPreview(){
   const label=document.createElement('b'); label.style.width='52px'; label.textContent=(SHAPES[level.queueFallback.shapeKey]||{label:level.queueFallback.key}).label;
   const cellsWrap=document.createElement('div'); cellsWrap.className='cells';
   level.queueFallback.cells.forEach(c=>{
-    const tag=document.createElement('span'); tag.className='cellTag'; tag.textContent=faceLabel(c.id);
+    const tag=document.createElement('span'); tag.className='cellTag'; tag.textContent=faceEmoji(c.id);
     tag.style.background=faceColor(c.id); tag.style.color='#1b140f';
     cellsWrap.appendChild(tag);
   });
@@ -1472,7 +1497,7 @@ function buildPieceGrid(cells){
     else{
       mc.className='mc'; mc.style.width='22px'; mc.style.height='22px';
       mc.style.background=faceColor(id); mc.style.color='#1b140f';
-      mc.textContent=faceLabel(id);
+      mc.textContent=faceEmoji(id);
     }
     grid.appendChild(mc);
   }

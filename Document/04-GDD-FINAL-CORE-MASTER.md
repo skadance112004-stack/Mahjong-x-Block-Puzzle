@@ -62,9 +62,9 @@ Người chơi được **chủ động chồng khối lên quân có sẵn đ�
 
 | Cơ chế | Cách mở | Có ở |
 |---|---|---|
-| Phong Ấn (Seal) | Match đủ N mặt **khác nhau** | 21/50 màn |
-| Ô Chắn (Permanent) | Không bao giờ mở, buộc định tuyến | 26/50 màn |
-| Lock | Gắn với **đúng 1 mặt cụ thể** + số lượng hiển thị sẵn (khác Seal ở chỗ đếm số lần khớp 1 mặt, không phải số mặt khác nhau) | Lv9, Lv22, Lv36 |
+| Phong Ấn (Seal) | Match đủ N mặt **khác nhau** | 17/50 màn |
+| Ô Chắn (Permanent) | Không bao giờ mở, buộc định tuyến | 28/50 màn |
+| Lock | Gắn với **đúng 1 mặt cụ thể** + số lượng hiển thị sẵn (khác Seal ở chỗ đếm số lần khớp 1 mặt, không phải số mặt khác nhau) | 16/50 màn |
 
 **A1.6 Move Limit** *(đảo ngược so với 08-24)* — Giới hạn số lượt đặt khối, dao động **1–10** tuỳ màn. Hết lượt chưa đạt goal → thua, tự restart màn đó. Lượt dư ảnh hưởng Điểm (A3) và Xu (A4).
 
@@ -87,36 +87,40 @@ Người chơi được **chủ động chồng khối lên quân có sẵn đ�
 
 ### A2. Nội dung: 50 level / 5 chương
 
+*(Cập nhật 2026-09-11: thứ tự giới thiệu cơ chế đã đổi so với bản trước — xác nhận lại bằng cách đọc trực tiếp `window.__digest24k1.LEVELS` từ build thật, không phải giả định. Lock giờ vào sớm nhất (C1), rồi Ô Chắn (C2), rồi Phong Ấn (C3) — đảo ngược thứ tự Seal/Ô Chắn so với tài liệu cũ.)*
+
 | Chương | Level | Trọng tâm |
 |---|---|---|
-| C1 — Nền tảng | 1–10 | Core loop: đặt, Match, che–lộ 2 tầng |
-| C2 — Phong Ấn | 11–20 | Giới thiệu Seal, tăng dần `sealRequiredDistinct` |
-| C3 — Ô Chắn | 21–30 | Ô khoá vĩnh viễn; **Lv30 là màn khó nhất toàn game** |
-| C4 — Kết hợp | 31–40 | Seal + Ô Chắn cùng lúc, **giới thiệu Lock** (Lv36) |
-| C5 — Mastery | 41–50 | Tổng hợp toàn bộ luật, Lv50 là bài thi cuối |
+| C1 — Nền tảng | 1–10 | Core loop: đặt, Match, che–lộ 2 tầng; **giới thiệu Lock** (Lv9) |
+| C2 — Ô Chắn | 11–20 | Giới thiệu Permanent ngay Lv11 ("First Blocker"), dùng xuyên suốt cả 10 màn |
+| C3 — Phong Ấn | 21–30 | Giới thiệu Seal ở Lv21 ("Break The First Seal"), tăng dần `sealRequiredDistinct`; Lv30 vẫn là bài thi cuối chương (kết hợp Seal+Ô Chắn) |
+| C4 — Kết hợp | 31–40 | Cả 3 cơ chế (Lock + Ô Chắn + Seal) xuất hiện đồng thời ngay từ Lv31 |
+| C5 — Mastery | 41–50 | Tổng hợp toàn bộ luật, **Lv50 giờ là màn khó nhất toàn game** |
 
-**Đường cong độ khó** (7 thành phần: cỡ bàn + số nước lời giải + độ chật + số mặt quân + cơ chế đặc biệt + khối lớn nhất + độ phức tạp mục tiêu — chi tiết `Mahjong_x_Block_Beatchart.xlsx`): nhịp **sawtooth** — mỗi đầu chương "thở" sau đỉnh khó chương trước. Thấp nhất 7.9 (Lv1), cao nhất 50/50 (Lv30). **Cần chú ý**: Lv49→50 dốc khá đứng (13.6→40.9) — có thể cần màn đệm.
+**Đường cong độ khó** (7 thành phần: cỡ bàn + số nước lời giải + độ chật + số mặt quân + cơ chế đặc biệt + khối lớn nhất + độ phức tạp mục tiêu — chi tiết `Mahjong_x_Block_Beatchart.xlsx`, vừa build lại từ dữ liệu màn mới nhất): nhịp lên dốc có ngắt quãng — chỉ có đầu C3 (Lv21, điểm 18.0) là "thở" rõ sau đỉnh C2; đầu C2 và C4 lại **bật khó ngay** thay vì giảm. Thấp nhất 7.9 (Lv1), cao nhất **54.9 (Lv50)** — khác bản cũ (từng cho rằng Lv30 là đỉnh). Hai cú nhảy độ khó lớn nhất game đều nằm đúng chỗ có chủ đích: Lv30→31 (38.0→48.8, mở màn "kết hợp cả 3 cơ chế") và Lv49→50 (44.6→54.9, cú bứt tốc "Grand Finale") — cả hai đều xuất phát từ nền đã cao (không phải dốc đứng từ thấp lên cao như ghi nhận trước đây), nên **không cần thêm màn đệm**. Ngưỡng tứ phân vị cũng đổi: Dễ < 24.9 · Vừa 24.9–34.3 · Khó 34.3–39.5 · Rất khó ≥ 39.5.
 
 ### A3. Hệ thống Điểm (Score)
 
-Hiện trực tiếp trong HUD ("ĐIỂM", cập nhật sống). Công thức = điểm nền (theo cỡ khối/nhóm match) + 3 lớp:
+Hiện trực tiếp trong HUD ("ĐIỂM", cập nhật sống). Công thức = điểm nền (theo cỡ khối/nhóm match) + 2 lớp:
 
 1. **Hệ số chuỗi**: mỗi wave cascade trong 1 lượt nhân thêm điểm — wave1=×1, mỗi wave sâu +0.25, chặn ×2.
 2. **Streak liên tiếp**: lượt nào cũng match thì lượt sau +15×(số lượt liên tiếp, chặn ở 10); đặt hụt reset về 0.
-3. **Bonus lượt dư**: 1 lần lúc thắng, +25/lượt dư.
 
 Không đổi luật thắng/thua (`S.pairs`/`levelWon()`) — Điểm là lớp thưởng cảm giác thuần tuý.
+
+**Đã bỏ "Bonus lượt dư" (+25/lượt dư lúc thắng)**: lượt dư không phải tín hiệu kỹ năng đáng tin — hàng đợi khối do tác giả định trước (không random), nên nhiều lúc người chơi buộc phải đặt khối "chờ" vì chưa tới lượt có đúng mặt Mahjong cần để Match, không phải do chơi dở. "Dư nhiều lượt" có thể chỉ phản ánh bố cục màn may mắn hơn là kỹ năng thật.
 
 ### A4. Kinh tế Xu (Economy)
 
 **Nguồn thu**: thắng màn **lần đầu** (chơi lại = 0 Xu, chặn cày):
 ```
 sàn = round(10 × ln(màn + 2))     // ~11 Xu (màn 1) → ~40 Xu (màn 50)
-+ lượt dư × 2
 + 15 nếu không dùng booster nào trong màn
 × 2 nếu là màn chốt chương (10/20/30/40/50)
 ```
-Tổng cả đời chơi 50 màn: **1,725 (tệ nhất) – 2,739 (tối ưu)**. Công thức Excel sống (đổi hệ số/offset, tự tính lại) ở `Mahjong_x_Block_SourceSink.xlsx`.
+*Đã bỏ bonus "lượt dư × 2" (từng có ở đây, cùng lý do đã bỏ khỏi Điểm — mục A3): hàng đợi khối định trước nên "dư lượt" nhiều lúc chỉ là đợi đúng mặt Mahjong cần để Match, không phải chơi giỏi hơn.*
+
+Tổng cả đời chơi 50 màn: **1,725 (tệ nhất) – 2,535 (tối ưu)**. Mốc bảo đảm "đủ mua skin rẻ nhất ở màn 30" (899 Xu tệ nhất) không đổi — kịch bản tệ nhất vốn đã giả định 0 lượt dư từ trước khi có bonus này. Công thức Excel sống (đổi hệ số/offset, tự tính lại) ở `Mahjong_x_Block_SourceSink.xlsx`.
 
 **Sink — Cửa hàng**: 24 món trả phí — 11 skin quân (895–2,265 Xu), 10 skin bàn (1,195–2,150 Xu), gói booster (100 Xu/5 lượt). Mỗi món preview thật + mô tả 3 ngôn ngữ.
 
