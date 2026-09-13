@@ -4521,56 +4521,43 @@ const P24M_LEVELS=[
     ],
 },
   {
-    // [Đổi thiết kế 12/09/2026] Bỏ hẳn Khóa (Lock) khỏi màn này -- Khóa/Phong Ấn không còn
-    // xuất hiện ở bất kỳ màn nào trước Lv20 nữa, chỉ còn Ô Chắn (Permanent, dạy từ Lv11).
-    // (4,4) từng là ô Khóa mở ngay từ move 2 (c1 pair đồng thời thỏa khóa) nên bỏ khóa không
-    // đổi gì về solution -- move 4 vẫn đặt được domino y hệt vào ô (4,3)-(4,4) như cũ.
-    title: 'Two Match Stations',
-    size: 5,
-    goalType: 'TARGET_FACE',
-    winTargets: [
-      { id: 'c1', need: 2 },
-      { id: 'w1', need: 2 },
-      { id: 's1', need: 2 },
-    ],
-    // s2/h1 targets dropped -- user cap is max 3 face types combined with other content.
-    // Auto-guide highlight removed from every level except Lv1.
-    // 5th target (h1) + move 5 added for the game-wide +1-move scale-up pass.
-    guideMoves: 0,
-    moveLimit: 15, // [Beatchart sync 2026-09-13] 8->15
-    boosterReroll: 1,
-    boosterHint: 1,
-    lesson: 'MATCH C1/W1 IN ONE WAVE, THEN S1/S2 IN THE NEXT',
-    teach: '',
-    tiles: [
-      P24K_TILE('h1', 2, 3, 0),
-    ],
-    sequence: [
-      K_DOMINO_H('p1', 'c1', 'w1'),
-      K_DOMINO_H('p2', 'c1', 'w1'),
-      K_DOMINO_H('p3', 's1', 's2'),
-      K_DOMINO_H('p4', 's1', 's2'),
-      K_DOMINO_H('p5', 'w2', 'h1'),
-    
-      K_DOMINO_H('freq8', 'c1', 's1'),
-    ],
-    solution: [
-      { row: 0, col: 0 }, // c1@(0,0), w1@(0,1)
-      { row: 1, col: 0 }, // c1@(1,0) matches -> c1=2; w1@(1,1) matches -> w1=2
-      { row: 3, col: 3 }, // s1@(3,3), s2@(3,4) both lone
-      { row: 4, col: 3 }, // s1@(4,3) matches -> s1=2, all three met; s2@(4,4) matches -> extra bonus pair (uncounted)
-      { row: 2, col: 1 }, // p5: w2(2,1) lands harmlessly; h1(2,2) matches seed h1(2,3) -> h1=2 done, all five targets met.
-    
-      { row: 0, col: 0 }, // freq: extra c1 exposure (+moveLimit)
-    ],
-  },
+  title: "Two Match Stations",
+  size: 5,
+  goalType: "TARGET_FACE",
+  winTargets: [{id:"c1",need:2}, {id:"w1",need:2}, {id:"s1",need:2}],
+  guideMoves: 0,
+  moveLimit: 15,
+  boosterReroll: 1,
+  boosterHint: 1,
+  lesson: "MATCH C1/W1 IN ONE WAVE, THEN S1/S2 IN THE NEXT",
+  teach: "",
+  tiles: [
+    P24K_TILE("h1", 2, 3, 0),
+    P24K_TILE("w1", 1, 1, 0),
+    P24K_TILE("s1", 4, 4, 0),
+    P24K_TILE("s2", 4, 1, 0),
+    P24K_TILE("w1", 0, 4, 0),
+    P24K_TILE("c1", 0, 4, 1),
+    P24K_TILE("w1", 1, 4, 0),
+    P24K_TILE("s2", 2, 0, 0),
+  ],
+  sequence: [
+    K_DOMINO_H("p1", "c1", "w1"),
+    K_DOMINO_H("p2", "c1", "w1"),
+    K_DOMINO_H("p3", "s1", "s2"),
+    K_DOMINO_H("p4", "s1", "s2"),
+    K_DOMINO_H("p5", "w2", "h1"),
+    K_DOMINO_H("freq8", "c1", "s1"),
+  ],
+  solution: [{ row: 1, col: 2 }, { row: 0, col: 2 }, { row: 3, col: 0 }, { row: 3, col: 1 }],
+},
   {
   title: "Core Review",
   size: 5,
   goalType: "TARGET_FACE",
   winTargets: [{id:"w1",need:2}, {id:"s1",need:4}],
   guideMoves: 0,
-  moveLimit: 15, // [Beatchart sync 2026-09-13] 10->15
+  moveLimit: 15,
   boosterReroll: 1,
   boosterHint: 1,
   lesson: "CURRENT NEXT PREVIEW · MIXED HEIGHT · TWO WAVE CASCADE",
@@ -4583,6 +4570,10 @@ const P24M_LEVELS=[
     P24K_TILE("s2", 2, 0, 0),
     P24K_TILE("w1", 4, 0, 0),
     P24K_TILE("h1", 0, 3, 0),
+    P24K_TILE("c1", 4, 4, 0),
+    P24K_TILE("w1", 4, 4, 1),
+    P24K_TILE("s2", 0, 4, 0),
+    P24K_TILE("h1", 0, 0, 0),
   ],
   sequence: [
     P24M_L3("cur", "s1", "s2", "c1"),
@@ -4594,7 +4585,7 @@ const P24M_LEVELS=[
     K_DOMINO_V("m7", "h1", "h2"),
     K_DOMINO_H("freq9", "w1", "s1"),
   ],
-  solution: [{ row: 0, col: 0 }, { row: 1, col: 3 }, { row: 4, col: 1 }, { row: 4, col: 3 }, { row: 0, col: 1 }, { row: 2, col: 4 }, { row: 0, col: 4 }, { row: 0, col: 0 }],
+  solution: [{ row: 2, col: 1 }, { row: 1, col: 3 }, { row: 2, col: 0 }, { row: 2, col: 1 }, { row: 1, col: 1 }, { row: 2, col: 4 }, { row: 1, col: 2 }, { row: 0, col: 0 }],
 },
   {
   title: "First Blocker",
@@ -4810,7 +4801,7 @@ const P24M_LEVELS=[
   title: "Open Route",
   size: 6,
   goalType: "TILE_QUOTA",
-  tileGoal: 4,
+  tileGoal: 8,
   permanents: [[0,4], [0,5], [1,5], [2,2], [3,2], [4,2]],
   guideMoves: 0,
   moveLimit: 14,
@@ -4882,8 +4873,8 @@ const P24M_LEVELS=[
   goalType: "TARGET_FACE",
   winTargets: [{id:"s1",need:4}, {id:"c1",need:5}, {id:"w1",need:4}],
   permanents: [[4,4], [4,5], [5,4], [5,5], [1,4], [1,5], [2,4], [2,5]],
-  guideMoves: 1,
-  moveLimit: 17, // [Beatchart sync 2026-09-13] 20->17
+  guideMoves: 0,
+  moveLimit: 17,
   boosterHint: 1,
   lesson: "THREE FACES · TWO PERMANENT BLOCKS",
   teach: "",
@@ -7100,13 +7091,22 @@ function p24qCloneModel(model){
    best available future draw at each step, is a sound guarantee: the runtime reroll gate
    will never accept a draw that fails this same proof, so the real game can never do worse
    than the "ideal" future this search assumes. */
+const P24Q_TIME_BUDGET_EXCEEDED=Symbol('p24q-time-budget-exceeded');
 function p24qTrySolveFrom(model,committed,pool,opts){
   const maxNodes=(opts&&opts.maxNodes)||20000,maxDepth=(opts&&opts.maxDepth)||8;
+  const deadline=(opts&&opts.deadline)||0;
   let nodes=0;const seen=new Set();
   function keyOf(m,remaining){return m.tiles.filter(t=>t.alive).map(t=>t.id+'@'+t.r+'_'+t.c+'_'+t.z).sort().join(',')+'|'+m.pairs+'|'+Object.keys(m.idCounts||{}).sort().join(',')+'|'+remaining.length;}
   function dfs(m,remaining,depth){
     if(p24mGoalMet(m.level,m))return true;
     if(depth>=maxDepth||nodes++>maxNodes)return false;
+    // Hard wall-clock backstop: node-count caps alone were not enough (some level configs
+    // blow past them in real time before the count trips), which used to freeze the tab
+    // for minutes on level open. A plain "return false" here only killed ONE branch and let
+    // every sibling candidate still get tried, so it never actually saved time -- throwing
+    // unwinds the WHOLE search immediately, which is the only way to bound it for real.
+    // Checked every 64 nodes to keep the Date.now() cost cheap.
+    if(deadline&&(nodes&63)===0&&Date.now()>deadline)throw P24Q_TIME_BUDGET_EXCEEDED;
     const key=keyOf(m,remaining);if(seen.has(key))return false;seen.add(key);
     const candidates=remaining.length?[{piece:remaining[0]}]:pool;
     for(const entry of candidates){
@@ -7119,7 +7119,12 @@ function p24qTrySolveFrom(model,committed,pool,opts){
     }
     return false;
   }
-  return dfs(p24qCloneModel(model),committed,0);
+  try{
+    return dfs(p24qCloneModel(model),committed,0);
+  }catch(e){
+    if(e===P24Q_TIME_BUDGET_EXCEEDED)return false;
+    throw e;
+  }
 }
 /* The reroll-gated draw itself: try up to `level.queueRerollBudget` weighted picks, accept
    the first one that keeps the level provably winnable. `committedPrefix` is `[]` for a
@@ -7129,10 +7134,16 @@ function p24qTrySolveFrom(model,committed,pool,opts){
    budget is exhausted without a safe candidate. */
 function p24qDrawGated(liveModel,committedPrefix,level,rng){
   const pool=level.queuePool,budget=level.queueRerollBudget||10,depth=level.queueSolveDepth||8;
+  // Wall-clock cap on the WHOLE reroll loop, not just node count: certain board configs
+  // make a single p24qTrySolveFrom attempt take minutes of real time (levels 37/38/39/49
+  // used to freeze the tab on open). Falling back to level.queueFallback is always safe
+  // and invisible to the player, so bail out early instead of ever hanging.
+  const hardDeadline=Date.now()+(level.queueSolveBudgetMs||1500);
   let attempts=0;
   for(;attempts<budget;attempts++){
+    if(Date.now()>=hardDeadline)break;
     const entry=p24qWeightedPick(pool,rng);
-    if(p24qTrySolveFrom(liveModel,[...committedPrefix,entry.piece],pool,{maxDepth:depth}))return {piece:entry.piece,usedFallback:false,attempts:attempts+1};
+    if(p24qTrySolveFrom(liveModel,[...committedPrefix,entry.piece],pool,{maxDepth:depth,deadline:hardDeadline}))return {piece:entry.piece,usedFallback:false,attempts:attempts+1};
   }
   const fallback=level.queueFallback||pool[0].piece;
   if(!level.queueFallback)console.warn('[queuePool] reroll budget exhausted with no queueFallback authored for level:',level.title);
@@ -7164,12 +7175,16 @@ function p24qGeneratePiece(level,rng,key){
 }
 function p24qDrawGatedGenerative(liveModel,committedPrefix,level,rng){
   const budget=level.queueRerollBudget||10,depth=level.queueSolveDepth||8,sampleN=8;
+  // Same wall-clock backstop as p24qDrawGated above, applied to the generative (randomShapes)
+  // path for consistency, in case any level using it ever hits the same pathological search.
+  const hardDeadline=Date.now()+(level.queueSolveBudgetMs||1500);
   let attempts=0;
   for(;attempts<budget;attempts++){
+    if(Date.now()>=hardDeadline)break;
     const candidate=p24qGeneratePiece(level,rng,'g'+attempts);
     const samplePool=[];
     for(let i=0;i<sampleN;i++)samplePool.push({piece:p24qGeneratePiece(level,rng,'s'+i),weight:1});
-    if(p24qTrySolveFrom(liveModel,[...committedPrefix,candidate],samplePool,{maxDepth:depth}))return {piece:candidate,usedFallback:false,attempts:attempts+1};
+    if(p24qTrySolveFrom(liveModel,[...committedPrefix,candidate],samplePool,{maxDepth:depth,deadline:hardDeadline}))return {piece:candidate,usedFallback:false,attempts:attempts+1};
   }
   const fallback=level.queueFallback||p24qGeneratePiece(level,rng,'fallback');
   if(!level.queueFallback)console.warn('[randomShapes] reroll budget exhausted with no queueFallback authored for level:',level.title);
