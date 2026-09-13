@@ -29,5 +29,21 @@
 * Ký tự `🀄` (Unicode Mahjong Tile Red Dragon, U+1F004) dùng ở vài chỗ trang trí — là glyph
 Unicode hệ thống, không phải asset hình ảnh cần cấp phép.
 
+---
+
+## 4. Khai báo nội dung do AI tạo/chỉnh sửa
+
+- **Do AI (Claude Code) tạo/chỉnh sửa**: mã nguồn game, level editor, dữ liệu 50 level, toàn bộ
+  tài liệu thiết kế (GDD/changelog), báo cáo nghiên cứu thị trường, nội dung + speaker notes của
+  pitch deck (đợt refine 12–13/09/2026), và chính 2 file `AI_Collaboration_Log.md`/`Assets.md` —
+  luôn theo yêu cầu người dùng, người dùng playtest/duyệt/chốt quyết định cuối. Chi tiết đầy đủ
+  từng giai đoạn: `Final Outputs/AI_Collaboration_Log.md`.
+- Bản dựng gốc của pitch deck (`tmp/pitch_deck_build/`) dùng **Codex CLI (OpenAI)**, không phải
+  Claude.
+- Tính năng "sinh level bằng AI" trong Level Editor là 1 feature *của sản phẩm*, khác với việc AI
+  hỗ trợ *làm ra* sản phẩm.
+- **Không do AI tạo** (asset ngoài, xem mục 1–2): âm thanh (Pixabay/Freesound/soundreality), ảnh
+  quân bài (mua từ itch.io), ảnh chụp UI (thiết kế bằng Figma).
+
 
 

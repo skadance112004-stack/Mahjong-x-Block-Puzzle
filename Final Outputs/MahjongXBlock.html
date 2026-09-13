@@ -174,7 +174,16 @@ body{
    nhỏ hơn 1 chút trong trường hợp xấu nhất, đổi lại không bao giờ nhảy số khi
    cuộn nữa. */
 #board{
-  width:min(100%, 62svh); flex:none;
+  /* [Sửa 13/09/2026 — báo lỗi thật: khay bị che 1 phần bàn cờ, chỉ lộ ra khi cuộn xuống]
+     62svh là tỉ lệ CỐ ĐỊNH theo chiều cao màn hình, không hề trừ đi phần HUD/goal-strip/khay+nút
+     Đổi khối-Hint (~310px tổng, gần như KHÔNG đổi theo kích thước màn hình vì đều là kích thước
+     px cố định, đo thật qua nhiều viewport). Trên màn hình thấp (điện thoại cũ/rẻ, hoặc thanh địa
+     chỉ trình duyệt ăn bớt chiều cao thật nhiều), 62svh cho ra bàn cờ CAO HƠN phần không gian còn
+     lại sau khi trừ HUD+khay, khiến toàn bộ nội dung tràn quá khung -- #tray-wrap lại là
+     position:sticky (cố ý để luôn thao tác được khay dù cuộn) nên tràn ra thành "khay đè lên đáy
+     bàn cờ", chỉ cuộn xuống mới thấy hết bàn. Đổi sang trừ thẳng phần dành cho HUD/goal/khay để
+     bàn cờ LUÔN vừa đúng phần còn lại, không bao giờ cần cuộn/đè nữa. */
+  width:min(100%, calc(100svh - 320px)); flex:none;
   display:grid; gap:3px; padding:6px; border-radius:14px;
   background:var(--tex-wood), linear-gradient(160deg,var(--panel),var(--panel2));
   border:1px solid rgba(232,182,76,.22);
@@ -234,7 +243,7 @@ body{
    khỏi màn hình mà người chơi không nhận ra là phải cuộn xuống mới thấy. Sticky
    giữ khay + tools LUÔN hiện ở đáy khi cuộn, không cần đổi cấu trúc layout hay
    ảnh hưởng gì ở các viewport đủ cao (nơi nó chưa từng cần "dính" tới). */
-#tray-wrap{position:sticky; bottom:4px; z-index:5; background:rgba(20,13,9,.94); backdrop-filter:blur(2px); border:1px solid rgba(232,182,76,.18); border-radius:13px; padding:6px; box-shadow:0 8px 22px rgba(0,0,0,.5);}
+#tray-wrap{position:sticky; bottom:4px; z-index:5; background:rgba(20,13,9,.94); /* [Perf] backdrop-filter:blur(2px) removed -- this is the piece tray, on-screen continuously during drag (the exact interaction users reported as laggy); background is already 94% opaque so the blur was barely visible for its GPU cost. */ border:1px solid rgba(232,182,76,.18); border-radius:13px; padding:6px; box-shadow:0 8px 22px rgba(0,0,0,.5);}
 #tray{display:flex; gap:6px; align-items:center; justify-content:space-around; min-height:74px;}
 .piece{flex:1; display:flex; align-items:center; justify-content:center; padding:5px 2px; border-radius:10px; position:relative; transition:transform .12s, background .12s;}
 .piece.sel{background:rgba(232,182,76,.15); box-shadow:inset 0 0 0 2px rgba(232,182,76,.6); transform:translateY(-3px);}
@@ -303,7 +312,7 @@ body{
    mượt của cổng menu/door-transition đã đầu tư kỹ trong phiên này. Đổi sang
    luôn display:flex + opacity/pointer-events để có thể fade+scale-in mượt;
    pointer-events:none khi ẩn đảm bảo không bấm xuyên được overlay lúc đang ẩn. */
-#ov{position:fixed; inset:0; z-index:100; background:rgba(12,8,6,.86); backdrop-filter:blur(3px);
+#ov{position:fixed; inset:0; z-index:100; background:rgba(12,8,6,.86); /* [Perf] backdrop-filter:blur(3px) removed -- full-screen live-blur behind a fixed overlay is one of the most expensive CSS effects on mobile GPUs, and it fired on every level win/lose plus every modal open. Background is already 86% opaque, so the blur added little visible depth for real cost. */
   display:flex; align-items:center; justify-content:center; padding:18px;
   opacity:0; pointer-events:none; transition:opacity .25s ease;}
 #ov.on{opacity:1; pointer-events:auto;}
@@ -516,7 +525,25 @@ body{
   display:flex; align-items:center; gap:5px; z-index:20;
   box-shadow:0 3px 6px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.2), inset 0 -3px 5px rgba(0,0,0,.3);}
 .coin-icon-svg{width:15px; height:15px; vertical-align:-2px; flex:none;}
-#mn-ov{position:fixed; inset:0; z-index:100; background:rgba(12,8,6,.86); backdrop-filter:blur(3px);
+/* [Sửa — báo lỗi thật trên ZTE Blade/Android]: công thức max(14px, 50%-226px) coi frame LUÔN
+   rộng ít nhất ~452px khi bị letterbox 2 bên -- đúng cho đa số điện thoại hiện đại (tỉ lệ cao hơn
+   16:9 nên #app-frame luôn full-width, không bao giờ letterbox trái/phải). Nhưng ở màn hình CŨ/
+   RẺ tỉ lệ RỘNG HƠN 16:9 (nhiều model ZTE Blade đời cũ, vd 320×480 ~ 2:3) và ở màn hình quá hẹp nói
+   chung, #app-frame bị letterbox 2 bên hẹp hơn hẳn 452px -- cụm 4 nút góc phải (needs ~230px) và
+   Xu góc trái (~90px) không còn đủ chỗ, ĐÈ LÊN NHAU (Xu bị nút Nhiệm Vụ che khuất hoàn toàn). Thu
+   nhỏ cả 2 cụm khi viewport hẹp để luôn còn khoảng trống giữa chúng, thay vì giữ nguyên kích thước
+   cố định rồi chấp nhận chồng lấn. */
+@media (max-width: 400px){
+  #btn-settings,#btn-shop-open,#btn-theme,#btn-quest-open{width:38px; height:38px; top:calc(env(safe-area-inset-top) + 15px);}
+  #btn-shop-open{right:calc(max(10px, calc(50% - 226px)) + 44px);}
+  #btn-theme{right:calc(max(10px, calc(50% - 226px)) + 88px);}
+  #btn-quest-open{right:calc(max(10px, calc(50% - 226px)) + 132px);}
+  #btn-settings{right:max(10px, calc(50% - 226px));}
+  #btn-shop-open,#btn-theme,#btn-quest-open,#btn-settings{font-size:16px;}
+  #menu-coin-badge{left:max(10px, calc(50% - 226px)); height:34px; padding:0 9px; top:calc(env(safe-area-inset-top) + 18px); font-size:12px; gap:4px;}
+  .coin-icon-svg{width:13px; height:13px;}
+}
+#mn-ov{position:fixed; inset:0; z-index:100; background:rgba(12,8,6,.86); /* [Perf] backdrop-filter:blur(3px) removed -- full-screen live-blur behind a fixed overlay is one of the most expensive CSS effects on mobile GPUs, and it fired on every level win/lose plus every modal open. Background is already 86% opaque, so the blur added little visible depth for real cost. */
   display:none; align-items:center; justify-content:center; padding:18px;}
 #mn-ov.on{display:flex;}
 #mn-ovcard{width:100%; max-width:340px; background:linear-gradient(170deg,#3d2a20,#241812); border:1px solid rgba(232,182,76,.35);
@@ -704,10 +731,6 @@ body{
 .gate.open .door-left{transform:translateX(-105%);}
 .gate.open .door-right{transform:translateX(105%);}
 .gate.open .door{pointer-events:none;}
-.gate-reveal{position:absolute; inset:0; z-index:2; display:flex; flex-direction:column; align-items:center;
-  justify-content:center; gap:1px; padding:4px; text-align:center; opacity:0; transition:opacity .3s .22s;}
-.gate.open .gate-reveal{opacity:1;}
-.reveal-goal{font-size:20px; font-weight:900; color:var(--gold); line-height:1;}
 .lock-badge{position:absolute; inset:0; z-index:4; display:flex; align-items:center; justify-content:center; font-size:17px;}
 .gate.current .gate-inner{box-shadow:inset 0 3px 10px rgba(0,0,0,.5), 0 0 0 2px var(--jade), 0 0 16px rgba(143,191,82,.55);
   animation:currentGatePulse 1.8s ease-in-out 3;}
@@ -858,7 +881,16 @@ body{
    nhỏ hơn 1 chút trong trường hợp xấu nhất, đổi lại không bao giờ nhảy số khi
    cuộn nữa. */
 #board{
-  width:min(100%, 62svh); flex:none;
+  /* [Sửa 13/09/2026 — báo lỗi thật: khay bị che 1 phần bàn cờ, chỉ lộ ra khi cuộn xuống]
+     62svh là tỉ lệ CỐ ĐỊNH theo chiều cao màn hình, không hề trừ đi phần HUD/goal-strip/khay+nút
+     Đổi khối-Hint (~310px tổng, gần như KHÔNG đổi theo kích thước màn hình vì đều là kích thước
+     px cố định, đo thật qua nhiều viewport). Trên màn hình thấp (điện thoại cũ/rẻ, hoặc thanh địa
+     chỉ trình duyệt ăn bớt chiều cao thật nhiều), 62svh cho ra bàn cờ CAO HƠN phần không gian còn
+     lại sau khi trừ HUD+khay, khiến toàn bộ nội dung tràn quá khung -- #tray-wrap lại là
+     position:sticky (cố ý để luôn thao tác được khay dù cuộn) nên tràn ra thành "khay đè lên đáy
+     bàn cờ", chỉ cuộn xuống mới thấy hết bàn. Đổi sang trừ thẳng phần dành cho HUD/goal/khay để
+     bàn cờ LUÔN vừa đúng phần còn lại, không bao giờ cần cuộn/đè nữa. */
+  width:min(100%, calc(100svh - 320px)); flex:none;
   display:grid; gap:3px; padding:6px; border-radius:14px;
   background:var(--tex-wood), linear-gradient(160deg,var(--felt),var(--felt2));
   border:1px solid rgba(232,182,76,.22);
@@ -924,7 +956,7 @@ body{
    khỏi màn hình mà người chơi không nhận ra là phải cuộn xuống mới thấy. Sticky
    giữ khay + tools LUÔN hiện ở đáy khi cuộn, không cần đổi cấu trúc layout hay
    ảnh hưởng gì ở các viewport đủ cao (nơi nó chưa từng cần "dính" tới). */
-#tray-wrap{position:sticky; bottom:4px; z-index:5; background:rgba(20,13,9,.94); backdrop-filter:blur(2px); border:1px solid rgba(232,182,76,.18); border-radius:13px; padding:6px; box-shadow:0 8px 22px rgba(0,0,0,.5);}
+#tray-wrap{position:sticky; bottom:4px; z-index:5; background:rgba(20,13,9,.94); /* [Perf] backdrop-filter:blur(2px) removed -- this is the piece tray, on-screen continuously during drag (the exact interaction users reported as laggy); background is already 94% opaque so the blur was barely visible for its GPU cost. */ border:1px solid rgba(232,182,76,.18); border-radius:13px; padding:6px; box-shadow:0 8px 22px rgba(0,0,0,.5);}
 #tray{display:flex; gap:6px; align-items:center; justify-content:space-around; min-height:74px;}
 .piece{flex:1; display:flex; align-items:center; justify-content:center; padding:5px 2px; border-radius:10px; position:relative; transition:transform .12s, background .12s;}
 .piece.sel{background:rgba(232,182,76,.15); box-shadow:inset 0 0 0 2px rgba(232,182,76,.6); transform:translateY(-3px);}
@@ -993,7 +1025,7 @@ body{
    mượt của cổng menu/door-transition đã đầu tư kỹ trong phiên này. Đổi sang
    luôn display:flex + opacity/pointer-events để có thể fade+scale-in mượt;
    pointer-events:none khi ẩn đảm bảo không bấm xuyên được overlay lúc đang ẩn. */
-#ov{position:fixed; inset:0; z-index:100; background:rgba(12,8,6,.86); backdrop-filter:blur(3px);
+#ov{position:fixed; inset:0; z-index:100; background:rgba(12,8,6,.86); /* [Perf] backdrop-filter:blur(3px) removed -- full-screen live-blur behind a fixed overlay is one of the most expensive CSS effects on mobile GPUs, and it fired on every level win/lose plus every modal open. Background is already 86% opaque, so the blur added little visible depth for real cost. */
   display:flex; align-items:center; justify-content:center; padding:18px;
   opacity:0; pointer-events:none; transition:opacity .25s ease;}
 #ov.on{opacity:1; pointer-events:auto;}
@@ -1011,6 +1043,12 @@ body{
    của HUD trong game thay vì tự vẽ style riêng, để pop up trông đồng nhất với
    phần HUD người chơi đã quen mắt suốt ván chơi. */
 #ovcard .result-stats{display:flex; gap:8px; margin:10px 0 4px;}
+/* Màn Thua tái dùng đúng .goal-chip/.goal-icon (icon mặt quân thật) của HUD thay vì chữ
+   "3/4" thô -- nhưng .hud-val gốc là nowrap/ellipsis (đúng cho 1 dòng số ở HUD trong game),
+   ở đây có thể tới 4 chip cùng lúc nên cần tự xuống dòng, không dùng lại .goal-multi (cố ý
+   không wrap, cuộn ngang) vì overlay hẹp cố định không hợp để cuộn. */
+#ovcard .hud-val.result-progress{white-space:normal; overflow:visible; text-overflow:clip;
+  display:flex; flex-wrap:wrap; gap:5px 10px; justify-content:center;}
 .btn{width:100%; padding:15px; border-radius:11px; border:0; font-size:17px; font-weight:800;
   background:linear-gradient(180deg,var(--gold),#c8912e); color:#2a1d0b; margin-top:6px;}
 .btn.ghost{background:rgba(255,255,255,.09); color:var(--cream); border:1px solid rgba(255,255,255,.16);}
@@ -1234,8 +1272,13 @@ body{
 .shop-grid{position:relative; z-index:1; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; max-width:100%;}
 .shop-card{display:flex; flex-direction:column; align-items:stretch; gap:6px; position:relative;}
 .shop-card-preview-btn{padding:6px; border-radius:10px; background:var(--tex-wood), linear-gradient(160deg,#5c3d26,#3a2716);
-  border:1px solid rgba(232,182,76,.3); cursor:pointer;
+  border:1px solid rgba(232,182,76,.3); cursor:pointer; color:var(--cream);
   box-shadow:0 3px 0 rgba(0,0,0,.35), 0 6px 10px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.08);}
+/* <button> không tự kế thừa color của body như thẻ thường (UA default color:buttontext,
+   thường là đen/xám đậm) -- thiếu dòng color ở trên khiến số lượt booster (div con không
+   style riêng trong .upgrade-icon, xem boosterUpgradeCard()) rơi về màu mặc định tối đó,
+   chìm hẳn vào nền gỗ tối của thẻ. Khai báo color rõ ràng ở đây để MỌI nội dung con kế
+   thừa đúng --cream, không chỉ riêng số booster. */
 .shop-card-preview{border-radius:7px; overflow:hidden; background:rgba(0,0,0,.22); box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);}
 .shop-card-preview-tiles{display:flex; align-items:center; justify-content:center; gap:2px; height:50px; padding:3px;}
 .shop-card-preview-tiles .tile{width:22px; height:27px; flex:none;}
@@ -1253,7 +1296,7 @@ body{
 
 /* Popup chi tiết vật phẩm -- cùng ngôn ngữ hình ảnh với #mn-ov (modal cài đặt)
    nhưng ID/class riêng vì đây là 1 modal khác, độc lập. */
-#shop-detail-ov{position:fixed; inset:0; z-index:200; background:rgba(12,8,6,.86); backdrop-filter:blur(3px);
+#shop-detail-ov{position:fixed; inset:0; z-index:200; background:rgba(12,8,6,.86); /* [Perf] backdrop-filter:blur(3px) removed -- full-screen live-blur behind a fixed overlay is one of the most expensive CSS effects on mobile GPUs, and it fired on every level win/lose plus every modal open. Background is already 86% opaque, so the blur added little visible depth for real cost. */
   display:none; align-items:center; justify-content:center; padding:18px;}
 #shop-detail-ov.on{display:flex;}
 #shop-detail-card{position:relative; width:100%; max-width:360px; max-height:80%; overflow-y:auto;
@@ -1274,7 +1317,7 @@ body{
    .shop-card-preview/.shop-card-preview-tiles/.shop-preview-board/
    .shop-card-badge/.shop-grid đã có ở cửa hàng cho phần preview, chỉ thêm
    style riêng cho khung thẻ (.theme-card) vì ở đây không có nút giá tiền. */
-#theme-ov{position:fixed; inset:0; z-index:150; background:rgba(12,8,6,.86); backdrop-filter:blur(3px);
+#theme-ov{position:fixed; inset:0; z-index:150; background:rgba(12,8,6,.86); /* [Perf] backdrop-filter:blur(3px) removed -- full-screen live-blur behind a fixed overlay is one of the most expensive CSS effects on mobile GPUs, and it fired on every level win/lose plus every modal open. Background is already 86% opaque, so the blur added little visible depth for real cost. */
   display:none; align-items:center; justify-content:center; padding:18px;}
 #theme-ov.on{display:flex;}
 /* Đổi nền modal Tủ Đồ từ nâu-trên-nâu sang KEM/GIẤY SÁNG theo ảnh tham khảo
@@ -1312,7 +1355,7 @@ body{
    .theme-tab bằng querySelectorAll TOÀN TRANG, không lồng theo modal cha --
    trùng class sẽ khiến bấm tab ở modal này đổi luôn active-state tab bên Tủ
    Đồ. Xem thêm chú thích ở HTML #quest-ov và JS wiring phía dưới. */
-#quest-ov{position:fixed; inset:0; z-index:150; background:rgba(12,8,6,.86); backdrop-filter:blur(3px);
+#quest-ov{position:fixed; inset:0; z-index:150; background:rgba(12,8,6,.86); /* [Perf] backdrop-filter:blur(3px) removed -- full-screen live-blur behind a fixed overlay is one of the most expensive CSS effects on mobile GPUs, and it fired on every level win/lose plus every modal open. Background is already 86% opaque, so the blur added little visible depth for real cost. */
   display:none; align-items:center; justify-content:center; padding:18px;}
 #quest-ov.on{display:flex;}
 /* Toast thưởng nổi -- xem showRewardToast() ở JS. position:fixed (không phải
@@ -1872,10 +1915,19 @@ function haptic(pattern){
 window.haptic = haptic;
 window.hapticOn = hapticOn;
 window.setHapticOn = setHapticOn;
+/* [Tăng độ dài 13/09/2026 — báo lỗi thật "không rung" trên Android giá rẻ (ZTE Blade)]: các mốc
+   cũ (12/22/18-25-22ms) đúng chuẩn thời lượng "tick" của Taptic Engine (iOS) nhưng iOS không hỗ
+   trợ Vibration API nên chưa từng thật sự chạy các số này -- trên Android, navigator.vibrate() chỉ
+   điều khiển 1 motor rung cơ học thật (không phải actuator tuyến tính như Taptic), motor rẻ tiền
+   thường có độ trễ "tăng tốc" (spin-up) hàng chục ms trước khi đạt biên độ đủ để cảm nhận được, nên
+   xung quá ngắn (<15-20ms) có thể kết thúc TRƯỚC KHI motor kịp quay đủ mạnh để cảm nhận -- không
+   phải lỗi code, mà là dưới ngưỡng cảm nhận vật lý của phần cứng rẻ tiền. Tăng toàn bộ mốc lên
+   ngưỡng an toàn hơn (vẫn ngắn/nhẹ, không lê thê) để có cơ hội cảm nhận được trên phần cứng yếu hơn
+   mà không đổi logic/API. */
 window.HAPTIC = {
-  place: 12,           // đặt quân thành công -- tick nhẹ
-  match: 22,            // 1 cặp match -- impact vừa
-  matchBig: [18,25,22], // match nhiều quân/cascade -- dồn dập hơn 1 chút
+  place: 25,            // đặt quân thành công -- tick nhẹ
+  match: 35,             // 1 cặp match -- impact vừa
+  matchBig: [30,30,35],  // match nhiều quân/cascade -- dồn dập hơn 1 chút
 };
 
 /* Click sfx dùng chung mọi nút bấm UI (menu/level-select/shop/game) -- cùng lý
@@ -1963,7 +2015,7 @@ const I18N={
     reset_progress:'Reset progress', reset_confirm:'Bấm lần nữa để xác nhận', reset_done:'Đã xoá tiến trình',
     shop_title:'CỬA HÀNG', tab_tiles:'Quân Bài', tab_boards:'Bàn Cờ', tab_upgrades:'Nâng Cấp',
     theme_title:'Chủ Đề', confirm:'Xác nhận', close:'Đóng', equipped:'Đang dùng', select:'Chọn', maxed:'Tối đa',
-    level_of:(n,total)=>`MÀN ${n} / ${total}`, level_label:'Level', score_label:'Điểm', coins_label:'Xu nhận', coins:'Xu',
+    level_of:(n,total)=>`MÀN ${n} / ${total}`, level_label:'Level', score_label:'Điểm', progress_label:'Tiến độ', coins_label:'Xu nhận', coins:'Xu',
     current_level_btn:'Màn hiện tại',
     win_title:n=>`HOÀN THÀNH LEVEL ${n}`, best_chain:n=>`Chuỗi tốt nhất ×${n}`,
     next_level:'MÀN TIẾP THEO', retry_level:'CHƠI LẠI LEVEL', back_to_select:'VỀ CHỌN MÀN',
@@ -1983,7 +2035,7 @@ const I18N={
     reset_progress:'Reset progress', reset_confirm:'Tap again to reset', reset_done:'Progress reset',
     shop_title:'SHOP', tab_tiles:'Tiles', tab_boards:'Boards', tab_upgrades:'Upgrades',
     theme_title:'Wardrobe', confirm:'Confirm', close:'Close', equipped:'Equipped', select:'Select', maxed:'Maxed',
-    level_of:(n,total)=>`LEVEL ${n} / ${total}`, level_label:'Level', score_label:'Score', coins_label:'Coins earned', coins:'Coins',
+    level_of:(n,total)=>`LEVEL ${n} / ${total}`, level_label:'Level', score_label:'Score', progress_label:'Progress', coins_label:'Coins earned', coins:'Coins',
     current_level_btn:'Current level',
     win_title:n=>`LEVEL ${n} COMPLETE`, best_chain:n=>`Best chain ×${n}`,
     next_level:'NEXT LEVEL', retry_level:'RETRY LEVEL', back_to_select:'BACK TO LEVELS',
@@ -2003,7 +2055,7 @@ const I18N={
     reset_progress:'重置进度', reset_confirm:'再次点击确认', reset_done:'进度已重置',
     shop_title:'商店', tab_tiles:'麻将牌', tab_boards:'棋盘', tab_upgrades:'升级',
     theme_title:'衣柜', confirm:'确认', close:'关闭', equipped:'使用中', select:'选择', maxed:'已满级',
-    level_of:(n,total)=>`第 ${n} / ${total} 关`, level_label:'关卡', score_label:'分数', coins_label:'获得金币', coins:'金币',
+    level_of:(n,total)=>`第 ${n} / ${total} 关`, level_label:'关卡', score_label:'分数', progress_label:'进度', coins_label:'获得金币', coins:'金币',
     current_level_btn:'当前关卡',
     win_title:n=>`第 ${n} 关完成`, best_chain:n=>`最佳连击 ×${n}`,
     next_level:'下一关', retry_level:'重新开始', back_to_select:'返回选关',
@@ -2062,20 +2114,42 @@ const MUSIC_LEVEL=0.3; // lowered from 0.5 per feedback (background music was to
                         // sfx AudioContext's gain — nothing here can attenuate placement/
                         // match/win sounds directly, so instead the music sits quieter to
                         // begin with, plus ducks further under __duckMusicForSfx() below.
-function startMusic(){
-  if(started) return; started=true;
+/* [13/09/2026] Decode giờ tách khỏi startMusic() và chạy NGAY khi script này tải xong, không
+   đợi cử chỉ người dùng -- decodeAudioData tự nó không phát ra âm thanh nên KHÔNG bị chính
+   sách autoplay chặn (chỉ việc PHÁT/resume context mới bị chặn tới khi có tương tác thật).
+   Trước đây cả atob() (~5.7MB base64, đồng bộ, có thể tốn hàng trăm ms) LẪN decodeAudioData
+   (bất đồng bộ) chỉ bắt đầu SAU cú chạm đầu tiên -- cộng dồn với độ trễ vốn có của chính
+   chính sách autoplay khiến nhạc nghe như "chỉ chạy khi đã vào tới màn chơi" dù thật ra đã
+   được yêu cầu chạy từ cú chạm đầu tiên ở menu. Giờ decode chạy song song trong lúc người
+   chơi còn đang nhìn menu -- tới cú chạm đầu tiên, buffer thường đã sẵn sàng, phát gần như
+   tức thì thay vì phải đợi giải mã xong rồi mới phát. */
+let decodedBuffer=null, wantsToPlay=false;
+function beginDecodeMusic(){
   const a=musicAc(); if(!a) return;
-  musicGain=a.createGain(); musicGain.gain.value=musicSoundOn()?MUSIC_LEVEL*musicVol():0; musicGain.connect(a.destination);
   a.decodeAudioData(b64ToArrayBuffer(BG_MUSIC_B64)).then(decoded=>{
-    bufferSource=a.createBufferSource(); bufferSource.buffer=decoded; bufferSource.loop=true;
-    bufferSource.connect(musicGain); bufferSource.start(0);
+    decodedBuffer=decoded;
+    if(wantsToPlay) playDecodedMusic();
   }).catch(()=>{});
+}
+function playDecodedMusic(){
+  if(bufferSource || !decodedBuffer) return;
+  const a=musicAc(); if(!a) return;
+  if(a.state==='suspended') a.resume().catch(()=>{});
+  musicGain=a.createGain(); musicGain.gain.value=musicSoundOn()?MUSIC_LEVEL*musicVol():0; musicGain.connect(a.destination);
+  bufferSource=a.createBufferSource(); bufferSource.buffer=decodedBuffer; bufferSource.loop=true;
+  bufferSource.connect(musicGain); bufferSource.start(0);
   setInterval(()=>{
     if(!musicGain) return;
     const target=musicSoundOn()?MUSIC_LEVEL*musicVol():0;
     if(Math.abs(musicGain.gain.value-target)>0.01) musicGain.gain.linearRampToValueAtTime(target,a.currentTime+0.4);
   },600);
 }
+function startMusic(){
+  if(started) return; started=true;
+  wantsToPlay=true;
+  if(decodedBuffer) playDecodedMusic(); // else: playDecodedMusic() tự chạy khi beginDecodeMusic() giải mã xong (xem wantsToPlay ở trên)
+}
+beginDecodeMusic();
 /* Exposed so the (separate-AudioContext) game sfx can duck the music bus for a moment
    whenever a placement/match/win sound needs to cut through clearly, rather than the two
    independent audio graphs just summing at their own fixed levels and letting a continuous
@@ -2089,7 +2163,19 @@ window.__duckMusicForSfx=function(){
   musicGain.gain.linearRampToValueAtTime(base,now+0.4);
 };
 window.__musicGainDebug=()=>musicGain?musicGain.gain.value:null;
-['pointerdown','keydown'].forEach(evt=>document.addEventListener(evt,startMusic,{once:true,passive:true}));
+/* [Sửa lỗi báo mất nhạc nền] startMusic() sống trong IIFE riêng của module này nên trước đây
+   KHÔNG có cách nào gọi nó từ bên ngoài (không phải window.startMusic) -- toàn bộ việc bắt đầu
+   nhạc chỉ dựa vào 1 listener pointerdown/keydown ở PHA BUBBLE trên document. Nếu bất kỳ phần tử
+   nào trên đường bubble từ nơi người chơi chạm tới document gọi stopPropagation() (kể cả code
+   thêm sau này), cú chạm đầu tiên sẽ không bao giờ tới được listener này -- nhạc coi như im
+   lặng vĩnh viễn (started vẫn false, không có lần thử lại). Sửa 2 lớp:
+   1) Expose startMusic ra window để nơi khác (như nút mở cổng ở Main Menu) có thể tự gọi thêm,
+      không phụ thuộc DUY NHẤT vào 1 listener toàn trang.
+   2) Thêm {capture:true} + thêm 'touchstart' -- capture phase chạy TRƯỚC bất kỳ handler nào của
+      chính phần tử bị chạm nên không thể bị stopPropagation() ở pha bubble chặn mất.
+   startMusic() tự có guard `if(started)return;` nên gọi lặp lại từ nhiều nơi là an toàn. */
+window.__startMusic=startMusic;
+['pointerdown','keydown','touchstart'].forEach(evt=>document.addEventListener(evt,startMusic,{once:true,passive:true,capture:true}));
 })();
 </script>
 <script>
@@ -2105,7 +2191,14 @@ window.__doorSfxReady=false;
 function doorAc(){ if(!DAC){ try{DAC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){DAC=false;} } if(DAC&&DAC.state==='suspended') DAC.resume().catch(()=>{}); return DAC; }
 function b64ToBufDoor_(b64s){ const bin=atob(b64s); const bytes=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i); return bytes.buffer; }
 const DOOR_SFX_B64 = "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MylVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMSAoYmV0YSAzKVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tAZPcB8qQRQssMSNAAAA0gAAABCGQtDYwkxQAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAxIChiZXRhIDMpVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDEgKGJldGEgMylVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+zBk9AHyGQ3CywlhQAAADSAAAAEGRC0RjAUiAAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMSAoYmV0YSAzKVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAxIChiZXRhIDMpVVVVVVVVVVVVVVVVVVVVVVX/+xBk9QPxYArEYSMxIAAADSAAAAECQB8RBYTAaAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDEgKGJldGEgMylVVVVVVVVVVVVVVVVVVVVVVf/7EGTjh/BBAUPAwAAKAAANIAAAAQBgAQ6gAAAwAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMSAoYmV0YSAzKVVVVVVVVVVVVVVVVVVVVVVV//sQZN2P8AAAf4AAAAgAAA0gAAABAAAB/gAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAxIChiZXRhIDMpVVVVVVVVVVVVVVVVVVVVVVX/+xBk3Y/wAAB/gAAACAAADSAAAAEAAAH+AAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDEgKGJldGEgMylVVVVVVVVVVVVVVVVVVVVVVf/7EGTdj/AAAGkAAAAIAAANIAAAAQAAAaQAAAAgAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMSAoYmV0YSAzKVVVVVVVVVVVVVVVVVVVVVVV//sQZN2P8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAxIChiZXRhIDMpVVVVVVVVVVVVVVVVVVVVVVX/+xBk3Y/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDEgKGJldGEgMylVVVVVVVVVVVVVVVVVVVVVVf/7EGTdj/AAAGkAAAAIAAANIAAAAQAAAaQAAAAgAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMSAoYmV0YSAzKVVVVVVVVVVVVVVVVVVVVVVV//sQZN2P8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAxIChiZXRhIDMpVVVVVVVVVVVVVVVVVVVVVVX/+xBk3Y/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDEgKGJldGEgMylVVVVVVVVVVVVVVVVVVVVVVf/7EGTdj/AAAGkAAAAIAAANIAAAAQAAAaQAAAAgAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMSAoYmV0YSAzKVVVVVVVVVVVVVVVVVVVVVVV//sQZN2P8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAxIChiZXRhIDMpVVVVVVVVVVVVVVVVVVVVVVX/+xBk3Y/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDEgKGJldGEgMylVVVVVVVVVVVVVVVVVVVVVVf/7EGTdj/AAAGkAAAAIAAANIAAAAQAAAaQAAAAgAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMSAoYmV0YSAzKVVVVVVVVVVVVVVVVVVVVVVV//sQZN2P8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAxIChiZXRhIDMpVVVVVVVVVVVVVVVVVVVVVVX/+xBk3Y/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDEgKGJldGEgMylVVVVVVVVVVVVVVVVVVVVVVf/7EGTdj/AAAGkAAAAIAAANIAAAAQAAAaQAAAAgAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMSAoYmV0YSAzKVVVVVVVVVVVVVVVVVVVVVVV//sQZN2P8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBk3Y/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/7EGTdj/AAAGkAAAAIAAANIAAAAQAAAaQAAAAgAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//sQZN2P8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBk3Y/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/7EGTdj/AAAGkAAAAIAAANIAAAAQAAAaQAAAAgAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//sQZN2P8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=";
-(function(){ const a=doorAc(); if(a) a.decodeAudioData(b64ToBufDoor_(DOOR_SFX_B64)).then(buf=>{doorBuffer=buf; window.__doorSfxReady=true;}).catch(()=>{}); })();
+/* Perf: creating an AudioContext + decoding this sample used to happen synchronously at
+   script-parse time, on the critical path competing with the very first paint (menu screen).
+   __playDoorSfx() already no-ops safely if doorBuffer isn't ready yet (see below), so nothing
+   depends on this finishing before the player can act -- deferring the start to idle time
+   (requestIdleCallback, with a short setTimeout fallback for browsers without it, e.g. Safari)
+   costs nothing in practice (idle fires within milliseconds of first paint) but stops it from
+   delaying that first paint. */
+(function(){ const start=()=>{ const a=doorAc(); if(a) a.decodeAudioData(b64ToBufDoor_(DOOR_SFX_B64)).then(buf=>{doorBuffer=buf; window.__doorSfxReady=true;}).catch(()=>{}); }; if(window.requestIdleCallback) requestIdleCallback(start,{timeout:1000}); else setTimeout(start,0); })();
 document.addEventListener('pointerdown', ()=>{ if(DAC&&DAC.state==='suspended') DAC.resume().catch(()=>{}); }, {passive:true});
 window.__playDoorSfx=function(){
   if(!doorSoundOn()||!doorBuffer) return;
@@ -2165,6 +2258,10 @@ gate.addEventListener('click', ()=>{
   if(gate.classList.contains('open')) return;
   gate.classList.add('open');
   ac();
+  // Redundant, safe (startMusic() no-ops if already started) explicit trigger tied to the
+  // single most meaningful "player has begun the game" moment, on top of the generic
+  // document-level first-gesture listener in the music module above.
+  if(typeof window.__startMusic==='function') window.__startMusic();
   if(window.__doorSfxReady){ window.__playDoorSfx(); } else { beep(160,.16,'square',.08,110); setTimeout(()=>beep(200,.12,'square',.07,140),80); }
   /* Doors still play their full open animation (.6s slide) for the moment of the gate
      parting — but the player no longer has to tap CHỌN MÀN/SELECT LEVEL afterward; we
@@ -2331,7 +2428,8 @@ function updateShopActiveSection(){
      ẩn/hiện dù khung (svh-based) không hề nhúc nhích, khiến section cuối cùng
      bị tính "còn lộ" nhiều hơn thực tế đang thấy. Cùng lỗi/cách sửa đã áp dụng
      cho #btn-ls-top/#btn-ls-current ở màn chọn màn. */
-  const vp=document.getElementById('app-scroll').getBoundingClientRect();
+  const appScroll=document.getElementById('app-scroll');
+  const vp=appScroll.getBoundingClientRect();
   const stickyOffset=54;
   let best=sections[0], bestVisible=-1;
   for(const sec of sections){
@@ -2339,6 +2437,13 @@ function updateShopActiveSection(){
     const visible=Math.min(r.bottom,vp.bottom)-Math.max(r.top,vp.top+stickyOffset);
     if(visible>bestVisible){ bestVisible=visible; best=sec; }
   }
+  /* [Sửa] "diện tích lộ ra nhiều nhất" tự nó vỡ khi section CUỐI (Nâng Cấp, chỉ 2 thẻ
+     Đổi khối/Hint) ngắn hơn hẳn khung nhìn: cuộn hết cỡ xuống đáy trang vẫn không đủ để
+     nó "lộ nhiều hơn" section liền trước (Bàn Cờ, 11 thẻ) -- tab Nâng Cấp vì vậy không
+     bao giờ tự sáng dù người chơi đã cuộn tới đáy thật sự. Bù bằng: đã chạm đáy cuộn thì
+     LUÔN ép sáng section cuối cùng, bất kể diện tích lộ ra so đo thế nào. */
+  const atBottom=appScroll.scrollTop+appScroll.clientHeight>=appScroll.scrollHeight-2;
+  if(atBottom) best=sections[sections.length-1];
   document.querySelectorAll('.shop-tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===best.dataset.section));
 }
 /* window không bao giờ tự cuộn trong kiến trúc khung 16:9 khoá tỷ lệ của game
@@ -2475,9 +2580,6 @@ function gateHTML(lv,i,locked,current){
       <div class="gate-inner">
         <div class="door door-left"></div>
         <div class="door door-right"></div>
-        <div class="gate-reveal">
-          <div class="reveal-goal">${lv.goal}</div>
-        </div>
         ${locked?'<div class="lock-badge">🔒</div>':''}
       </div>
     </div>
@@ -2698,15 +2800,22 @@ const SWITCH_SFX_B64 = "//vUZAAABopkSK0l4AJmR5c2pKQAIUYVV/mXgAmIHSc3CtAAgAAHhBAK
    real tap after that (which will always come) gets a fresh chance to unlock it. */
 function ac(){ if(!AC){ try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){AC=false;} } if(AC&&AC.state==='suspended') AC.resume().catch(()=>{}); return AC; }
 document.addEventListener('pointerdown', ()=>{ if(AC&&AC.state==='suspended') AC.resume().catch(()=>{}); }, {passive:true});
-(function(){ const a=ac(); if(a) a.decodeAudioData(b64ToBuf_(PLACE_SFX_B64)).then(buf=>{
+/* Perf: these 3 decode IIFEs used to fire synchronously at script-parse time (AudioContext
+   creation + atob + decodeAudioData for 3 samples), on the critical path competing with first
+   paint of the menu screen -- for sounds that are only reachable once the player has already
+   navigated menu -> gate -> level select -> gameplay. playWoodTile()/playMatchSfx() already fall
+   back gracefully to the old synthesized beep/woodClack sounds if their buffer isn't ready yet,
+   so deferring the decode start to idle time is behavior-preserving in the worst case and, in
+   practice, finishes long before the player reaches actual gameplay. */
+(function(){ const start=()=>{ const a=ac(); if(a) a.decodeAudioData(b64ToBuf_(PLACE_SFX_B64)).then(buf=>{
   placeSfxBuffer=buf;
   try{
     const d=buf.getChannelData(0), thr=.02; let i=0;
     while(i<d.length && Math.abs(d[i])<thr) i++;
     placeSfxOffset=Math.max(0,(i/buf.sampleRate)-.003);
   }catch(e){}
-}).catch(()=>{}); })();
-(function(){ const a=ac(); if(a) a.decodeAudioData(b64ToBuf_(MATCH_SFX_B64)).then(buf=>{
+}).catch(()=>{}); }; if(window.requestIdleCallback) requestIdleCallback(start,{timeout:1000}); else setTimeout(start,0); })();
+(function(){ const start=()=>{ const a=ac(); if(a) a.decodeAudioData(b64ToBuf_(MATCH_SFX_B64)).then(buf=>{
   matchSfxBuffer=buf;
   /* This sample has a soft rattly lead-in before the actual crack — without skipping past
      it, the fixed-length playDur window in playMatchSfx() below plays mostly that quiet
@@ -2716,11 +2825,11 @@ document.addEventListener('pointerdown', ()=>{ if(AC&&AC.state==='suspended') AC
     while(i<d.length && Math.abs(d[i])<thr) i++;
     matchSfxOffset=Math.max(0,(i/buf.sampleRate)-.004);
   }catch(e){}
-}).catch(()=>{}); })();
+}).catch(()=>{}); }; if(window.requestIdleCallback) requestIdleCallback(start,{timeout:1000}); else setTimeout(start,0); })();
 /* Real recorded "switch" sample (soundreality) — the crisp snap that now leads the match/
    pop sound (playMatchSfx below), with the wood-crate sample above kept as a quieter
    texture layer underneath instead of the whole sound. */
-(function(){ const a=ac(); if(a) a.decodeAudioData(b64ToBuf_(SWITCH_SFX_B64)).then(buf=>{
+(function(){ const start=()=>{ const a=ac(); if(a) a.decodeAudioData(b64ToBuf_(SWITCH_SFX_B64)).then(buf=>{
   switchSfxBuffer=buf;
   /* First pass guessed a lead-in trim threshold blind and it likely scanned right past
      the transient into near-silence (report: switch sound wasn't audible at all) --
@@ -2736,7 +2845,7 @@ document.addEventListener('pointerdown', ()=>{ if(AC&&AC.state==='suspended') AC
      qua closure, phải đi qua window để dùng lại đúng asset đã decode 1 lần này
      thay vì decode thêm 1 bản riêng (tốn thêm base64 lặp lại trong file). */
   window.__switchSfxBuffer=switchSfxBuffer; window.__switchSfxOffset=switchSfxOffset;
-}).catch(()=>{}); })();
+}).catch(()=>{}); }; if(window.requestIdleCallback) requestIdleCallback(start,{timeout:1000}); else setTimeout(start,0); })();
 function beep(f,d,type,vol,slide){
   if(!soundOn()||S.fast) return; const a=ac(); if(!a) return;
   try{
@@ -3271,15 +3380,20 @@ function spendCoins(v){ if(getCoins()<v) return false; setCoins(getCoins()-v); r
    moveLimit) + thưởng "không dùng booster" (đọc bàn tốt, không cần cứu) +
    x2 ở màn chốt chương (10/20/30...). Chơi lại màn đã từng qua chỉ nhận 20%
    để tránh cày 1 màn dễ lấy Xu vô hạn. */
+// [Đổi 13/09/2026, theo yêu cầu người dùng] Sàn Xu đổi từ logarith sang EXPONENTIAL:
+// round(COIN_BASE * COIN_GROWTH^S.lv) (S.lv 0-indexed, nên Lv1 = COIN_BASE đúng bằng, không
+// lệch 1 như công thức log cũ). Đặc tính đảo ngược hẳn so với log: log tăng nhanh ở đầu rồi
+// PHẲNG dần về cuối; exponential ngược lại -- tăng CHẬM/nhẹ ở các màn đầu rồi DỐC hẳn lên ở cuối
+// game (Lv50 ~496 Xu, so với ~40 Xu của công thức log cũ). Vẫn giữ đúng bất biến thiết kế đã
+// có từ trước: người chơi tệ nhất (luôn dùng hết booster, 0 lượt dư, không nhận bonus nào ngoài
+// sàn) vẫn gom đủ ≥895 Xu (đủ mua skin rẻ nhất, xem TILE_SKINS) trước khi hết màn 30 -- verify
+// bằng self-test `economy_floor_affords_cheapest_skin_by_level30` (dùng ĐÚNG cùng công thức này,
+// xem bên dưới) mỗi lần đổi COIN_BASE/COIN_GROWTH.
+const COIN_BASE=9, COIN_GROWTH=1.07;
 function computeWinCoins(){
   let prevUnlocked=0; try{ prevUnlocked=parseInt(localStorage.getItem('mxb_level_unlocked')||'0',10)||0; }catch(e){}
   const firstClear=S.lv>=prevUnlocked;
-  // Sàn theo đồ thị logarith, base=10: round(10*ln(level+2)) — tăng nhanh ở các
-  // màn đầu (11 ở màn 1) rồi chậm dần, chạm ~40 ở màn 50, không tăng phẳng đều
-  // như bản cũ. Ngay cả người chơi tệ nhất (luôn dùng hết booster, 0 lượt dư,
-  // không nhận bonus nào ngoài sàn) cũng gom đủ ~899 Xu sau màn 30 — đủ mua skin
-  // rẻ nhất (895 Xu, xem TILE_SKINS) mà không cần chơi giỏi hay dùng đủ 50 màn.
-  let coins=Math.round(10*Math.log(S.lv+3));
+  let coins=Math.round(COIN_BASE*Math.pow(COIN_GROWTH,S.lv));
   // Đã BỎ bonus "lượt dư -> Xu" từng có ở đây (cùng lý do đã bỏ khỏi Điểm): hàng
   // đợi khối định trước, nên "dư lượt" nhiều lúc chỉ là đợi đúng mặt Mahjong cần
   // để Match, không phải chơi giỏi hơn. Mốc bảo đảm "đủ mua skin rẻ nhất ở màn
@@ -3793,7 +3907,13 @@ window.__claimQuestMilestone=(count)=>{
 const P24K={tiles:[],pieces:[],drag:null,nextUid:1,queueIndex:0,lastTurn:null,phase:'idle',randomPieces:null};
 function p24kLevel(){return P24K_LEVELS[S.lv]||P24K_LEVELS[0];}
 function p24kAlive(tiles=P24K.tiles){return tiles.filter(t=>t&&t.alive);}
-function p24kTileAt(r,c,z,tiles=P24K.tiles){return tiles.find(t=>t&&t.alive&&t.r===r&&t.c===c&&t.z===z)||null;}
+/* Perf: profiled under 4x CPU throttle running full cascade solutions across 10 spread-out
+   levels -- this single function (a linear .find() scan) was the #1 JS hot path (~19% of all
+   sampled time), because `tiles` only ever grows (dead/matched tiles stay in the array,
+   `alive:false`, forever) and this gets called many times per neighbor/exposure check during
+   every match/cascade wave. Plain for-loop instead of .find()+arrow avoids a closure call per
+   element; same first-match-in-array-order semantics, same null-if-not-found return. */
+function p24kTileAt(r,c,z,tiles=P24K.tiles){for(let i=0;i<tiles.length;i++){const t=tiles[i];if(t&&t.alive&&t.r===r&&t.c===c&&t.z===z)return t;}return null;}
 function p24kPieceDims(piece){return {rows:Math.max(...piece.cells.map(x=>x.dr))+1,cols:Math.max(...piece.cells.map(x=>x.dc))+1};}
 function p24kCloneTiles(tiles=P24K.tiles){return tiles.map(t=>({...t}));}
 function p24kClonePiece(piece){return {key:piece.key,cells:piece.cells.map(x=>({...x}))};}
@@ -4086,24 +4206,24 @@ const P24K1_ASSET_IDS=Object.freeze(['c2','c5','c8','s1','s4','s7','w3','w6']);
 const P24M_LEVELS=[
   {
   title: "A Single Spot",
-  size: 2,
+  size: 3,
   goalType: "TILE_QUOTA",
-  tileGoal: 7,
-  guideMoves: 2,
-  moveLimit: 4,
+  tileGoal: 10,
+  guideMoves: 3,
   lesson: "ONE FOOTPRINT · SAME-LAYER MATCH · REVEAL",
+  teach: "",
   tiles: [
-    P24K_TILE("w1", 0, 1, 0),
-    P24K_TILE("c1", 1, 0, 0),
-    P24K_TILE("c1", 0, 0, 1),
-    P24K_TILE("w1", 0, 1, 1),
-    P24K_TILE("w1", 0, 0, 0),
+    P24K_TILE("c1", 0, 0, 0),
+    P24K_TILE("s1", 0, 1, 0),
+    P24K_TILE("c1", 0, 1, 1),
+    P24K_TILE("w1", 0, 2, 1),
+    P24K_TILE("s2", 0, 2, 0),
   ],
   sequence: [
     K_DOMINO_H("p1", "c1", "w1"),
-    K_DOMINO_H("p2", "c1", "w1"),
+    K_DOMINO_H("p2", "c1", "s2"),
   ],
-  solution: [{ row: 1, col: 0 }, { row: 1, col: 0 }],
+  solution: [{ row: 1, col: 0 }, { row: 1, col: 1 }, { row: 1, col: 1 }, { row: 0, col: 1 }],
 },
   {
   title: "Current and Next",
@@ -4128,7 +4248,7 @@ const P24M_LEVELS=[
     K_DOMINO_V("m2", "c1", "s1"),
     K_DOMINO_H("m4", "s2", "w2"),
   ],
-  solution: [{ row: 1, col: 1 }, { row: 1, col: 1 }, { row: 1, col: 0 }, { row: 1, col: 0 }, { row: 1, col: 2 }],
+  solution: [{ row: 1, col: 1 }, { row: 1, col: 1 }, { row: 1, col: 1 }, { row: 1, col: 1 }],
 },
   {
   title: "Every Cell Falls On Its Own",
@@ -4754,7 +4874,7 @@ const P24M_LEVELS=[
   {
   title: "Chapter Final Exam",
   size: 6,
-  goalType: "BURIED_TARGET",
+  goalType: "TARGET_FACE",
   winTargets: [{id:"s1",need:2}, {id:"w2",need:1}, {id:"c1",need:4}],
   permanents: [[3,5], [4,4], [4,5], [5,4], [5,5], [5,1], [4,1], [4,0], [5,0]],
   guideMoves: 0,
@@ -5066,7 +5186,7 @@ const P24M_LEVELS=[
   {
   title: "Buried Under Seal",
   size: 6,
-  goalType: "BURIED_TARGET",
+  goalType: "TARGET_FACE",
   winTargets: [{id:"s1",need:4}, {id:"c1",need:4}, {id:"w1",need:6}],
   seals: [[5,0,3], [0,5,5], [5,5,7], [0,0,8]],
   permanents: [[2,2], [3,3], [2,3], [3,2]],
@@ -5180,7 +5300,7 @@ const P24M_LEVELS=[
   // lock now sits ON the two cells move4/move5 need for s1/h1 -- c2's own bonus pair (was
   // move6, now move1) is moved to the front so those placements are illegal until it fires.
   size: 5,
-  goalType: "BURIED_TARGET",
+  goalType: "TARGET_FACE",
   winTargets: [{id:"s1",need:6}, {id:"h1",need:2}],
   locks: [{ cells: [[1, 0], [1, 2]], face: "c2", required: 2 }],
   permanents: [[0,3],[3,0],[2,3],[2,1],[1,3]],
@@ -5431,7 +5551,7 @@ const P24M_LEVELS=[
   {
   title: "Buried Behind Seal",
   size: 5,
-  goalType: "BURIED_TARGET",
+  goalType: "TARGET_FACE",
   winTargets: [{id:"s1",need:2}, {id:"s2",need:2}, {id:"h1",need:4}],
   seals: [[3,3,1]],
   permanents: [[2,3], [1,3]],
@@ -5748,7 +5868,7 @@ const P24M_LEVELS=[
   {
   title: "Buried Twice",
   size: 6,
-  goalType: "BURIED_TARGET",
+  goalType: "TARGET_FACE",
   winTargets: [{id:"s1",need:2}, {id:"c1",need:2}, {id:"s2",need:2}],
   seals: [[5,5,2]],
   permanents: [[2,4], [0,3], [0,4], [1,4], [3,0], [4,3]],
@@ -5953,7 +6073,7 @@ const P24M_LEVELS=[
   {
   title: "Penultimate",
   size: 6,
-  goalType: "BURIED_TARGET",
+  goalType: "TARGET_FACE",
   winTargets: [{id:"s1",need:4}, {id:"w1",need:4}, {id:"s2",need:2}],
   seals: [[2,4,3], [2,5,3]],
   permanents: [[2,2], [2,3], [3,2], [3,3], [1,4], [1,5], [1,1], [1,2], [1,3], [3,5]],
@@ -6002,7 +6122,7 @@ const P24M_LEVELS=[
   {
   title: "Grand Finale",
   size: 6,
-  goalType: "BURIED_TARGET",
+  goalType: "TARGET_FACE",
   winTargets: [{id:"s1",need:6}, {id:"c1",need:6}],
   seals: [[4,1,3], [1,3,2], [2,1,2], [2,4,4], [0,1,2]],
   permanents: [[5,4], [5,5], [5,0], [5,1], [5,2], [5,3], [3,5]],
@@ -6617,8 +6737,8 @@ p24kPlace=async function(r,c,index=0){
   await p24kMaybeOpenLocks();
   p24kAdvanceRandomQueue();renderTray();renderHUD();
   if(levelWon()){S.busy=false;return win();}
-  if(Number.isFinite(S.movesLeft)&&S.movesLeft<=0){S.busy=false;return lose(window.t('lose_moves_title'));}
-  if(!p24kLegalMoves().length){S.busy=false;return lose(window.t('lose_nospace_title'));}
+  if(Number.isFinite(S.movesLeft)&&S.movesLeft<=0){S.busy=false;return lose('moves');}
+  if(!p24kLegalMoves().length){S.busy=false;return lose('nospace');}
   S.busy=false;renderHUD();return {legal:true,...result};
 };
 place=p24kPlace;
@@ -6676,13 +6796,26 @@ win=function(){
     <button class="btn${last?'':' ghost'}" onclick="__mxbRetry()">${window.t('retry_level')}</button>
     <button class="btn ghost" onclick="__mxbToLevelSelect()">${window.t('back_to_select')}</button>`);
 };
-lose=function(title){
+lose=function(reason){
   S.busy=true;P24K.phase='lost';sfx.lose();
+  const title=window.t('lose_'+reason+'_title'), msg=window.t('lose_'+reason+'_msg');
   const targets=p24kLevel().winTargets||[];
-  const sub=targets.length>1
-    ? targets.map(tg=>`${S.targetCounts[tg.id]||0}/${tg.need}`).join('  ·  ')
-    : (()=>{ const tg=targets[0]; const cur=tg?(S.targetCounts[tg.id]||0):S.pairs; const tot=tg?tg.need:p24kLevel().pairGoal; return `${cur}/${tot}`; })();
-  overlay(`<h2 style="color:var(--danger)">${title}</h2><div class="sub">${sub}</div>
+  // Đồng bộ với overlay Thắng (win() ở trên): cùng khung .result-stats + .hud-box (Điểm /
+  // Tiến độ), và Tiến độ giờ dùng lại đúng .goal-chip + icon mặt quân thật (tileHTML(T(id)))
+  // của HUD trong game thay vì chữ số thô "3/4" -- nhất quán trực quan giữa 2 màn kết thúc.
+  const progress=targets.length
+    ? targets.map(tg=>{const cur=S.targetCounts[tg.id]||0;return `<span class="goal-chip${cur>=tg.need?' met':''}"><span class="goal-icon">${tileHTML(T(tg.id))}</span>${cur}<small>/${tg.need}</small></span>`;}).join('')
+    // [Sửa lỗi hiển thị] .result-progress là display:flex + gap (để xếp nhiều .goal-chip khi
+    // targets.length>0) -- nhưng nhánh fallback này chỉ có 1 text node + 1 <small>, không bọc
+    // trong span, nên flexbox coi đó là 2 flex-item riêng và tự chèn khoảng gap 10px giữa
+    // chúng (ra "6    /6" thay vì "6/6" liền nhau). Bọc cả cụm vào 1 span để chỉ có ĐÚNG 1
+    // flex-item, không còn khoảng trống giữa số và /goal nữa.
+    : `<span>${S.pairs}<small>/${p24kLevel().pairGoal||S.pairs}</small></span>`;
+  overlay(`<h2 style="color:var(--danger)">${title}</h2><div class="sub">${msg}</div>
+    <div class="result-stats">
+      <div class="hud-box"><div class="hud-lab">${window.t('score_label')}</div><div class="hud-val">${S.score}</div></div>
+      <div class="hud-box"><div class="hud-lab">${window.t('progress_label')}</div><div class="hud-val result-progress">${progress}</div></div>
+    </div>
     <button class="btn" onclick="__mxbRetry()">${window.t('retry_level')}</button>
     <button class="btn ghost" onclick="__mxbToLevelSelect()">${window.t('back_to_select')}</button>`);
 };
@@ -6799,7 +6932,10 @@ function p24kUseHint(){
   if(S.busy||!(S.boosterHint>0))return;
   const onTrack=p24kSolutionOnTrack();
   if(onTrack){ p24kApplyHintMove(onTrack); return; }
-  toast(window.t('hint_searching'),900);
+  // [Đổi 13/09/2026, theo yêu cầu người dùng] Không hiện "Đang tìm gợi ý…" nữa -- trước đây
+  // luôn hiện ở nhánh DFS (nhánh "đã đi lệch solution") nhưng KHÔNG hiện ở nhánh nhanh (bám
+  // đúng solution) phía trên, khiến người chơi thấy có lúc hiện có lúc không, tưởng lỗi. Giờ
+  // im lặng chờ, chỉ hiện kết quả khi thật sự CÓ kết quả (guide hoặc "không tìm được").
   setTimeout(async ()=>{
     const move=(typeof p24kTrySolveLive==='function')?await p24kTrySolveLive():null;
     if(!move){ toast(window.t('hint_notfound')); return; }
@@ -7110,7 +7246,7 @@ function p24mSelfTest(){
   // Ngay cả người chơi tệ nhất (luôn hết booster, 0 lượt dư -> chỉ nhận sàn mỗi
   // màn) cũng phải gom đủ tiền mua skin rẻ nhất trong vòng 30 màn đầu.
   checks.economy_floor_affords_cheapest_skin_by_level30=(()=>{
-    let worstCase=0;for(let i=0;i<30;i++){const b=Math.round(10*Math.log(i+3));worstCase+=(i+1)%10===0?b*2:b;}
+    let worstCase=0;for(let i=0;i<30;i++){const b=Math.round(COIN_BASE*Math.pow(COIN_GROWTH,i));worstCase+=(i+1)%10===0?b*2:b;}
     const cheapest=Math.min(...TILE_SKINS.filter(s=>s.price>0).map(s=>s.price),...BOARD_SKINS.filter(s=>s.price>0).map(s=>s.price));
     return worstCase>=cheapest;
   })();
