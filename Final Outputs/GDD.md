@@ -1,5 +1,4 @@
 # GDD Tổng Hợp — Mahjong × Block (Final Core)
-
 ---
 
 ## 1. Tổng quan
@@ -61,10 +60,12 @@ Mỗi level khai báo đúng 1 trong 4 `goalType`. Thống kê thực tế trên
 
 | goalType | Số level | Điều kiện thắng |
 |---|---|---|
-| `TILE_QUOTA` | 5 | Tổng số quân đã phá (mọi mặt cộng dồn) ≥ `tileGoal`. Không yêu cầu mặt cụ thể. |
-| `TARGET_FACE` | 32 | Mỗi mặt trong `winTargets` (vd `{id:'s1',need:4}`) phải đạt đủ số lượng RIÊNG của nó. Nếu level có `targetRequiredCount`, chỉ cần đạt đủ N/M mục tiêu (không cần tất cả — vd "3 trong 4 mặt"). |
-| `OPEN_SEAL` | 6 | Mở đủ Phong Ấn (xem mục 4) — không cần phá thêm gì sau khi mở. |
+| `TILE_QUOTA` | 12 | Tổng số quân đã phá (mọi mặt cộng dồn) ≥ `tileGoal`. Không yêu cầu mặt cụ thể. |
+| `TARGET_FACE` | 29 | Mỗi mặt trong `winTargets` (vd `{id:'s1',need:4}`) phải đạt đủ số lượng RIÊNG của nó. Nếu level có `targetRequiredCount`, chỉ cần đạt đủ N/M mục tiêu (không cần tất cả — vd "3 trong 4 mặt"). |
+| `OPEN_SEAL` | 2 | Mở đủ Phong Ấn (xem mục 4) — không cần phá thêm gì sau khi mở. |
 | `BURIED_TARGET` | 7 | Về mặt luật, xử lý **giống hệt `TARGET_FACE`** (cùng hàm kiểm tra `p24mTargetsMet`) — khác biệt duy nhất là ở CÁCH THIẾT KẾ LEVEL: quân mục tiêu bị chôn dưới Phong Ấn/mái, buộc người chơi phải mở seal hoặc dọn mái trước khi chạm được mục tiêu. Đây là nhãn thiết kế (design label), không phải nhánh luật riêng trong engine. |
+
+*(Thay đổi lớn so với các bản trước: `OPEN_SEAL` giảm mạnh 6→2 — hầu hết màn Seal giờ chỉ là rào chắn phụ trong 1 goal `TARGET_FACE`/`BURIED_TARGET` lớn hơn, không còn tự nó là goal; `TILE_QUOTA` tăng gấp đôi 6→12.)*
 
 
 ---
@@ -73,18 +74,19 @@ Mỗi level khai báo đúng 1 trong 4 `goalType`. Thống kê thực tế trên
 
 Hàm `p24kCellBlocked()` kiểm tra theo đúng thứ tự ưu tiên sau (ô có thể bị chặn bởi nhiều lý do cùng lúc):
 
-1. **Ô Chắn / Permanent (`level.permanents`)** — chặn vĩnh viễn, không bao giờ mở, không phụ thuộc điều kiện gì. Dạy khái niệm "định tuyến quanh vật cản" (routing).
-2. **Phong Ấn / Seal (`level.seals`, mở qua `sealRequiredDistinct`)** — **[Đổi luật 11/09/2026]** chặn cho tới khi người chơi đã Match đủ N **mặt khác nhau** (không phải N quân) mà mỗi match đó phải xảy ra **KỀ SÁT ít nhất 1 ô Seal** (một ô trong nhóm match có ít nhất 1 hàng-xóm trực tiếp — trên/dưới/trái/phải — là ô Seal), không còn tính match xảy ra bất kỳ đâu trên bàn như trước nữa. Lý do đổi: luật cũ khiến Seal không khác gì goal `TARGET_FACE` phụ — người chơi chỉ cần ghép đủ N mặt bất kỳ ở bất kỳ đâu, không tạo ra quyết định không gian nào riêng. Luật mới buộc người chơi phải chủ động đưa quân TỚI GẦN ô Seal để mở nó, biến Seal thành 1 ràng buộc không gian thật sự. Theo dõi bằng bộ đếm RIÊNG `S.sealAdjacentCounts` (tách khỏi `S.targetCounts` của goal `TARGET_FACE`, vì 2 khái niệm "khác nhau" giờ đã khác nhau: toàn bàn vs. kề sát Seal). Vẫn mở đúng 1 lần, chỉ sau khi 1 cascade đã settle hoàn toàn.
-   - **Hệ quả khi thiết kế màn**: không thể tự do đặt seed/piece dùng để mở Seal ở bất kỳ đâu trên bàn nữa — phải đặt (hoặc dẫn 1 match tới) ô liền kề Seal. Toàn bộ 21 màn dùng Seal tại thời điểm đổi luật đã được rà soát lại (xem `08-GDD-LEVEL-DESIGN.md` §7 mục 8 cho quy trình cụ thể); 4 trong số đó không còn giữ được Seal có ý nghĩa sau khi đổi CẢ luật lẫn thứ tự dạy cơ chế (mục 5 dưới) nên đã được thiết kế lại thành Permanent thuần — còn lại **17 màn dùng Seal**.
-3. **Khóa / Lock (`level.locks`, mỗi entry `{cells, face, required}`)** — giống Phong Ấn (luật CŨ, trước 11/09/2026 — Khóa KHÔNG đổi theo luật kề-sát mới) nhưng **theo từng NHÓM Ô riêng biệt**, gắn với ĐÚNG 1 mặt cụ thể + số lượng cần, hiển thị rõ ràng trên ô (không mờ như Seal). Dùng lại luôn bộ đếm `targetCounts` sẵn có, không cần state mới.
-   - Dùng trong **16 level**: Lv9 (Ch1), Lv12 (Ch2), toàn bộ Lv31-40 (Ch4), và Lv41/43/44/48 (Ch5) — không còn chỉ 3 level như ghi chú cũ; số ô Khóa từng màn xem cột "Lock" trong `Final Outputs/Mahjong_x_Block_Beatchart.xlsx`.
+1. **Ô Chắn / Permanent (`level.permanents`)** — chặn vĩnh viễn, không bao giờ mở, không phụ thuộc điều kiện gì. Dạy khái niệm "định tuyến quanh vật cản" (routing). Dùng trong **31/50 màn**, xuất hiện đầu tiên ở Lv11.
+2. **Phong Ấn / Seal (`level.seals`, mỗi entry `[r,c,required]`)** — **[Luật hiện tại, đã chốt lại sau 2 lần đổi]** mỗi ô Seal có ngưỡng `required` **riêng của chính nó** (không dùng chung 1 số cho cả màn), mở khi tổng số **CẶP bất kỳ đã Match ở bất kỳ đâu trên bàn** (`S.pairs`, cộng dồn toàn màn, không cần khác mặt nhau, không cần match xảy ra kề sát ô Seal) đạt đủ ngưỡng đó. Bộ đếm dùng chung `S.pairs` — không có state "kề sát" riêng. Vẫn mở đúng 1 lần, chỉ sau khi 1 cascade đã settle hoàn toàn. Dùng trong **24/50 màn**, xuất hiện đầu tiên ở Lv21.
+   - *(Lịch sử: từng có 1 giai đoạn ngắn đổi sang luật "phải match kề sát ô Seal" — đã bị revert, không còn trong code hiện tại; không nhầm với ghi chép cũ.)*
+3. **Khóa / Lock (`level.locks`, mỗi entry `{cells, face, required}`)** — giống Phong Ấn nhưng **theo từng NHÓM Ô riêng biệt**, gắn với ĐÚNG 1 mặt cụ thể + số lượng cần (đếm số TILE của đúng mặt đó qua `targetCounts`, khác Seal đếm CẶP bất kỳ mặt), hiển thị rõ ràng trên ô (không mờ như Seal). Dùng trong **19/50 màn**, xuất hiện đầu tiên ở Lv31.
+   - **Lock 2 giai đoạn (`lock.after`)**: engine hỗ trợ 1 Lock yêu cầu mở 1 Lock khác trước (`lock.after={face,required}`, xem `p24kLockMet()`) — đã cài đặt xong nhưng **hiện 0/50 màn dùng field này** (đã thử ở Lv33/Lv35 rồi bị thiết kế lại, gỡ field).
+   - **13 màn kết hợp cả 3 cơ chế cùng lúc**: Lv33, 38, 39, 40, 41, 42, 44, 45, 46, 47, 48, 49, 50.
 
 Bảng phân biệt nhanh 3 loại chặn:
 
 | Cơ chế | Điều kiện mở | Phạm vi | Mở lại được? |
 |---|---|---|---|
 | Ô Chắn | Không bao giờ mở | Ô đơn | Không |
-| Phong Ấn | N mặt khác nhau, mỗi match phải KỀ SÁT 1 ô seal | Cả nhóm seal cùng lúc | 1 lần, vĩnh viễn sau đó |
+| Phong Ấn | Đủ N cặp bất kỳ (không cần khác mặt, không cần kề sát), N riêng từng ô | Từng ô Seal riêng, ngưỡng chung 1 bộ đếm `pairs` | 1 lần, vĩnh viễn sau đó |
 | Khóa | N quân của 1 mặt cụ thể (không cần kề sát) | Từng nhóm ô riêng | 1 lần/nhóm, vĩnh viễn sau đó |
 
 ## 5. Nội dung 50 level
@@ -98,7 +100,7 @@ Bảng phân biệt nhanh 3 loại chặn:
   - **Ch2 (Lv11-20):** giới thiệu Ô Chắn (Permanent) — cơ chế đơn giản hơn ("ô này không bao giờ mở"), dạy trước.
   - **Ch3 (Lv21-30):** giới thiệu Phong Ấn (Seal, luật kề-sát mới) — cơ chế phức tạp hơn (ngưỡng N mặt khác nhau + ràng buộc không gian), dạy sau khi người chơi đã quen "vật cản".
   - Thực tế mốc chương chỉ là "cứ 10 level một nhóm" để hiển thị số ("màn X/50"), KHÔNG còn quyết định nội dung dạy — nội dung dạy trải không đều  - 
-- **Độ khó biến thiên:** `moveLimit` dao động 1–8; kích thước bàn 2×2 đến 6×6; số mặt mục tiêu tới 6 mặt cùng lúc (Lv47, Lv50).
+- **Độ khó biến thiên:** `moveLimit` dao động 1–10; kích thước bàn 2×2 đến 6×6 — **toàn bộ Lv46-50 đều là board 6×6** (đợt nâng cấp gần nhất, mật độ Ô Chắn/Seal/Lock và move limit cũng tăng theo cho cả 5 màn này so với phần còn lại của game).
 
 
 ---
@@ -119,7 +121,7 @@ Engine hỗ trợ 2 kiểu nguồn khối KHÔNG cố định, cả hai đều �
 ### 7.1 Kiếm Xu
 Công thức thắng màn (`computeWinCoins()`):
 - Sàn: `round(10 × ln(level + 3))` — tăng nhanh ở màn đầu (~11 Xu ở Lv1), chậm dần, chạm ~40 Xu ở Lv50.
-- `+2 Xu` cho mỗi lượt dư (nếu level có `moveLimit`).
+- **Không có bonus lượt dư** (đã bỏ hẳn — hàng đợi khối định trước, "dư lượt" nhiều lúc chỉ là đợi đúng mặt Mahjong cần để Match, không phải chơi giỏi hơn).
 - `+15 Xu` nếu thắng mà KHÔNG dùng mất booster nào so với lúc bắt đầu màn.
 - `×2` ở mọi level chốt chương (level thứ 10, 20, 30, 40, 50).
 - Chơi lại 1 level đã từng qua (`firstClear=false`) → **0 Xu** (không phải 20% như comment code ghi — đọc thẳng code: `if(!firstClear) return 0;`, không cào Xu vô hạn bằng cách chơi lại level dễ).
@@ -185,9 +187,9 @@ Toàn bộ game bọc trong `#app-frame` cố định tỉ lệ 16:9 (ngang)/9:1
 ## 10. Âm thanh, Haptic, Đa ngôn ngữ
 
 ### 10.1 Âm thanh
-- **Đã chuyển hẳn từ WebAudio tổng hợp sang sample thu âm thật**, nhúng base64 thẳng trong file (giữ đúng ràng buộc "1 file HTML tự chứa"): tiếng đặt gỗ (place), tiếng phá gỗ/vỡ khối (match), tiếng chuyển khối (switch/reroll), tiếng cửa (door), và 1 bản nhạc nền (nhạc cụ Trung Hoa, âm lượng nền mặc định 30% — đã hạ từ 50% theo phản hồi "quá to").
-- Mỗi sample đã qua 1 vòng tinh chỉnh v2: cắt khoảng lặng/tiếng rè đầu sample (trim lead-in), bọc envelope fade in/out để không bị cụt tiếng.
-- Tiếng "cạch" gỗ cho MỌI nút bấm UI (menu/chọn màn/shop/game) tổng hợp riêng (không phải sample) qua 2 lớp: noise ngắn qua bandpass ~1.6kHz (tiếng va chạm bề mặt) + 1 tone sine trầm đổ nhanh (cộng hưởng thân gỗ) — có công tắc bật/tắt riêng đồng bộ với công tắc Âm thanh chung.
+- **Hiệu ứng gameplay (`sfx.*`: place/pop/reveal/sealOpen/target/win/lose...) đều là WebAudio tổng hợp trực tiếp bằng code** (`beep()`, `playWoodTile()`, `playMatchSfx()` — oscillator + gain envelope, không phải sample thu âm), chạy trên 1 `AudioContext` riêng. *(Có 2 định nghĩa `const sfx=` trong file do lịch sử phát triển nhiều lớp — chỉ định nghĩa CUỐI xuất hiện trong file là bản đang chạy thật, xem quy tắc ở `04-GDD-FINAL-CORE-MASTER.md` B1.)*
+- **Nhạc nền** dùng 1 track base64 nhúng thẳng trong file (giữ đúng ràng buộc "1 file HTML tự chứa"), chạy trên `AudioContext` riêng biệt hoàn toàn với sfx — không cái nào làm giảm âm lượng cái kia.
+- Tiếng "cạch" gỗ cho MỌI nút bấm UI (menu/chọn màn/shop/game) tổng hợp riêng qua 2 lớp: noise ngắn qua bandpass ~1.6kHz (tiếng va chạm bề mặt) + 1 tone sine trầm đổ nhanh (cộng hưởng thân gỗ), chạy trên `AudioContext` thứ 3 riêng (`__clickAc`) — có công tắc bật/tắt riêng đồng bộ với công tắc Âm thanh chung.
 - 2 thanh trượt âm lượng ĐỘC LẬP trong Cài đặt: Nhạc nền / Hiệu ứng.
 
 ### 10.2 Haptic (rung)
@@ -213,7 +215,8 @@ Toàn bộ game bọc trong `#app-frame` cố định tỉ lệ 16:9 (ngang)/9:1
 `mxb_coins`, `mxb_owned_tileskins`, `mxb_owned_boardskins`, `mxb_active_tileskin`, `mxb_active_boardskin`, `mxb_booster_reroll`, `mxb_booster_hint`, `mxb_level_unlocked`, `mxb_quest_state`, `mxb_checkin_state`, `mxb_sound`, `mxb_music_vol`, `mxb_sfx_vol`, `mxb_haptic`, `mxb_lang`.
 
 ### 11.3 Tự kiểm (self-test) & công cụ QA
-- `p24mSelfTest()` chạy hàng chục assertion mỗi khi tải trang (dev), bao gồm: đúng 50 level, mọi khối là polyomino hợp lệ (2-5 ô), không khối nào tự-match sẵn (trừ Lv1), luật match nhóm 3/4 quân, gravity chọn đúng tầng thấp nhất, quân bị che không match, Ô Chắn/Phong Ấn/Khóa chặn đúng luật, mọi level có Seal đều thật sự mở được trong lời giải tác giả, mọi `moveLimit` đủ chỗ cho lời giải, và quan trọng nhất — **`all_solutions`: lời giải tác giả soạn cho cả 50 level đều thắng được dưới đúng luật hiện tại** (chạy lại mỗi khi luật thay đổi để bắt sớm level nào bị "gãy" theo).
+- `window.__digest24k1.selfTest()` chạy ~33 assertion mỗi khi tải trang (dev), bao gồm: đúng 50 level, mọi khối là polyomino hợp lệ (2-5 ô), không khối nào tự-match sẵn (trừ Lv1), luật match nhóm 3/4 quân, gravity chọn đúng tầng thấp nhất, quân bị che không match, Ô Chắn/Phong Ấn/Khóa chặn đúng luật, mọi level có Seal đều thật sự mở được trong lời giải tác giả, mọi `moveLimit` đủ chỗ cho lời giải, và quan trọng nhất — **`all_solutions`: lời giải tác giả soạn cho cả 50 level đều thắng được dưới đúng luật hiện tại** (chạy lại mỗi khi luật thay đổi để bắt sớm level nào bị "gãy" theo).
+- **✅ Cập nhật 13/09/2026: `ok === true` (33/33 check)** — 3 màn Lv40/Lv42/Lv46 từng fail `every_seal_level_opens_in_its_own_solution`/`all_solutions` (solution rỗng/`sequence` rỗng khiến rút quân ngẫu nhiên/goal không khả thi) đã được vá, xem root-cause chi tiết từng màn ở `08-GDD-LEVEL-DESIGN.md` §1. Đã xác nhận qua `runSolution(39)`, `runSolution(41)`, `runSolution(45)` (0-indexed) và `check_all_solutions` trên cả 50 level.
 - Bộ test riêng cho chế độ generative: `gen_test_levels.js` (30 lượt chơi mô phỏng/level bằng bot naive) — xem mục 6.
 - Playwright + script chụp màn hình (`tmp/ls-shot*.mjs`) để kiểm tra UI trực quan ở nhiều kích thước màn hình, thay cho test tay từng lần sửa giao diện.
 - Tiện ích debug qua URL: `?level=N` (mở thẳng level N), `?unlockAll=1` (mở khoá mọi level), `?genTest=1`/`?genTest=0` (bật/tắt bộ 50 level generative test).

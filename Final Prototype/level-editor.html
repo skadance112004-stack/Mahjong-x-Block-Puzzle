@@ -158,13 +158,13 @@ legend{font-size:10.5px; color:var(--gold); padding:0 4px;}
     <option value="BURIED_TARGET">BURIED_TARGET (mọi winTargets, bị chôn)</option>
   </select>
   <div id="goalFields"></div>
-  <label>Seal — số mặt khác nhau cần (sealRequiredDistinct)</label>
-  <input id="fSealDistinct" type="number" min="0" value="0">
-  <div class="hint">Chỉ có tác dụng nếu bàn có ô Seal (vẽ ở khung giữa).</div>
+  <label>Seal — mỗi ô có ngưỡng "số cặp cần phá" RIÊNG (đổi luật 12/09/2026, lần 2: không còn 1 số dùng chung cho cả màn, và không còn cần phá KHÁC mặt nhau)</label>
+  <div id="sealList"></div>
+  <div class="hint">Vẽ ô Seal bằng công cụ Seal (khung giữa) trước, rồi chỉnh ngưỡng riêng cho từng ô ở đây. Đếm TỔNG SỐ CẶP đã ghép ở BẤT KỲ ĐÂU trên bàn (không cần liền kề ô Seal, không cần khác mặt nhau — ghép lại đúng 1 mặt nhiều lần vẫn tính).</div>
   <label>Khóa (locks) — mỗi màn có thể có NHIỀU nhóm Khóa độc lập, mỗi nhóm 1 mặt + 1 ngưỡng riêng</label>
   <div id="lockGroups"></div>
   <button class="jade small" id="btnAddLockGroup" type="button" style="width:100%;margin-top:4px;">+ Thêm nhóm Khóa</button>
-  <div class="hint">Chọn "● vẽ" ở 1 nhóm rồi dùng công cụ Khóa (khung giữa) để tô ô cho ĐÚNG nhóm đó. Ô Khóa hiện rõ mặt + số lượng cần cho người chơi ngay trên ô; đếm số MAHJONG (không phải số cặp) của đúng mặt đó đã bị phá ở BẤT KỲ đâu trên bàn — khác Seal (đếm số mặt khác nhau, không quan tâm mặt nào).</div>
+  <div class="hint">Chọn "● vẽ" ở 1 nhóm rồi dùng công cụ Khóa (khung giữa) để tô ô cho ĐÚNG nhóm đó. Ô Khóa hiện rõ mặt + số lượng cần cho người chơi ngay trên ô; đếm số MAHJONG (không phải số cặp) của đúng mặt đó đã bị phá ở BẤT KỲ đâu trên bàn — khác Seal (đếm số CẶP đã ghép, không quan tâm mặt nào, không cần đúng 1 mặt cụ thể).</div>
   <label>guideMoves (số nước đầu được pulsing-highlight)</label>
   <input id="fGuideMoves" type="number" min="0" value="0">
   <label>moveLimit — số lượt đặt khối tối đa (0 = không giới hạn)</label>
@@ -427,13 +427,24 @@ function p24kResolveAllModel(tiles,activeUids){
   }
   return {waves,pairCount,active,idCounts};
 }
-function p24kCellBlocked(level,sealOpen,r,c,targetCounts){
+// [Đổi luật 12/09/2026, lần 2] Seal đếm TỔNG SỐ CẶP đã ghép ở BẤT KỲ ĐÂU trên bàn (model.pairs
+// -- cùng con số PAIR_QUOTA dùng, không cần liền kề ô Seal, không cần khác mặt nhau: ghép lại
+// đúng 1 mặt nhiều lần vẫn cộng dồn bình thường), và mỗi ô Seal có ngưỡng `required` riêng
+// (level.seals' phần tử thứ 3, mặc định 1 nếu thiếu) thay vì 1 sealRequiredDistinct dùng chung
+// cho cả màn -- mirrors index.html's p24kSealRequired/p24kSealMet/p24kSealsAllOpen exactly.
+function p24kSealRequired(level,i){ return (level.seals[i][2])||1; }
+function p24kSealMet(level,pairs,i){ return (pairs||0)>=p24kSealRequired(level,i); }
+function p24kSealsAllOpen(level,pairs){ return !level.seals||!level.seals.length||level.seals.every((s,i)=>p24kSealMet(level,pairs,i)); }
+function p24kCellBlocked(level,r,c,targetCounts,pairs){
   if(level.permanents&&level.permanents.some(p=>p[0]===r&&p[1]===c)) return true;
-  if(!sealOpen&&level.seals&&level.seals.some(s=>s[0]===r&&s[1]===c)) return true;
-  // Byte-for-byte the same loop as index.html's p24kCellBlocked (Final Core/index.html
-  // ~line 6929): level.locks is now the real locks:[{cells,face,required}, ...] array (the
-  // editor's live `level` object and the exported/loaded shape are the same schema), so
-  // Play-test and the real game evaluate lock-blocking identically.
+  if(level.seals){
+    const si=level.seals.findIndex(s=>s[0]===r&&s[1]===c);
+    if(si!==-1&&!p24kSealMet(level,pairs,si)) return true;
+  }
+  // Byte-for-byte the same loop as index.html's p24kCellBlocked (Final Outputs/index.html):
+  // level.locks is now the real locks:[{cells,face,required}, ...] array (the editor's live
+  // `level` object and the exported/loaded shape are the same schema), so Play-test and the
+  // real game evaluate lock-blocking identically.
   if(level.locks&&targetCounts){
     for(const lock of level.locks){
       if((targetCounts[lock.face]||0)>=lock.required) continue;
@@ -442,12 +453,12 @@ function p24kCellBlocked(level,sealOpen,r,c,targetCounts){
   }
   return false;
 }
-function p24kSimulateDrop(r,c,tiles,pieces,level,sealOpen,targetCounts){
+function p24kSimulateDrop(r,c,tiles,pieces,level,targetCounts,pairs){
   const piece=pieces[0]; if(!piece) return {legal:false,reason:'missing'}; const placements=[];
   for(let n=0;n<piece.cells.length;n++){
     const cell=piece.cells[n], rr=r+cell.dr, cc=c+cell.dc;
     if(rr<0||cc<0||rr>=level.size||cc>=level.size) return {legal:false,reason:'bounds'};
-    if(p24kCellBlocked(level,sealOpen,rr,cc,targetCounts)) return {legal:false,reason:'blocked',blockedAt:[rr,cc]};
+    if(p24kCellBlocked(level,rr,cc,targetCounts,pairs)) return {legal:false,reason:'blocked',blockedAt:[rr,cc]};
     const bottom=p24kTileAt(rr,cc,0,tiles), top=p24kTileAt(rr,cc,1,tiles);
     if(top) return {legal:false,reason:'full',blockedAt:[rr,cc]};
     placements.push({dr:cell.dr,dc:cell.dc,id:cell.id,r:rr,c:cc,z:bottom?1:0,tempUid:-(n+1)});
@@ -491,11 +502,11 @@ function p24kFreshModel(level){
     queueIndex:0,
     pieces:[p24kQueuePiece(0,level,0),p24kQueuePiece(1,level,0)],
     nextUid: level.tiles.length+1,
-    pairs:0, idCounts:{}, sealOpen:false,
+    pairs:0, idCounts:{},
   };
 }
 function p24kModelDrop(model,r,c){
-  const sim=p24kSimulateDrop(r,c,model.tiles,model.pieces,model.level,model.sealOpen,model.idCounts);
+  const sim=p24kSimulateDrop(r,c,model.tiles,model.pieces,model.level,model.idCounts,model.pairs);
   if(!sim.legal) return {legal:false,sim};
   const active=[];
   for(const p of sim.placements){ const tile={uid:model.nextUid++,id:p.id,r:p.r,c:p.c,z:p.z,alive:true}; model.tiles.push(tile); active.push(tile.uid); }
@@ -504,13 +515,12 @@ function p24kModelDrop(model,r,c){
   const result=p24kResolveAllModel(model.tiles,new Set(active));
   model.pairs+=result.pairCount;
   Object.entries(result.idCounts).forEach(([id,n])=>{ model.idCounts[id]=(model.idCounts[id]||0)+n; });
-  if(!model.sealOpen&&model.level.sealRequiredDistinct&&Object.keys(model.idCounts).length>=model.level.sealRequiredDistinct) model.sealOpen=true;
   return {legal:true,sim,result};
 }
 function p24mTileTotal(idCounts){return Object.values(idCounts||{}).reduce((s,n)=>s+n,0);}
 function p24mGoalMet(level,model){
   if(level.goalType==='TILE_QUOTA') return p24mTileTotal(model.idCounts)>=level.tileGoal;
-  if(level.goalType==='OPEN_SEAL') return !!model.sealOpen;
+  if(level.goalType==='OPEN_SEAL') return p24kSealsAllOpen(level,model.pairs);
   const targets=level.winTargets||[];
   if(targets.length){
     if(level.targetRequiredCount) return targets.filter(t=>(model.idCounts[t.id]||0)>=t.need).length>=level.targetRequiredCount;
@@ -521,7 +531,7 @@ function p24mGoalMet(level,model){
 function p24kLegalMoves(model){
   const out=[];
   for(let r=0;r<model.level.size;r++) for(let c=0;c<model.level.size;c++){
-    const sim=p24kSimulateDrop(r,c,model.tiles,model.pieces,model.level,model.sealOpen,model.idCounts);
+    const sim=p24kSimulateDrop(r,c,model.tiles,model.pieces,model.level,model.idCounts,model.pairs);
     if(sim.legal) out.push({row:r,col:c});
   }
   return out;
@@ -588,7 +598,7 @@ function faceEmoji(id){
    ========================================================================= */
 let level={
   title:'New Level', size:3, goalType:'TILE_QUOTA', pairGoal:1,
-  targetRequiredCount:0, winTargets:[], seals:[], permanents:[], sealRequiredDistinct:0,
+  targetRequiredCount:0, winTargets:[], seals:[], permanents:[],
   // locks: MULTIPLE independent groups, matching the real P24M_LEVELS schema exactly
   // (locks:[{cells,face,required}, ...]) -- several shipped levels (e.g. Lv36 "Roof Chain")
   // now use 2+ groups in the same level, so a single flat lockCells/lockFace/lockRequired
@@ -652,7 +662,7 @@ function renderGoalFields(){
       ${gt==='TARGET_FACE'?`<label>targetRequiredCount (N-trên-M, để trống = cần tất cả)</label><input id="fReqCount" type="number" min="0" value="${level.targetRequiredCount||0}">`:''}
       <div class="hint">${gt==='BURIED_TARGET'?'Nhớ đặt target dưới 1 lớp tile khác (roof che floor) ở bước 2.':''}</div>`;
   } else if(gt==='OPEN_SEAL'){
-    el.innerHTML=`<div class="hint">Thắng ngay khi Seal mở — nhớ đặt sealRequiredDistinct &gt; 0 và vẽ ít nhất 1 ô Seal.</div>`;
+    el.innerHTML=`<div class="hint">Thắng ngay khi TẤT CẢ ô Seal đều mở — vẽ ít nhất 1 ô Seal và đặt ngưỡng riêng cho từng ô ở khung "Seal" bên dưới.</div>`;
   }
 }
 $('fGoalType').addEventListener('change', ()=>{ renderGoalFields(); onDataChanged(); });
@@ -705,14 +715,47 @@ function removeLockGroup(i){
 }
 $('btnAddLockGroup').addEventListener('click', addLockGroup);
 
+/* ---------------- seal list (seals[]: [r,c,required] triples, each cell independent) -------
+   [Đổi luật 12/09/2026, lần 2] Seal đếm TỔNG SỐ CẶP đã ghép khắp bàn (không cần liền kề,
+   không cần khác mặt nhau), và mỗi ô Seal giờ có ngưỡng `required` riêng thay vì 1
+   sealRequiredDistinct dùng chung cho cả màn -- mirrors the lock-group card pattern above,
+   just one row per cell (no grouping, since a Seal cell doesn't share cells with others the
+   way a Lock group does). Cells themselves are still added/removed by painting with the Seal
+   tool (onCellClick/rect-drag); this list only edits the `required` an already-painted cell
+   carries. */
+function renderSealList(){
+  const el=$('sealList'); if(!el) return; el.innerHTML='';
+  if(!level.seals.length){ el.innerHTML='<div class="hint">Chưa có ô Seal nào -- dùng công cụ Seal để vẽ.</div>'; return; }
+  level.seals.forEach((s,i)=>{
+    const [r,c]=s, required=s[2]||1;
+    const row=document.createElement('div');
+    row.className='row';
+    row.innerHTML=`
+      <span class="hint" style="flex:none;">Ô (${r},${c})</span>
+      <div><label style="margin:2px 0;">Cần phá bao nhiêu cặp</label><input class="seal-required" type="number" min="1" value="${required}"></div>
+      <button class="danger small" style="flex:none;" type="button">Xoá</button>`;
+    row.querySelector('.seal-required').addEventListener('input', e=>{
+      level.seals[i]=[r,c,Math.max(1,parseInt(e.target.value,10)||1)];
+      onDataChanged();
+    });
+    row.querySelector('button.danger').addEventListener('click', ()=>{
+      level.seals.splice(i,1);
+      renderSealList(); renderBoard(); onDataChanged();
+    });
+    el.appendChild(row);
+  });
+}
+
 function pullMetaFromForm(){
   level.title=$('fTitle').value||'Untitled';
   level.size=Math.max(2,Math.min(6, parseInt($('fSize').value,10)||3));
   level.goalType=$('fGoalType').value;
-  level.sealRequiredDistinct=parseInt($('fSealDistinct').value,10)||0;
   // level.locks (array of {cells,face,required} groups) is mutated directly by the lock-group
   // UI (addLockGroup/removeLockGroup/the face+required inputs rendered per group in
-  // renderLockGroups) -- nothing to pull from a single flat field here anymore.
+  // renderLockGroups) -- nothing to pull from a single flat field here anymore. level.seals
+  // ([r,c,required] triples, added 12/09/2026) works the same way now: each cell's own
+  // required input (renderSealList) mutates it directly, no shared level.sealRequiredDistinct
+  // field left to pull from a single form field.
   level.guideMoves=parseInt($('fGuideMoves').value,10)||0;
   level.moveLimit=parseInt($('fMoveLimit').value,10)||0;
   level.boosterReroll=parseInt($('fBoosterReroll').value,10)||0;
@@ -743,12 +786,12 @@ function pullMetaFromForm(){
     Object.assign(allLevels[currentLevelIndex], {title:level.title, lesson:level.lesson, beatTag:level.beatTag, tension:level.tension, novelty:level.novelty, mastery:level.mastery});
   }
 }
-['fTitle','fSize','fSealDistinct','fGuideMoves','fMoveLimit','fBoosterReroll','fBoosterHint','fQueueRerollBudget','fQueueSolveDepth','fLesson','fTeach','fBeatTag','fTension','fNovelty','fMastery'].forEach(id=>$(id).addEventListener('input',onDataChanged));
+['fTitle','fSize','fGuideMoves','fMoveLimit','fBoosterReroll','fBoosterHint','fQueueRerollBudget','fQueueSolveDepth','fLesson','fTeach','fBeatTag','fTension','fNovelty','fMastery'].forEach(id=>$(id).addEventListener('input',onDataChanged));
 
 /* ---------------- level picker: load an existing P24M_LEVELS entry into the editor ---------------- */
 function blankLevel(){
   return {title:'New Level', size:3, goalType:'TILE_QUOTA', pairGoal:1, tileGoal:4, targetRequiredCount:0,
-    winTargets:[], seals:[], permanents:[], sealRequiredDistinct:0,
+    winTargets:[], seals:[], permanents:[],
     locks:[],
     tiles:[], sequence:[],
     guideMoves:0, moveLimit:0, boosterReroll:0, boosterHint:0,
@@ -767,8 +810,12 @@ function loadLevelIntoEditor(src){
   level=JSON.parse(JSON.stringify({
     title:src.title||'Untitled', size:src.size||3, goalType:src.goalType||'PAIR_QUOTA',
     pairGoal:src.pairGoal||1, tileGoal:src.tileGoal||4, targetRequiredCount:src.targetRequiredCount||0,
-    winTargets:src.winTargets||[], seals:src.seals||[], permanents:src.permanents||[],
-    sealRequiredDistinct:src.sealRequiredDistinct||0,
+    winTargets:src.winTargets||[],
+    // Old-format [r,c] seal entries (no per-seal required count) fall back to the level's old
+    // flat sealRequiredDistinct if present, else 1 -- migrates historical/backup data loaded
+    // from before the 12/09/2026 per-seal-required change without losing its old difficulty.
+    seals:(src.seals||[]).map(s=>s.length>=3?s:[s[0],s[1],src.sealRequiredDistinct||1]),
+    permanents:src.permanents||[],
     tiles:src.tiles||[],
     // Full locks[] array, every group preserved (see the `let level=` declaration comment
     // for why this replaced the old single-flat-group model).
@@ -793,8 +840,7 @@ function loadLevelIntoEditor(src){
   mode='edit'; playModel=null; recordedSolution=[]; activeLockGroup=0;
   $('fTitle').value=level.title; $('fSize').value=level.size; $('fGoalType').value=level.goalType;
   renderGoalFields(); // reads level.pairGoal/winTargets/targetRequiredCount + $('fGoalType').value, so order matters
-  $('fSealDistinct').value=level.sealRequiredDistinct;
-  renderLockGroups();
+  renderLockGroups(); renderSealList();
   $('fGuideMoves').value=level.guideMoves;
   $('fMoveLimit').value=level.moveLimit||0;
   $('fBoosterReroll').value=level.boosterReroll||0;
@@ -860,22 +906,22 @@ function isLockCell(r,c){ return level.locks.some(lock=>lock.cells.some(([lr,lc]
 function lockGroupAt(r,c){ return level.locks.find(lock=>lock.cells.some(([lr,lc])=>lr===r&&lc===c)); }
 function onCellClick(r,c){
   if(mode==='play'){ attemptPlay(r,c); return; }
-  if(tool.mode==='erase'){ clearCellCompletely(r,c); renderLockGroups(); }
+  if(tool.mode==='erase'){ clearCellCompletely(r,c); renderLockGroups(); renderSealList(); }
   else if(tool.mode==='seal'){
     if(!level.seals.some(([sr,sc])=>sr===r&&sc===c)){
       level.tiles=level.tiles.filter(t=>!(t.r===r&&t.c===c));
       level.permanents=level.permanents.filter(([pr,pc])=>!(pr===r&&pc===c));
       level.locks.forEach(lock=>{ lock.cells=lock.cells.filter(([lr,lc])=>!(lr===r&&lc===c)); });
-      level.seals.push([r,c]);
-      renderLockGroups();
-    } else level.seals=level.seals.filter(([sr,sc])=>!(sr===r&&sc===c));
+      level.seals.push([r,c,1]);
+      renderLockGroups(); renderSealList();
+    } else { level.seals=level.seals.filter(([sr,sc])=>!(sr===r&&sc===c)); renderSealList(); }
   } else if(tool.mode==='permanent'){
     if(!level.permanents.some(([pr,pc])=>pr===r&&pc===c)){
       level.tiles=level.tiles.filter(t=>!(t.r===r&&t.c===c));
       level.seals=level.seals.filter(([sr,sc])=>!(sr===r&&sc===c));
       level.locks.forEach(lock=>{ lock.cells=lock.cells.filter(([lr,lc])=>!(lr===r&&lc===c)); });
       level.permanents.push([r,c]);
-      renderLockGroups();
+      renderLockGroups(); renderSealList();
     } else level.permanents=level.permanents.filter(([pr,pc])=>!(pr===r&&pc===c));
   } else if(tool.mode==='lock'){
     if(!level.locks.length){ toast('Chưa có nhóm Khóa nào — bấm "+ Thêm nhóm Khóa" trước'); return; }
@@ -891,7 +937,7 @@ function onCellClick(r,c){
       // clicking a cell that belongs to a DIFFERENT group is a no-op here (rect-drag over it
       // would be ambiguous too) -- switch the active group first if you meant to edit that one.
     }
-    renderLockGroups();
+    renderLockGroups(); renderSealList();
   } else if(tool.mode==='floor'||tool.mode==='roof'){
     if(level.seals.some(([sr,sc])=>sr===r&&sc===c)||level.permanents.some(([pr,pc])=>pr===r&&pc===c)||isLockCell(r,c)) return;
     const z = tool.mode==='floor'?0:1;
@@ -994,7 +1040,7 @@ function showGhost(r,c){
   if(mode!=='play'||!playModel) return;
   clearGhost();
   const boardEl=$('board');
-  const sim=p24kSimulateDrop(r,c,playModel.tiles,playModel.pieces,playModel.level,playModel.sealOpen,playModel.idCounts);
+  const sim=p24kSimulateDrop(r,c,playModel.tiles,playModel.pieces,playModel.level,playModel.idCounts,playModel.pairs);
   if(sim.legal){
     sim.placements.forEach(p=>{
       const idx=p.r*level.size+p.c; const cellEl=boardEl.children[idx]; if(!cellEl) return;
@@ -1074,13 +1120,25 @@ function renderBoard(){
   for(let r=0;r<level.size;r++) for(let c=0;c<level.size;c++){
     const div=document.createElement('div'); div.className='cell';
     div.dataset.r=r; div.dataset.c=c;
-    const isSeal=level.seals.some(([sr,sc])=>sr===r&&sc===c);
+    const sealIdx=level.seals.findIndex(([sr,sc])=>sr===r&&sc===c);
     const isPerm=level.permanents.some(([pr,pc])=>pr===r&&pc===c);
     const lockHere=lockGroupAt(r,c);
     const lockCounts=(mode==='play'&&playModel)?playModel.idCounts:{};
     const lockCur=lockHere?Math.min(lockHere.required,lockCounts[lockHere.face]||0):0;
     const lockOpenNow=lockHere&&mode==='play'&&playModel&&lockCur>=lockHere.required;
-    if(isSeal && !(mode==='play'&&playModel&&playModel.sealOpen)) div.classList.add('seal');
+    // Seal opens per-cell now (its own required TOTAL-PAIRS count vs the shared pairs tally,
+    // no distinct-face/adjacency requirement) -- mirrors the Lock cur/required badge above
+    // instead of the old level-wide sealOpen boolean.
+    const pairsSoFar=(mode==='play'&&playModel)?playModel.pairs:0;
+    const sealReq=sealIdx!==-1?p24kSealRequired(level,sealIdx):0;
+    const sealCur=sealIdx!==-1?Math.min(sealReq,pairsSoFar||0):0;
+    const sealOpenNow=sealIdx!==-1&&mode==='play'&&playModel&&sealCur>=sealReq;
+    if(sealIdx!==-1 && !sealOpenNow){
+      div.classList.add('seal');
+      const st=document.createElement('div'); st.className='lockTag';
+      const cnt=document.createElement('div'); cnt.className='lt-count'; cnt.textContent=`${sealCur}/${sealReq}`;
+      st.appendChild(cnt); div.appendChild(st);
+    }
     if(isPerm) div.classList.add('permanent');
     if(lockHere && !lockOpenNow){
       div.classList.add('lock');
@@ -1546,8 +1604,10 @@ function renderGoalLine(){
     const cur=p24mTileTotal(playModel.idCounts), need=level.tileGoal||1;
     bodyHTML=`<span class="goal-chip${cur>=need?' met':''}">🀄 ${cur}<small>/${need}</small></span>`;
   } else if(level.goalType==='OPEN_SEAL'){
-    const cur=Object.keys(playModel.idCounts).length, need=level.sealRequiredDistinct||0;
-    bodyHTML=`<span class="goal-chip${cur>=need?' met':''}">🔓 ${cur}<small>/${need}</small></span>`;
+    // Aggregate: how many of the level's seals are open, each checked against its OWN
+    // required count (level.seals[i][2]) -- not one shared level-wide number anymore.
+    const total=level.seals.length, opened=level.seals.filter((s,i)=>p24kSealMet(level,playModel.pairs,i)).length;
+    bodyHTML=`<span class="goal-chip${opened>=total?' met':''}">🔓 ${opened}<small>/${total}</small></span>`;
   } else if(level.winTargets&&level.winTargets.length){
     if(level.goalType==='TARGET_FACE' && level.targetRequiredCount){
       const done=level.winTargets.filter(t=>(playModel.idCounts[t.id]||0)>=t.need).length;
@@ -1622,7 +1682,7 @@ function runValidation(){
   if(level.goalType==='TILE_QUOTA'){
     (Number.isInteger(level.tileGoal)&&level.tileGoal>0) ? pass('tileGoal hợp lệ') : fail('tileGoal hợp lệ');
   } else if(level.goalType==='OPEN_SEAL'){
-    (level.seals.length>0 && level.sealRequiredDistinct>0) ? pass('OPEN_SEAL có seal + sealRequiredDistinct') : fail('OPEN_SEAL có seal + sealRequiredDistinct');
+    (level.seals.length>0 && level.seals.every(s=>(s[2]||1)>0)) ? pass('OPEN_SEAL có seal + mỗi ô có required riêng') : fail('OPEN_SEAL có seal + mỗi ô có required riêng');
   } else if(level.winTargets&&level.winTargets.length){
     if(level.goalType==='TARGET_FACE' && level.targetRequiredCount){
       level.targetRequiredCount<=level.winTargets.length ? pass('targetRequiredCount ≤ số winTargets') : fail('targetRequiredCount ≤ số winTargets');
@@ -1694,11 +1754,10 @@ function genCode(){
   if(level.goalType==='TILE_QUOTA') lines.push(`  tileGoal: ${level.tileGoal},`);
   if(level.winTargets&&level.winTargets.length) lines.push(`  winTargets: [${level.winTargets.map(t=>`{id:${JSON.stringify(t.id)},need:${t.need}}`).join(', ')}],`);
   if(level.goalType==='TARGET_FACE'&&level.targetRequiredCount) lines.push(`  targetRequiredCount: ${level.targetRequiredCount},`);
-  if(level.seals.length) lines.push(`  seals: [${level.seals.map(s=>`[${s[0]},${s[1]}]`).join(', ')}],`);
+  if(level.seals.length) lines.push(`  seals: [${level.seals.map(s=>`[${s[0]},${s[1]},${s[2]||1}]`).join(', ')}],`);
   if(level.permanents.length) lines.push(`  permanents: [${level.permanents.map(p=>`[${p[0]},${p[1]}]`).join(', ')}],`);
   const nonEmptyLocks=(level.locks||[]).filter(l=>l.cells.length);
   if(nonEmptyLocks.length) lines.push(`  locks: [${nonEmptyLocks.map(l=>`{ cells: [${l.cells.map(k=>`[${k[0]},${k[1]}]`).join(', ')}], face: ${JSON.stringify(l.face)}, required: ${l.required} }`).join(', ')}],`);
-  if(level.sealRequiredDistinct) lines.push(`  sealRequiredDistinct: ${level.sealRequiredDistinct},`);
   lines.push(`  guideMoves: ${level.guideMoves},`);
   if(level.moveLimit) lines.push(`  moveLimit: ${level.moveLimit},`);
   if(level.boosterReroll) lines.push(`  boosterReroll: ${level.boosterReroll},`);
@@ -2009,8 +2068,8 @@ LUẬT ENGINE (bắt buộc tuân thủ chính xác):
   - TILE_QUOTA: cộng dồn tổng số TILE đã từng nổ, gộp CHUNG mọi mặt lại (không phân biệt mặt nào) cho tới khi đạt tileGoal — khác PAIR_QUOTA (đếm theo cụm/pairs, không theo tile) và khác TARGET_FACE (không yêu cầu mặt cụ thể). Dùng cho màn mở đầu, chỉ dạy thao tác đặt/khớp khối, chưa cần phân biệt mặt.
   - TARGET_FACE: winTargets là mảng [{id,need}] — mỗi mục cần đủ số TILE (không phải pairs) của mặt đó đã từng nổ; nếu targetRequiredCount>0 thì chỉ cần đạt đủ N-trên-M mục tiêu đó, không cần tất cả.
   - BURIED_TARGET: điều kiện thắng giống TARGET_FACE, nhưng nên đặt tile mục tiêu ở floor bị 1 roof khác che lên trên để tăng độ khó.
-  - OPEN_SEAL: thắng ngay khi tổng số MẶT KHÁC NHAU đã từng nổ (ở bất kỳ đâu trên bàn) đạt sealRequiredDistinct — không cần điều kiện nào khác.
-- seals: mảng [[r,c],...] — luôn chặn đặt tới khi mở (dùng được như chướng ngại cho MỌI goalType, không chỉ OPEN_SEAL). permanents: mảng [[r,c],...] — chặn vĩnh viễn, không bao giờ mở.
+  - OPEN_SEAL: thắng ngay khi TẤT CẢ ô Seal đều mở — mỗi ô mở riêng khi TỔNG SỐ CẶP đã ghép (ở bất kỳ đâu trên bàn, không cần khác mặt nhau) đạt đúng ngưỡng "required" CỦA RIÊNG ô đó (không phải 1 số dùng chung cho cả màn).
+- seals: mảng [[r,c,required],...] — mỗi ô luôn chặn đặt tới khi MỞ (dùng được như chướng ngại cho MỌI goalType, không chỉ OPEN_SEAL); "required" (số nguyên ≥1) là TỔNG SỐ CẶP đã ghép ở BẤT KỲ ĐÂU trên bàn mà RIÊNG ô này cần để mở (không cần khác mặt nhau — ghép lại đúng 1 mặt nhiều lần vẫn tính) — mỗi ô trong cùng 1 màn có thể có required khác nhau, chúng cùng đọc 1 bộ đếm chung nhưng mở ở các mốc khác nhau. permanents: mảng [[r,c],...] — chặn vĩnh viễn, không bao giờ mở.
 - locks: mảng [{cells:[[r,c],...], face, required}] — "ô khóa": mỗi ô trong cells bị chặn đặt (như seal) tới khi tổng số TILE mặt "face" đã từng nổ ở BẤT KỲ ĐÂU trên bàn (đếm y hệt TARGET_FACE, không phải riêng ô đó) đạt đủ "required"; dùng được với MỌI goalType, độc lập hoàn toàn với winTargets/pairGoal/tileGoal. Engine hỗ trợ nhiều nhóm lock độc lập, nhưng editor hiện chỉ author được TỐI ĐA 1 nhóm/màn — nếu trả về nhiều nhóm, chỉ nhóm đầu tiên được giữ lại, nên chỉ dùng 0 hoặc 1 phần tử trong mảng này.
 - Danh sách hình khối — "ids" phải có ĐÚNG số lượng bằng số ô của shapeKey, theo đúng thứ tự offset:
 ${shapesPromptBlock()}
@@ -2018,7 +2077,7 @@ ${shapesPromptBlock()}
 YÊU CẦU THIẾT KẾ:
 - Bám sát mô tả của designer (chủ đề, độ khó, cơ chế muốn nhấn mạnh).
 - Màn PHẢI giải được — tự suy luận kỹ 1 chuỗi nước đi hợp lệ trước khi chốt board+sequence (tool sẽ tự chạy solver kiểm tra lại sau).
-- KHÔNG cần tự tạo "solution" — chỉ cần board (tiles), seals/permanents/sealRequiredDistinct nếu dùng, và sequence khối.
+- KHÔNG cần tự tạo "solution" — chỉ cần board (tiles), seals/permanents nếu dùng (mỗi seal tự mang required riêng), và sequence khối.
 - title ngắn gọn tiếng Việt; lesson là 1 câu ngắn mô tả bài học/cơ chế màn dạy cho người chơi (có thể để trống "").
 - Field không áp dụng với goalType đã chọn thì để rỗng/0 (vd goalType khác TARGET_FACE/BURIED_TARGET thì winTargets=[]).
 - notes: giải thích ngắn gọn (1-3 câu) bạn đã thiết kế màn này ra sao để đáp ứng mô tả.`;
@@ -2032,9 +2091,8 @@ const AI_LEVEL_SCHEMA = {
     tileGoal:{type:'integer', minimum:0},
     winTargets:{type:'array', items:{type:'object', properties:{id:{type:'string',enum:FACES}, need:{type:'integer',minimum:1}}, required:['id','need'], additionalProperties:false}},
     targetRequiredCount:{type:'integer', minimum:0},
-    sealRequiredDistinct:{type:'integer', minimum:0},
     locks:{type:'array', items:{type:'object', properties:{cells:{type:'array',items:{type:'array',items:{type:'integer'},minItems:2,maxItems:2}}, face:{type:'string',enum:FACES}, required:{type:'integer',minimum:1}}, required:['cells','face','required'], additionalProperties:false}},
-    seals:{type:'array', items:{type:'array', items:{type:'integer'}, minItems:2, maxItems:2}},
+    seals:{type:'array', items:{type:'array', items:{type:'integer'}, minItems:3, maxItems:3}},
     permanents:{type:'array', items:{type:'array', items:{type:'integer'}, minItems:2, maxItems:2}},
     guideMoves:{type:'integer', minimum:0},
     lesson:{type:'string'},
@@ -2042,7 +2100,7 @@ const AI_LEVEL_SCHEMA = {
     sequence:{type:'array', items:{type:'object', properties:{shapeKey:{type:'string', enum:Object.keys(SHAPES)}, ids:{type:'array', items:{type:'string', enum:FACES}}}, required:['shapeKey','ids'], additionalProperties:false}},
     notes:{type:'string'},
   },
-  required:['title','size','goalType','pairGoal','tileGoal','winTargets','targetRequiredCount','sealRequiredDistinct','locks','seals','permanents','guideMoves','lesson','tiles','sequence','notes'],
+  required:['title','size','goalType','pairGoal','tileGoal','winTargets','targetRequiredCount','locks','seals','permanents','guideMoves','lesson','tiles','sequence','notes'],
   additionalProperties:false,
 };
 function currentLevelAsAiInput(){
@@ -2052,7 +2110,7 @@ function currentLevelAsAiInput(){
     targetRequiredCount:level.targetRequiredCount, winTargets:level.winTargets, seals:level.seals,
     locks:level.locks.filter(l=>l.cells.length).map(l=>({cells:l.cells, face:l.face, required:l.required})),
     permanents:level.permanents,
-    sealRequiredDistinct:level.sealRequiredDistinct, guideMoves:level.guideMoves,
+    guideMoves:level.guideMoves,
     lesson:level.lesson, tiles:level.tiles,
     sequence:level.sequence.map(p=>({shapeKey:p.shapeKey, ids:p.cells.map(c=>c.id)}))};
 }
@@ -2088,7 +2146,7 @@ function applyAiLevel(ai){
   const size=Math.max(2,Math.min(6,parseInt(ai.size,10)||3));
   const inBounds=(r,c)=>Number.isInteger(r)&&Number.isInteger(c)&&r>=0&&c>=0&&r<size&&c<size;
   const tiles=(ai.tiles||[]).filter(t=>t&&FACES.includes(t.id)&&(t.z===0||t.z===1)&&inBounds(t.r,t.c));
-  const seals=(ai.seals||[]).filter(s=>Array.isArray(s)&&inBounds(s[0],s[1]));
+  const seals=(ai.seals||[]).filter(s=>Array.isArray(s)&&inBounds(s[0],s[1])).map(s=>[s[0],s[1],Math.max(1,parseInt(s[2],10)||1)]);
   const permanents=(ai.permanents||[]).filter(p=>Array.isArray(p)&&inBounds(p[0],p[1])&&!seals.some(s=>s[0]===p[0]&&s[1]===p[1]));
   const sequence=(ai.sequence||[]).map((p,i)=>{
     const shape=SHAPES[p.shapeKey]||SHAPES.DH;
@@ -2112,7 +2170,6 @@ function applyAiLevel(ai){
     targetRequiredCount:Math.max(0,parseInt(ai.targetRequiredCount,10)||0),
     winTargets, seals, permanents,
     locks,
-    sealRequiredDistinct:Math.max(0,parseInt(ai.sealRequiredDistinct,10)||0),
     tiles, sequence,
     guideMoves:Math.max(0,parseInt(ai.guideMoves,10)||0),
     lesson:(ai.lesson||'').toString(), solution:[],

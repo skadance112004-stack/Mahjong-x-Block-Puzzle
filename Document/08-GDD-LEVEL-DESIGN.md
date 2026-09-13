@@ -1,65 +1,103 @@
 # GDD — Level Design (50 màn, Final Core)
 
 *Nguồn duy nhất: `Final Outputs/index.html` (`P24M_LEVELS`, đọc trực tiếp qua
-`window.__digest24k1` lúc runtime) + `Final Outputs/Mahjong_x_Block_Beatchart.xlsx` (điểm độ khó
-tính lại từ chính dữ liệu đó). Tài liệu này **không** lặp lại nội dung cơ chế/gameplay đã có ở
-`Final Outputs/GAME_DESIGN_DOCUMENT.md` (đọc file đó trước nếu cần hiểu Core Loop, Goal Type,
-Blocker — file này thay thế `07-GDD-TONG-HOP-TU-INDEX.md` cũ, đã xoá khỏi repo) — đây là tài
-liệu **chuyên về thiết kế màn**: cấu trúc độ khó, các quy tắc tác giả hoá đã được đúc kết qua
-nhiều đợt playtest/feedback thật, và quy trình an toàn khi sửa/thêm màn. Khi tài liệu này mâu
-thuẫn với `04-GDD-FINAL-CORE-MASTER.md` (bản 30-level, đã cũ) thì tài liệu này và
+`window.__digest24k1` lúc runtime) + `Final Outputs/Mahjong_x_Block_Beatchart.xlsx` (dữ liệu THÔ
+từng màn, đọc lại từ chính `index.html`, không suy diễn). Tài liệu này **không** lặp lại nội dung
+cơ chế/gameplay đã có ở `Final Outputs/GAME_DESIGN_DOCUMENT.md` (đọc file đó trước nếu cần hiểu
+Core Loop, Goal Type, Blocker) — đây là tài liệu **chuyên về thiết kế màn**: cấu trúc độ khó, các
+quy tắc tác giả hoá đã đúc kết qua nhiều đợt playtest/feedback thật, và quy trình an toàn khi
+sửa/thêm màn. Khi tài liệu này mâu thuẫn với `04-GDD-FINAL-CORE-MASTER.md` thì tài liệu này và
 `GAME_DESIGN_DOCUMENT.md` thắng.*
 
-*Cập nhật lần cuối: 11/09/2026, sau 3 đợt liên tiếp cùng ngày: (1) "đổi luật Seal sang kề-sát",
-(2) "đổi thứ tự dạy Ô Chắn/Phong Ấn" (cả 2 theo yêu cầu người dùng — xem
-`GAME_DESIGN_DOCUMENT.md` mục 4 cho chi tiết luật Seal mới), và (3) thêm chi tiết "Nước thắng
-thật" vào sheet "Level Difficulty" + sheet "Economy" mới (Xu/Booster theo màn, mục 9 dưới) vào
-`Beatchart.xlsx`. Bản 08/09/2026 trước đó vẫn đúng cho mọi phần không nhắc tới Seal/thứ tự
-chương/Economy bên dưới.*
+*Cập nhật lần cuối: 13/09/2026 — rà soát toàn bộ theo yêu cầu người dùng ("cả 50 màn đã xong,
+cập nhật GDD chi tiết nhất"), đối chiếu lại 100% với `window.__digest24k1.LEVELS` sống, không
+dùng số liệu cũ từ bản 11-12/09. Thay đổi lớn nhất so với bản trước:*
+
+- *`Beatchart.xlsx` được viết lại HOÀN TOÀN theo yêu cầu người dùng: chỉ còn **1 sheet duy nhất
+  "Level Data"**, chứa dữ liệu THÔ từng màn (goal, mechanic, move limit, số nước, số khối...),
+  **không còn** sheet "Đường cong độ khó" (biểu đồ), "Công thức" (điểm khó 7 thành phần + tứ
+  phân vị), hay "Economy" (Xu/Booster). Mọi cross-reference tới 3 sheet đó trong bản cũ đã được
+  gỡ hoặc thay bằng số liệu thô tương đương ở tài liệu này.*
+- *Rất nhiều màn 30-50 đã được thiết kế lại nhiều lần (bởi cả AI lẫn người dùng, có lúc song
+  song) kể từ bản 12/09: thứ tự dạy Ô Chắn/Seal/Lock giữ nguyên (Lv11/21/31), nhưng phân bố
+  goalType, số màn dùng mỗi cơ chế, và độ khó tuyệt đối từng chương đã đổi khác nhiều so với mọi
+  bản trước — xem §1 và §3 cho số liệu mới nhất.*
+- ***Cập nhật cùng ngày, sau đợt trên***: 3 màn từng CHƯA XONG (Lv40, Lv42, Lv46) đã được vá và
+  verify lại — xem hộp cập nhật cuối §1 và cột "Trạng thái" trong `Beatchart.xlsx` (nay 50/50
+  "OK"). `selfTest().ok` đã trở lại `true` (33/33 check).*
 
 ---
 
 ## 1. Cấu trúc tổng thể
 
-50 màn chia **5 chương × 10 màn**, ranh giới chương chỉ mang tính hiển thị ở màn chọn cấp
-(không gate nội dung — Ô Chắn đã xuất hiện từ Lv11, Seal từ Lv21, không đợi đúng mốc chương).
-**Thứ tự Ch2/Ch3 đã ĐẢO NGƯỢC so với bản trước 11/09/2026** (Ô Chắn dạy trước Phong Ấn, không
-phải ngược lại) theo yêu cầu người dùng — Ô Chắn là cơ chế đơn giản hơn (chặn vĩnh viễn, không
-điều kiện) nên hợp lý để dạy trước Seal (ngưỡng N mặt + giờ còn thêm ràng buộc kề-sát):
+50 màn chia **5 chương × 10 màn**, ranh giới chương chỉ mang tính hiển thị ở màn chọn cấp (không
+gate nội dung). Thứ tự dạy cơ chế theo đúng dữ liệu sống hiện tại — **mỗi cơ chế mới vẫn xuất
+hiện lần đầu ở đúng đầu chương của nó, không sớm hơn**:
 
 | Chương | Tên | Màn | Vai trò |
 |---|---|---|---|
-| C1 | Nền tảng | 1–10 | Dạy luật chơi cơ bản (drop, match, TILE_QUOTA) |
-| C2 | Ô Chắn | 11–20 | Dạy Permanent (đổi chỗ với C3 cũ, 11/09/2026) |
-| C3 | Phong Ấn | 21–30 | Dạy Seal (luật kề-sát mới), một số màn kết hợp với Permanent |
-| C4 | Kết hợp | 31–40 | Ôn + phối hợp toàn bộ cơ chế trên board nhỏ (chủ yếu 4×4/5×5) |
-| C5 | Mastery | 41–50 | Board lớn (5×5/6×6), phối hợp dày nhất, màn chốt hạ |
+| C1 | Nền tảng | 1–10 | Core loop: đặt, Match, che–lộ 2 tầng. Không có Ô Chắn/Seal/Lock nào. |
+| C2 | Ô Chắn | 11–20 | Ô Chắn (Permanent) xuất hiện lần đầu ở Lv11, dùng xuyên suốt 10/10 màn. |
+| C3 | Phong Ấn | 21–30 | Seal xuất hiện lần đầu ở Lv21. Lv21/22 là 2 màn `OPEN_SEAL` duy nhất còn lại trong toàn game. |
+| C4 | Kết hợp | 31–40 | Lock xuất hiện lần đầu ở Lv31. Từ đây cả 3 cơ chế bắt đầu xuất hiện chung trong cùng 1 màn. |
+| C5 | Mastery | 41–50 | Board lớn nhất game (đa số 6×6), mật độ Ô Chắn/Seal/Lock dày nhất, màn chốt hạ. |
 
-> 4 màn từng kết hợp Seal+Permanent ở vị trí Ch2 cũ (nay là Ch2 mới, trước khi Seal được dạy)
-> đã được thiết kế lại thành Permanent thuần khi đổi chỗ chương: "Double Block" (Lv16, trước là
-> "Seal Behind Stone"), "Three Faces, Two Stations" (Lv19), "Open Route" (Lv17), "Chapter Final
-> Exam" (Lv20). Tile/sequence/solution giữ nguyên — chỉ đổi ô Seal (không còn ý nghĩa thật khi
-> chưa dạy Seal) thành ô Permanent tương đương.
+**Phân bố loại mục tiêu (Goal Type)** — tính lại trực tiếp từ `window.__digest24k1.LEVELS`
+ngày 13/09/2026 (đã đổi RẤT NHIỀU so với mọi bản trước — không còn đúng "TARGET_FACE là loại chủ
+đạo áp đảo" như các bản cũ, dù vẫn là loại nhiều màn nhất):
 
-Phân bố loại mục tiêu (Goal Type) trên toàn bộ 50 màn (không đổi so với bản trước — đổi thứ tự
-chương/đổi luật Seal không ảnh hưởng goalType của màn nào):
+| Goal Type | Số màn | Danh sách màn | Ý nghĩa |
+|---|---|---|---|
+| `TILE_QUOTA` | 12 | 1,2,3,4,5,17,31,34,37,43,44,48 | Ghép đủ N quân bất kỳ mặt nào |
+| `TARGET_FACE` | 29 | (còn lại, xem `Beatchart.xlsx`) | Ghép đủ N của (các) mặt cụ thể |
+| `BURIED_TARGET` | 7 | 20,29,32,38,45,49,50 | Phải phá roof che trước mới chạm được mặt bị chôn bên dưới |
+| `OPEN_SEAL` | 2 | 21,22 | Thắng khi tất cả Seal của màn đã mở (đếm tổng số cặp khắp bàn) |
 
-| Goal Type | Số màn | Ý nghĩa |
-|---|---|---|
-| `TILE_QUOTA` | 5 | Ghép đủ N quân bất kỳ mặt nào (C1, dạy luật match cơ bản) |
-| `TARGET_FACE` | 32 | Ghép đủ N của (các) mặt cụ thể được liệt kê |
-| `OPEN_SEAL` | 6 | Ghép đủ K mặt khác nhau, mỗi match kề sát seal, để phá niêm phong |
-| `BURIED_TARGET` | 7 | Phải phá roof che trước mới chạm được mặt bị chôn bên dưới |
+> **Thay đổi lớn cần lưu ý**: `OPEN_SEAL` giảm từ 6 màn (bản 12/09) xuống còn đúng **2** (Lv21,
+> Lv22 — 2 màn dạy Seal đầu tiên của Ch3). Các màn từng là `OPEN_SEAL` (31 "Seal and Stone", 34
+> "Three Keys", 43 "Triple Seal", 48 "Two Seals" — số cũ, đã đổi tên/nội dung) phần lớn đã được
+> thiết kế lại thành `TILE_QUOTA` hoặc giữ tên "Two Seals" (Lv48) nhưng khác nội dung. Không suy
+> diễn thêm lý do — đây là kết quả của nhiều đợt chỉnh sửa độc lập, xem `Beatchart.xlsx` để biết
+> chi tiết từng màn hiện tại.
 
-Phân bố cơ chế chặn/khoá (một màn có thể dùng nhiều hơn 1 loại; số liệu tính lại trực tiếp từ
-`window.__digest24k1.LEVELS` ngày 11/09/2026 — chênh lệch với bản 08/09/2026 vì 4 màn đổi Seal
-thành Permanent (mục trên) và vì một vài con số cũ đã lệch khỏi dữ liệu sống từ trước đó):
+**Phân bố cơ chế chặn/khoá** (một màn có thể dùng nhiều hơn 1 loại cùng lúc):
 
-| Cơ chế | Số màn dùng |
-|---|---|
-| Permanent (Ô Chắn) | 28 |
-| Seal (Niêm phong) | 17 |
-| Lock (Khoá) | 16 |
+| Cơ chế | Số màn dùng | Màn sớm nhất | Số màn kết hợp CẢ 3 cơ chế cùng lúc |
+|---|---|---|---|
+| Ô Chắn (Permanent) | 31 | Lv11 | |
+| Seal (Niêm phong) | 24 | Lv21 | 13 màn: 33, 38, 39, 40, 41, 42, 44, 45, 46, 47, 48, 49, 50 |
+| Lock (Khoá) | 19 | Lv31 | (bảng bên trái) |
+
+**[Thử nghiệm, hiện KHÔNG dùng ở màn nào]** Engine hỗ trợ sẵn **Khóa 2 giai đoạn** (field
+`lock.after: {face, required}` — Lock chỉ thật sự mở khi CẢ điều kiện của riêng nó VÀ 1 điều
+kiện tiền đề đều đạt, không chỉ dựa vào số lượng như hiện tại). Đây là cải tiến được đề xuất và
+cài đặt vào engine (`p24kLockMet()`, xem `GAME_DESIGN_DOCUMENT.md`) để tách biệt Lock khỏi Seal
+bằng một trục THỨ TỰ mà Seal (đếm tổng số cặp, không quan tâm thứ tự) không có. Từng được áp
+dụng thử ở Lv33/Lv35 nhưng đã bị ghi đè khi 2 màn đó được thiết kế lại sau đó — **không màn nào
+trong 50 màn hiện tại dùng `lock.after`**. Cơ chế vẫn sẵn sàng dùng lại bất kỳ lúc nào (backward
+compatible 100% — Lock không có `after` hoạt động y hệt như trước).
+
+> ✅ **3 màn từng CHƯA XONG nay đã vá xong (13/09/2026, cùng ngày)**:
+> - **Lv40 "Chapter 4 Review"**: `solution` từng rỗng (0 nước). Dò lại qua engine thật
+>   (`debug.freshModel`/`debug.modelDrop`): mấu chốt là move 1 phải đưa `c2` khớp cặp với hạt
+>   giống `c2@(4,4)` trước — đó là cách DUY NHẤT đạt required=2 của Khóa, và 2 ô Khóa
+>   ((2,1)/(2,3)) lại chính là 2 hàng xóm KHÔNG-permanent duy nhất của ô hạt giống `w1`, nên
+>   `w1` không thể ghép được nếu chưa mở Khóa trước. Solution mới: 4 nước, `moveLimit` giữ
+>   nguyên 11 (không đổi thiết kế gốc, chỉ bổ khuyết phần thiếu).
+> - **Lv42 "Squeezed"**: `sequence` từng rỗng, khiến engine rút quân NGẪU NHIÊN từ `queuePool`
+>   thay vì theo `solution` cố định (không phải "ra ngoài biên" như ghi nhận ban đầu — đó là
+>   hệ quả của việc rút nhầm quân ngẫu nhiên, không phải lỗi toạ độ thật). Đã khôi phục
+>   `sequence` để mirror đúng `queuePool` (cùng khuôn mẫu Lv37/Lv47: `queuePool` cho rút ngẫu
+>   nhiên lúc chơi thật, `sequence` cố định cho solver/self-test) — `solution` 10 nước gốc chạy
+>   đúng ngay khi `sequence` được khôi phục, không cần đổi gì khác.
+> - **Lv46 "Two Shots"**: goal gốc cần `c1:4` nhưng bàn chỉ có ĐÚNG 1 hạt giống `c1`, và tìm
+>   kiếm vét cạn (tới 30 nước) xác nhận không có đường nào tạo cặp `c1` thứ 2 trong giới hạn
+>   nước đi hiện tại — hạ xuống `c1:2`, khớp đúng tên màn "Two Shots" / lesson "still no second
+>   chance". `h1:4` và `s1:4` giữ nguyên, đã đạt được.
+>
+> `selfTest().ok` nay là `true` (33/33 check xanh, bao gồm `all_solutions` và
+> `every_seal_level_opens_in_its_own_solution`). Cột "Trạng thái" trong `Beatchart.xlsx` đã
+> cập nhật, 50/50 màn "OK — solution replay đúng, đạt goal."
 
 ---
 
@@ -67,89 +105,55 @@ thành Permanent (mục trên) và vì một vài con số cũ đã lệch khỏ
 
 Áp dụng trực tiếp §3 của `puzzle-design-6-muc-tieu 1.md` (lý thuyết trục độ khó):
 
-- **Trục thô (qualitative)**: cơ chế mới (Ô Chắn, Seal, Lock, BURIED_TARGET...). Luôn giới
-  thiệu ở **màn dễ, đơn lẻ** trước khi bị trộn với cơ chế khác — ví dụ Ô Chắn dạy ở Lv11 (đơn
-  lẻ, không kèm Seal) trước khi Seal xuất hiện ở Lv21 và 2 cơ chế bắt đầu kết hợp trong Ch4/5.
-- **Trục tinh (quantitative)**: số nước, số mặt quân, `need` của từng mục tiêu, cỡ bàn. Dùng
-  để tinh chỉnh độ khó *sau khi* cơ chế đã quen, không dùng để che giấu việc thiếu nội dung.
-- **Không tăng đều một mạch (sawtooth)**: mỗi chương có nhịp "khó dần rồi thả một màn dễ"
-  (breather level) — ví dụ Lv25 "A Breather" ngay sau đỉnh Lv23, Lv32 "Two Under One" là màn
-  dễ nhất Chương 4 dù không phải màn đầu chương. *(Vị trí Lv23/25 đã đổi so với bản trước
-  11/09/2026 — nội dung của 2 màn này nằm trong khối Ch2/Ch3 vừa đổi chỗ, xem §1.)*
-- **Đỉnh cục bộ (peak) được đặt tên rõ**: Lv7/23/28 tự nhận là "PEAK 1/2/3 OF 3" trong lesson
-  text (Lv23, Lv28 đã dịch chuyển từ Lv13/Lv18 cũ khi đổi chỗ Ch2/Ch3) — Lv7 nằm ở Ch1 trước
-  khi cơ chế nào xuất hiện, còn Lv23/Lv28 nằm ở Ch3, sau khi cả Ô Chắn (Ch2) lẫn Seal (đầu Ch3)
-  đã được dạy.
-- **Sàn độ khó phải tăng dần theo chương** (đo bằng điểm trung bình chương, xem §3 dưới) —
-  đây là quy tắc **cứng**: nếu một chương sau có điểm trung bình thấp hơn chương trước, đó là
-  lỗi thiết kế cần sửa ngay, không phải "biến thể cho phong phú". **Ngoại lệ đã ghi nhận có chủ
-  đích (11/09/2026)**: Ch2 (Ô Chắn, TB 40.6) hiện CAO HƠN Ch3 (Phong Ấn, TB 33.5) sau khi đổi
-  thứ tự dạy cơ chế theo yêu cầu người dùng — xem hộp cảnh báo ở §3 để biết lý do và trạng
-  thái "cần cân bằng lại sau" của ngoại lệ này.
+- **Trục thô (qualitative)**: cơ chế mới luôn giới thiệu ở **màn dễ, đơn lẻ** trước khi bị trộn
+  với cơ chế khác — Ô Chắn ở Lv11 (đơn lẻ), Seal ở Lv21 (đơn lẻ, 2 màn `OPEN_SEAL` liên tiếp),
+  Lock ở Lv31 (ngay lập tức kết hợp với 2 cơ chế kia — Ch4 mang tên "Kết hợp" đúng nghĩa: không
+  có màn nào chỉ giới thiệu Lock một mình).
+- **Trục tinh (quantitative)**: số nước, số mặt quân, `need` của từng mục tiêu, cỡ bàn, số khối
+  lớn nhất trong hàng đợi. Dùng để tinh chỉnh độ khó *sau khi* cơ chế đã quen.
+- **Không tăng đều một mạch (sawtooth)**: mỗi chương nên có nhịp "khó dần rồi thả một màn dễ"
+  (breather level) thay vì tăng tuyến tính — xem `Beatchart.xlsx` cột "Số nước lời giải"/"Lượt
+  dư" để xác định vị trí breather hiện tại của từng chương (đã đổi vị trí nhiều lần qua các đợt
+  chỉnh sửa, không còn cố định ở Lv25/Lv32 như bản cũ).
+- **Sàn độ khó nên tăng dần theo chương** — quy tắc **định hướng**, không còn là quy tắc cứng
+  100% kể từ khi bỏ điểm-khó-tổng-hợp (xem §3): vì không còn 1 con số duy nhất đại diện cho "độ
+  khó" mỗi màn, việc so sánh chương-với-chương giờ dựa trên NHIỀU chỉ số thô song song (cỡ bàn,
+  số nước, số cơ chế kết hợp) thay vì 1 điểm tổng — xem bảng ở §3.
 
 ---
 
-## 3. Công thức điểm độ khó
+## 3. Số liệu độ khó thô theo chương
 
-Tính từng màn bằng 7 thành phần cộng lại (định nghĩa đầy đủ + số liệu sống nằm ở
-`Final Outputs/Mahjong_x_Block_Beatchart.xlsx`, sheet "Công thức" + "Level Difficulty"):
+**[Đổi 13/09/2026]** Bản trước dùng 1 công thức 7 thành phần cộng có trọng số ra 1 điểm khó duy
+nhất mỗi màn, lưu trong sheet "Level Difficulty" + "Công thức" của `Beatchart.xlsx`. Theo yêu
+cầu người dùng, `Beatchart.xlsx` giờ **chỉ chứa dữ liệu thô**, không tính điểm tổng hợp nữa —
+mục này thay bằng số liệu TRUNG BÌNH thô theo chương (tính trực tiếp từ `Beatchart.xlsx`/
+`window.__digest24k1.LEVELS`, không suy diễn):
 
-| # | Thành phần | Công thức | Ý nghĩa |
+| Chương | Cỡ bàn TB | Số nước lời giải TB | Move Limit TB |
 |---|---|---|---|
-| ① | Cỡ bàn | `size² / 4` | Bàn to hơn = nhiều ô phải quản lý cùng lúc |
-| ② | Kế hoạch | `= Nước lời giải tối ưu` | Lời giải dài hơn = phải nghĩ xa hơn |
-| ③ | Độ chật | `max(0, 3 − Lượt dư) × 1.5` | Lượt dư = Move Limit − Nước lời giải; dư càng ít càng ít chỗ sai |
-| ④ | Mặt quân | `Số mặt khác nhau TRÊN BÀN × 1.2` | Đếm mọi mặt xuất hiện trong `tiles`/`sequence`, **không chỉ** mặt được tính là mục tiêu |
-| ⑤ | Cơ chế | `Seal×2 + Ô Chắn×2 + Lock×3` | Lock nặng nhất vì luôn gắn với ngưỡng 1 mặt cụ thể |
-| ⑥ | Khối | `Khối lớn nhất trong hàng đợi × 0.5` | Khối nhiều ô hơn = khó tìm chỗ đặt hợp lệ |
-| ⑦ | Mục tiêu | `TILE_QUOTA=0 · OPEN_SEAL=1 · TARGET_FACE=2 · BURIED_TARGET=4` | Trọng số theo độ phức tạp bản chất của loại goal |
+| C1 Nền tảng | 4.2 | 5.5 | 7.1 |
+| C2 Ô Chắn | 5.6 | 8.5 | 14.0 |
+| C3 Phong Ấn | 5.6 | 7.3 | 10.1 |
+| C4 Kết hợp | 5.2 | 7.7 | 11.4 |
+| C5 Mastery | 5.9 | 10.4 | 12.6 |
 
-**[Mới 11/09/2026] Chi tiết bổ sung — "Nước thắng thật" / "Nước chết sau thắng"**: 2 cột mới
-trong sheet "Level Difficulty" (chèn ngay sau "Nước lời giải"), tính bằng cách replay từng
-`solution` qua `debug.freshModel`/`debug.modelDrop` và check điều kiện thắng đúng theo
-`goalType` sau MỖI nước (giống hệt `levelWon()` thật) — không suy luận, đọc trực tiếp từ engine.
-Đây KHÔNG phải 1 thành phần của công thức điểm khó (vẫn dùng `solution.length` cho ② như cũ,
-xem mục 7.2 lý do) mà là chi tiết CHẨN ĐOÁN: cho biết đúng "nước chết" phía sau điểm thắng thật
-là bao nhiêu (safety-net pattern, mục 7.3) — 24/50 màn hiện có ít nhất 1 nước chết, dài nhất là
-Lv23 "Use The Freed Cell" (6/11 nước là nước chết, hoàn toàn cho mục đích phá Seal trang trí,
-không ảnh hưởng goal `TARGET_FACE` thật của màn).
+**Đọc bảng này thế nào**: cỡ bàn và số nước lời giải tăng dần khá rõ từ C1→C5 (đúng hướng thiết
+kế). Move Limit TB không đơn điệu (C2 cao nhất, 14.0) — đây là hệ quả trực tiếp của việc C2 có
+`spare` (lượt dư) rộng rãi hơn các chương khác theo chủ đích thiết kế ("Ô Chắn dạy nhẹ nhàng"),
+**không phải dấu hiệu C2 "dễ hơn"** — số nước lời giải TB của C2 (8.5) vẫn cao hơn C1 (5.5) và
+C3/C4 (7.3/7.7), chỉ thấp hơn C5 (10.4). Không còn 1 điểm số tổng hợp để xếp hạng "màn nào khó
+nhất" một cách khách quan tuyệt đối nữa — muốn so sánh 2 màn cụ thể, đọc trực tiếp nhiều cột
+trong `Beatchart.xlsx` (cỡ bàn, số nước, lượt dư, số cơ chế, khối lớn nhất) thay vì 1 con số.
 
-**Mức độ** (Dễ/Vừa/Khó/Rất khó) chia theo **tứ phân vị thật** của 50 điểm hiện tại — luôn tính
-lại mỗi khi có màn thay đổi, không dùng ngưỡng số cố định. Tại thời điểm viết tài liệu này (sau
-đợt đổi luật Seal + đổi chỗ Ch2/Ch3, 11/09/2026):
-Dễ < 27.9 · Vừa 27.9–39.0 · Khó 39.0–43.5 · Rất khó ≥ 43.5.
+**Phân bố cỡ bàn toàn game**: 2×2×1, 3×3×1, 4×4×7, 5×5×14, 6×6×27. Hơn một nửa số màn (27/50)
+đã là 6×6 — bao gồm toàn bộ C5 gần như 100% và phần lớn C4 (do các đợt "tăng mật độ" và "kết hợp
+3 cơ chế" gần đây đều mở rộng board để có chỗ thêm nội dung thay vì nén vào board cũ).
 
-Điểm trung bình theo chương hiện tại (mục tiêu: tăng dần, cho phép 2 chương liền kề gần bằng
-nhau nếu chênh lệch nhỏ; **không được đảo thứ tự** — trừ ngoại lệ Ch2/Ch3 đã ghi nhận có chủ
-đích ngay dưới):
-
-| Chương | Điểm TB | Min | Max |
-|---|---|---|---|
-| C1 Nền tảng | 21.1 | 7.9 | 26.7 |
-| C2 Ô Chắn | 40.6 | 32.5 | 50.1 |
-| C3 Phong Ấn | 33.5 | 22.8 | 44.8 |
-| C4 Kết hợp | 42.9 | 34.6 | 56.0 |
-| C5 Mastery | 45.2 | 34.3 | 59.7 |
-
-> **⚠️ Vi phạm quy tắc "tăng dần theo chương" — CÓ CHỦ Ý (11/09/2026)**: Ch2 (40.6) hiện CAO
-> HƠN Ch3 (33.5), vì Ch2/Ch3 chỉ đổi CHỖ nội dung cho nhau (đổi thứ tự dạy Ô Chắn/Seal theo yêu
-> cầu người dùng — xem §1) mà KHÔNG cân bằng lại độ khó nội tại của từng chương theo vị trí
-> mới. Đánh đổi được chấp nhận có chủ đích: ưu tiên thứ tự dạy cơ chế hợp lý (Ô Chắn — chặn
-> vĩnh viễn, không điều kiện — dễ hiểu hơn Seal — ngưỡng N mặt + ràng buộc kề-sát — nên dạy
-> trước) hơn đường cong độ khó tuyệt đối theo chương. **Việc cần làm sau (chưa làm trong đợt
-> này)**: 1 đợt cân bằng lại riêng để hạ độ khó trung bình Ch2 hoặc nâng Ch3 (hoặc cả hai) tới
-> khi quy tắc đơn điệu được khôi phục — xem cột "Điểm độ khó" trong `Beatchart.xlsx` để chọn
-> đúng màn cần chỉnh trong mỗi chương (ưu tiên màn lệch xa TB nhất trước).
->
-> C4 và C5 hiện gần bằng nhau (42.9 vs 45.2) sau khi đánh đổi vài điểm độ khó của C4 lấy bố
-> cục gọn hơn (xem §6) — đây là đánh đổi có chủ đích, không phải sai số cần "sửa cho khớp".
-
-**Quy trình cập nhật**: sau bất kỳ thay đổi nào ảnh hưởng đến 1 trong 7 thành phần trên (thêm
-target, đổi moveLimit, thêm Seal/Permanent/Lock, đổi cỡ bàn...), phải chạy lại script trích
-xuất + tính điểm và ghi đè `Final Outputs/Mahjong_x_Block_Beatchart.xlsx` (cả bảng số liệu lẫn ảnh
-biểu đồ) trước khi coi màn đó là "xong". Không có script này trong repo — nó được viết lại từ
-đầu mỗi phiên làm việc bằng cách gọi `window.__digest24k1.LEVELS` qua Playwright rồi dùng
-`exceljs`/`jszip` để ghi lại file (xem §8).
+**Phân bố khối lớn nhất trong hàng đợi**: domino (2 ô) — 14 màn; tromino (3 ô) — 23 màn;
+tetromino (4 ô) — 7 màn; pentomino (5 ô) — 5 màn. Đa dạng hình khối đã được chủ động thêm vào
+nhiều màn Chương 5 (46-50) theo yêu cầu người dùng — không còn tình trạng "toàn domino" như các
+bản thiết kế rất sớm.
 
 ---
 
@@ -164,193 +168,132 @@ vượt:
 
 **Lý do**: thanh mục tiêu (goal-strip) hiển thị 1 chip riêng cho mỗi mặt quân + 1 chip cho
 Seal/Lock nếu có. Quá 4-5 chip trên màn hình điện thoại hẹp làm chữ số bị bé, khó phân biệt
-loại mặt — người chơi thật (playtest theo 2 persona: nam trung niên và nữ trung niên, cả hai
-đều là nhóm tuổi mục tiêu thực tế của thể loại game xếp mạt chược) đều phản hồi "quá nhiều
-loại phải nhớ cùng lúc" là điểm trừ rõ rệt, không phải cảm nhận chủ quan của 1 người.
+loại mặt — người chơi thật (playtest theo 2 persona: nam trung niên và nữ trung niên) đều phản
+hồi "quá nhiều loại phải nhớ cùng lúc" là điểm trừ rõ rệt.
 
 **Không phải target thì vẫn được giữ lại làm nội dung "trang trí"**: khi một mặt bị loại khỏi
 `winTargets` do vượt giới hạn, KHÔNG xoá tile/sequence/move đã tạo ra nó — chỉ xoá khỏi mảng
 `winTargets`. Quân đó vẫn được đặt và ghép bình thường trên bàn, chỉ là không được đếm vào
-điều kiện thắng. Cách này giữ nguyên toàn bộ nội dung/độ dài lời giải đã thiết kế, chỉ giảm số
-lượng phải HIỂN THỊ và THEO DÕI cùng lúc.
+điều kiện thắng.
 
 ---
 
 ## 5. Số nước dư tối thiểu (spare moves)
 
-`Lượt dư = Move Limit − Nước lời giải`. Quy tắc chuẩn: **mọi màn nên có ít nhất 2 nước dư**
-(cho phép 1-2 nước sai/thử nghiệm mà không thua ngay).
+`Lượt dư = Move Limit − Nước lời giải`. Quy tắc chuẩn: **mọi màn nên có ít nhất 2 nước dư**.
 
-**Ngoại lệ đã ghi nhận** (không tự ý "sửa cho giống"):
+**Tình trạng thực tế (13/09/2026)** — đã đổi khá nhiều so với mọi bản trước, đọc trực tiếp từ
+`Beatchart.xlsx`:
 
-- **Lv1**: không đụng vào theo yêu cầu người dùng ở mọi đợt tinh chỉnh — là màn tutorial gốc.
-- **Lv46 "Two Shots"**: `moveLimit = 2 = Nước lời giải` → **0 nước dư, có chủ đích**. Đây là
-  redesign toàn bộ theo yêu cầu người dùng cho một màn "chính xác tuyệt đối, không có cơ hội
-  thứ hai" — mỗi trong 2 nước phải tạo ra 2 cặp ghép cùng lúc. Playtest persona xác nhận đây
-  là "cái khó đúng gu" (ngắn, thử lại nhanh, không mất công làm lại cả màn dài) — **không**
-  nới thêm nước dư cho màn này dù áp dụng quy tắc "≥2 nước dư" ở nơi khác.
-- Các màn từng có 0-1 nước dư nhưng KHÔNG có lý do thiết kế đặc biệt (Lv4, 7, 10, 21, 22, 23,
-  18, 35, 37, 39 — số màn đã quy đổi theo lần đổi chỗ Ch2/Ch3 11/09/2026; tại thời điểm sửa
-  08/09/2026 các màn này là Lv4, 7, 10, 11, 12, 13, 28, 35, 37, 39) đã được nới lên ≥2 trong đợt
-  08/09/2026 — kể cả 2 màn từng tự nhận là "đỉnh khó, zero nước dư" (Lv7, Lv23) trong lịch sử,
-  vì playtest thật cho thấy "đỉnh khó" không cần đi kèm "không còn margin cho sai sót" mới đúng
-  nghĩa khó.
+- **Lv1**: không đụng vào — màn tutorial gốc, quy tắc không áp dụng.
+- **Lv4, Lv43, Lv45**: `0 lượt dư` (moveLimit = số nước lời giải chính xác). Không có ghi chú
+  thiết kế đặc biệt nào cho 3 màn này trong dữ liệu hiện tại — khác với Lv46 ở các bản tài liệu
+  trước (từng là "0 lượt dư CÓ CHỦ ĐÍCH" nổi tiếng của game), **Lv46 hiện KHÔNG còn ở trạng thái
+  0 lượt dư** — sau khi vá lỗi (§1), solution xác nhận 8 nước / moveLimit 14 = **6 lượt dư**,
+  khá rộng rãi so với phần còn lại của C5.
+- **Lv2, 3, 12, 18, 22, 23, 29, 32, 39, 48, 49**: `1 lượt dư`. Không có exception note nào ghi
+  nhận các màn này là "có chủ đích" trong dữ liệu — nên coi đây là ứng viên cần rà lại nếu muốn
+  áp dụng nghiêm quy tắc "≥2" trong 1 đợt cân bằng sau này.
+
+> **Khuyến nghị cho game designer đọc tài liệu này**: danh sách "0-1 lượt dư" ở trên khá dài
+> (14/50 màn) so với các bản tài liệu trước (từng chỉ có 1-2 ngoại lệ có chủ đích). Đây là dấu
+> hiệu cho thấy nhiều đợt chỉnh sửa độc lập gần đây (tăng độ khó Lv30-50, tăng mật độ cơ chế,
+> thêm đa dạng hình khối) đã làm hẹp lượt dư ở khá nhiều màn mà không có ghi chú thiết kế đi
+> kèm — nên rà lại có chủ đích trong đợt cân bằng tiếp theo, thay vì giả định tất cả đều "được
+> thiết kế đúng như vậy".
 
 ---
 
 ## 6. Mật độ trực quan — tránh "rối mắt"
 
-Quy tắc mới (chốt 08/09/2026, từ phản hồi persona "nữ trung niên": *"vài màn ở giữa game
-thấy hơi rối vì nhiều thứ dồn vào ô nhỏ"*). Khi thêm Permanent để tăng điểm độ khó (⑤), **hình
-dạng cụm ô bị chặn quan trọng hơn số lượng tuyệt đối**:
+Quy tắc (chốt 08/09/2026, từ phản hồi persona "nữ trung niên"). Khi thêm Permanent để tăng độ
+khó, **hình dạng cụm ô bị chặn quan trọng hơn số lượng tuyệt đối**:
 
-- **Ưu tiên**: 1 cụm hình học rõ ràng (một hàng, một cột, một khối vuông) hơn là các ô rải
-  rác từng cái một khắp bàn. Người chơi đọc được "à, đây là một bức tường" nhanh hơn nhiều so
-  với việc phải dò từng ô đen lẻ tẻ.
-- **Khi cần thêm điểm mà không muốn thêm ô bị chặn mới**: nâng cấp 1 ô Permanent đã có trong
-  cụm thành **Lock** thay vì thêm Permanent mới cạnh đó. Lock cho `+3` so với Permanent `+2`
-  (cùng chiếm 1 ô, điểm cao hơn, lại còn là cơ chế "sống" — có ngưỡng mở — thay vì vĩnh viễn
-  chết) → cùng lúc tăng điểm ⑤ nhiều hơn VÀ giảm số ô-đen-tĩnh trên bàn.
-- **Ví dụ đã áp dụng**: Lv37, Lv38 (bỏ 1 ô Permanent lẻ phá vỡ hàng/cột thẳng, nâng 1 ô trong
-  cụm thành Lock); Lv39 (bỏ 3 ô rải rác xa cụm góc, giữ cụm 3 ô + 1 Lock ở góc).
-- Board càng nhỏ (4×4) càng nhạy cảm với quy tắc này — trên 4×4 (16 ô), mỗi ô bị chặn thêm là
-  +6.25% diện tích bàn nhìn thấy được, cảm giác chật hẹp tăng rất nhanh so với board 6×6.
+- **Ưu tiên**: 1 cụm hình học rõ ràng (một hàng, một cột, một khối vuông) hơn là các ô rải rác
+  từng cái một khắp bàn.
+- **Khi cần thêm mà không muốn thêm ô bị chặn mới**: nâng cấp 1 ô Permanent đã có trong cụm
+  thành **Lock** thay vì thêm Permanent mới cạnh đó — cùng chiếm 1 ô nhưng Lock là cơ chế "sống"
+  (có ngưỡng mở) thay vì vĩnh viễn chết.
+- Board càng nhỏ (4×4) càng nhạy cảm với quy tắc này — mỗi ô bị chặn thêm là +6.25% diện tích
+  bàn nhìn thấy được.
 
 ---
 
 ## 7. Quy trình an toàn khi sửa/thêm màn
 
-Đúc kết từ rất nhiều lỗi thật gặp phải trong quá trình chỉnh 49/50 màn (mọi màn trừ Lv1) qua
-nhiều đợt. Đọc kỹ trước khi sửa bất kỳ `winTargets`/`tiles`/`sequence`/`solution` nào:
+Đúc kết từ rất nhiều lỗi thật gặp phải khi chỉnh màn qua nhiều đợt. Đọc kỹ trước khi sửa bất kỳ
+`winTargets`/`tiles`/`sequence`/`solution` nào:
 
 1. **RAW id vs rendered id**: code luôn dùng raw id (`s1,s2,c1,c2,w1,w2,h1,h2`) trong
-   `tiles`/`sequence`/`winTargets` khi viết trong file nguồn. Nhưng đọc `LEVELS[i].winTargets`
-   qua `window.__digest24k1` lúc runtime trả về **rendered id đã map** (`s1→s1, c1→c2, w1→w3,
-   s2→s4, c2→c5, w2→w6, h1→c8, h2→s7`). Luôn quy đổi ngược trước khi viết vào source.
+   `tiles`/`sequence`/`winTargets`/`locks[].face`/`locks[].after.face` khi viết trong file
+   nguồn. Đọc `LEVELS[i]` qua `window.__digest24k1` lúc runtime trả về **rendered id đã map**
+   (`s1→s1, c1→c2, w1→w3, s2→s4, c2→c5, w2→w6, h1→c8, h2→s7`). Luôn quy đổi ngược trước khi
+   viết vào source.
 2. **"Real playtime" ≠ độ dài `solution`**: `levelWon()` được check ngay sau MỌI nước đi, màn
-   kết thúc NGAY khi đạt mục tiêu — không đợi hết `solution`. Nhiều màn có nước "chết" phía
-   sau điểm thắng thật (chấp nhận được, xem "safety-net pattern" bên dưới), nhưng công thức
-   điểm khó (`② Kế hoạch`, `③ Độ chật`) tính theo **toàn bộ `solution.length`**, không theo
-   điểm thắng thật — 2 con số này KHÔNG PHẢI LÀ MỘT, đừng nhầm khi đọc điểm.
+   kết thúc NGAY khi đạt mục tiêu — không đợi hết `solution`. Nhiều màn có nước "chết" phía sau
+   điểm thắng thật (safety-net pattern, mục 3 dưới) — chấp nhận được, không phải bug.
 3. **"Safety-net pattern" — CHỦ Ý, không phải bug**: game cho phép thắng sớm rồi chơi tiếp vài
-   nước "vô hại" (không ảnh hưởng gì vì màn đã kết thúc từ trước theo logic thắng-ngay ở mục
-   2). Đừng "sửa" hiện tượng `check_win_at` báo `ok:false` (nghĩa là thắng trước nước cuối) —
-   đây là thiết kế được chấp nhận, không phải điều cần fix, trừ khi được yêu cầu rõ ràng.
-4. **Lỗi "cascade-absorption"**: nếu thêm seed/piece mới dùng CHUNG 1 mặt đã tồn tại ở nơi
-   khác trong màn, quân mới có thể bị "hút" vào một cascade match đã có sẵn ở nước đi TRƯỚC
-   nước dự kiến, khiến nước dự kiến trở thành vô nghĩa (idCounts không đổi). Quy tắc: **ưu
-   tiên một mặt chưa từng dùng trong màn đó** cho seed/piece mới; nếu bắt buộc dùng lại mặt cũ,
-   phải kiểm tra kỹ mọi ô liền kề (4 hướng) của seed mới không chạm bất kỳ quân cùng mặt nào
-   còn sống ở BẤT KỲ thời điểm nào trước nước dự kiến.
-5. **Board đã đầy kín (0 ô trống)**: một số board nhỏ (đặc biệt 4×4 sau nhiều đợt thêm nội
-   dung) không còn ô nào chưa từng bị chạm. Không thể thêm seed/piece mới ở đây. Giải pháp
-   theo thứ tự ưu tiên: (a) tái sử dụng 1 quân "mồi nhử cùng mặt khác tầng, không match" đã có
-   sẵn trong màn bằng cách cho quân mới đáp làm roof liền kề nó; (b) nếu vẫn không đủ chỗ, mở
-   rộng board (4×4→5×5) — tọa độ cũ vẫn hợp lệ, chỉ thêm hàng/cột mới cho nội dung mới, không
-   đụng vào phần đã thiết kế.
-6. **Sequence dạng "cyclic"**: nếu `sequence.length < solution.length` gốc (nghĩa là engine
-   lặp lại quân qua modulo `(queueIndex+offset) % sequence.length`), **PHẢI "unroll"** thành
-   danh sách tường minh đúng bằng `solution.length` cũ trước khi thêm quân mới vào cuối — nếu
-   không, thêm 1 phần tử vào `sequence` sẽ đổi luôn modulo và tráo quân của TẤT CẢ các nước cũ
-   đã có sẵn (đã từng gây lỗi thật ở Lv13, Lv20 lúc chỉnh — số màn cũ tại thời điểm gây lỗi là
-   Lv23/Lv30, đã đổi số theo lần đổi chỗ Ch2/Ch3 11/09/2026).
-7. **[Mới 11/09/2026] Seal giờ đòi hỏi match KỀ SÁT**: mọi seed/piece dùng để mở 1 Seal phải
-   được đặt (hoặc dẫn 1 match cascade tới) một ô LIỀN KỀ trực tiếp (không chéo) với ít nhất 1 ô
-   trong `level.seals` — không còn tính nếu match xảy ra ở nơi khác trên bàn, dù cùng đủ N mặt
-   khác nhau. Khi thêm màn Seal mới hoặc di chuyển vị trí Seal, luôn kiểm tra bằng
-   `model.sealAdjacentCounts` (không phải `model.idCounts`/`S.targetCounts` — 2 bộ đếm này giờ
-   tách biệt) sau khi replay `solution`, và xác nhận `model.sealOpen === true` ở cuối — riêng
-   `selfTest().ok===true` (mục 8 dưới) KHÔNG đủ để bắt lỗi này, vì 1 màn có thể `ok:true` (goal
-   khác vẫn đạt) trong khi Seal của nó không bao giờ thật sự mở.
-8. **Sau mỗi thay đổi, luôn xác nhận**: `selfTest()` (`window.__digest24k1.selfTest()`, phải
-   `ok:true` — check toàn bộ 50 màn cùng lúc, không chỉ màn vừa sửa, bao gồm cả check
-   `every_seal_level_opens_in_its_own_solution` mới) + trace lại đúng `solution` bằng
-   `debug.freshModel`/`debug.modelDrop` để chắc điểm thắng thật đúng như dự tính, không lệch đi
-   vì hiệu ứng dây chuyền không lường trước.
+   nước "vô hại". Đừng "sửa" hiện tượng thắng trước nước cuối cùng của `solution` — đây là thiết
+   kế được chấp nhận.
+4. **Lỗi "cascade-absorption"**: nếu thêm seed/piece mới dùng CHUNG 1 mặt đã tồn tại ở nơi khác
+   trong màn, quân mới có thể bị "hút" vào một cascade match đã có sẵn ở nước đi TRƯỚC nước dự
+   kiến. Ưu tiên một mặt CHƯA từng dùng trong màn đó cho seed/piece mới.
+5. **Board đã đầy kín (0 ô trống)**: kiểm tra bằng cách replay `solution` qua
+   `debug.freshModel`/`debug.modelDrop` và ghi lại mọi ô từng bị chạm (kể cả tạm thời) — chỉ ô
+   KHÔNG nằm trong danh sách đó mới thật sự an toàn để đặt seed mới. Nếu không còn ô nào, mở
+   rộng board (VD 4×4→5×5) — tọa độ cũ vẫn hợp lệ nguyên vẹn, chỉ thêm hàng/cột mới.
+6. **Sequence dạng "cyclic"**: nếu `sequence.length < solution.length`, engine lặp lại quân qua
+   modulo `(queueIndex+offset) % sequence.length`. Phải "unroll" thành danh sách tường minh
+   trước khi thêm quân mới vào cuối, nếu không sẽ tráo quân của TẤT CẢ các nước cũ.
+7. **Luật Seal hiện hành**: Seal đếm **TỔNG SỐ CẶP đã ghép khắp bàn** (`S.pairs`/`model.pairs`),
+   không cần khác mặt, không cần kề sát ô Seal. `level.seals` là mảng bộ ba `[r, c, required]` —
+   mỗi ô Seal có ngưỡng riêng, mở ở các mốc khác nhau của cùng 1 bộ đếm `pairs` chung. Thiếu phần
+   tử thứ 3 mặc định `required = 1`. Sau khi thêm/sửa Seal, luôn xác nhận bằng
+   `p24kSealsAllOpen(level, model.pairs) === true` sau khi replay `solution` — `selfTest().ok`
+   không đủ để bắt lỗi Seal không thật sự mở.
+8. **Lock 2 giai đoạn (`lock.after`)**: nếu dùng, nhớ quy đổi RAW id cho `after.face` giống như
+   `face` (mục 1) — pipeline remap đã xử lý cả hai, nhưng dễ quên khi viết tay. Hiện không màn
+   nào trong 50 màn dùng field này (xem §1).
+9. **Sau mỗi thay đổi, luôn xác nhận**: `window.__digest24k1.selfTest().ok === true` (check
+   TOÀN BỘ 50 màn cùng lúc, không chỉ màn vừa sửa) + trace lại `solution` bằng
+   `debug.freshModel`/`debug.modelDrop` để chắc điểm thắng thật đúng như dự tính. **Tại thời
+   điểm viết tài liệu này (13/09/2026, sau khi vá Lv40/42/46), `selfTest().ok === true` (33/33
+   check) và `check_all_solutions` xác nhận cả 50/50 màn đều `runSolution` thành công** — xem §1.
 
 ---
 
 ## 8. Công cụ hỗ trợ (không nằm trong repo)
 
-Các script Playwright/Node dưới đây được viết lại theo nhu cầu mỗi phiên làm việc (không
-commit vào repo, sống trong thư mục scratchpad của agent) — nếu cần lặp lại 1 tác vụ, viết lại
-theo mô tả sau thay vì tìm file cũ:
+Các script Playwright/Node dưới đây được viết lại theo nhu cầu mỗi phiên làm việc (không commit
+vào repo) — nếu cần lặp lại 1 tác vụ, viết lại theo mô tả sau:
 
-- **Trích xuất dữ liệu 1 hoặc nhiều màn**: mở `index.html?genTest=0&unlockAll=1` bằng
-  Playwright, đọc `window.__digest24k1.LEVELS[i]`, tính `neverTouched` (ô chưa từng bị chạm
-  bởi seed/move nào — an toàn để đặt seed MỚI) và `freeAtEndButTouched` (ô từng bị chạm nhưng
-  trống lúc kết thúc solution gốc — chỉ an toàn cho quân MỚI đáp xuống, không phải seed).
-- **Kiểm tra điểm thắng thật**: replay từng nước bằng `debug.freshModel(idx)` +
-  `debug.modelDrop(model,row,col)`, check điều kiện thắng (theo `goalType`) sau mỗi nước, so
-  với `solution.length` — lệch nghĩa là có nước "chết" phía sau (safety-net, xem §7.3).
-- **Cập nhật Beatchart.xlsx**: đọc toàn bộ `LEVELS` → tính 7 thành phần (§3) → dùng `exceljs`
-  ghi lại sheet "Level Difficulty" + ngưỡng tứ phân vị trong "Công thức" → dựng lại ảnh biểu đồ
-  (SVG render qua Playwright, cùng style cột-theo-chương) → dùng `jszip` thay trực tiếp
-  `xl/media/image1.png` bên trong file `.xlsx` (KHÔNG dùng `Compress-Archive`/zip tool chung
-  chung để đóng gói lại toàn bộ file — làm hỏng cấu trúc OOXML, `exceljs` sẽ không đọc lại
-  được; chỉ thay đúng 1 file ảnh bên trong archive đã có sẵn).
+- **Trích xuất dữ liệu 1 hoặc nhiều màn**: mở `index.html?genTest=0&unlockAll=1` bằng Playwright,
+  đọc `window.__digest24k1.LEVELS[i]`, tính ô "chưa từng bị chạm" (an toàn đặt seed mới) qua
+  `debug.freshModel`/`debug.modelDrop`.
+- **Kiểm tra điểm thắng thật**: replay từng nước, check điều kiện thắng theo `goalType` sau mỗi
+  nước, so với `solution.length` — lệch nghĩa là có nước "chết" phía sau (safety-net, §7.3).
+- **Cập nhật `Beatchart.xlsx`** *(đơn giản hoá 13/09/2026)*: đọc toàn bộ `LEVELS` qua
+  `window.__digest24k1`, dùng `exceljs` ghi ra ĐÚNG 1 sheet "Level Data" với dữ liệu thô mỗi màn
+  (cỡ bàn, goalType, goal detail, moveLimit, số nước, lượt dư, số khối, khối lớn nhất, số mặt
+  khác nhau, số Ô Chắn/Seal/Lock + chi tiết, có/không Random Queue Pool, cột "Trạng thái" ghi rõ
+  màn nào đang lỗi/chưa xong). **Không còn** bước tính điểm khó 7 thành phần, không còn dựng lại
+  ảnh biểu đồ SVG, không còn sheet Economy — các bước đó đã bị bỏ theo yêu cầu người dùng.
 
 ---
 
-## 9. Economy — Xu & Booster theo màn
-
-**[Mới 11/09/2026, theo yêu cầu người dùng]** Sheet mới **"Economy"** trong
-`Final Outputs/Mahjong_x_Block_Beatchart.xlsx`. Phạm vi CỐ Ý thu hẹp đúng 2 thứ người chơi THẬT
-SỰ nhận được: **Xu kiếm được** và **Booster nhận được** — không đụng tới giá Cửa hàng, danh
-sách skin, hay bất kỳ phần "chi tiêu" nào khác của economy (những phần đó đã có sẵn đầy đủ ở
-`GAME_DESIGN_DOCUMENT.md` mục 7, không lặp lại ở đây).
-
-**Bảng "Xu theo màn"** — tính lại chính xác công thức `computeWinCoins()` (`index.html`) cho cả
-50 màn, ở 2 kịch bản biên:
-- **Xu Tối Đa**: chơi tới đúng "Nước thắng thật" rồi dừng (tối đa hoá lượt dư), không dùng
-  Booster nào, cộng dồn đủ mọi bonus.
-- **Xu Tệ Nhất**: dùng hết Booster + không còn lượt dư nào (vẫn được Xu Sàn vì màn vẫn thắng).
-
-Cả 2 kịch bản đều nhân đôi đúng ở màn 10/20/30/40/50. **Validate chéo với
-`GAME_DESIGN_DOCUMENT.md` mục 7.1**: cộng dồn Xu Tệ Nhất tới đúng Lv30 = **899 Xu**, khớp
-CHÍNH XÁC với câu "người chơi tệ nhất... vẫn gom đủ ~899 Xu tới màn 30 — đúng bằng giá skin rẻ
-nhất" — xác nhận công thức trong sheet đúng với engine thật, không phải số ước lượng.
-
-**Lưu ý quan trọng khi đọc cột "Xu +Lượt dư"**: tính theo **Nước thắng thật** (mục 3 ở trên),
-KHÔNG phải `Nước lời giải`/`solution.length` — 1 người chơi dừng ngay khi thắng (không chơi hết
-`solution` tác giả soạn, kể cả phần "nước chết") luôn được lượt dư nhiều hơn hoặc bằng người
-chơi hết cả `solution`, nên Xu tối đa trong sheet là con số ĐÚNG cho người chơi thật, không phải
-con số nếu tính nhầm theo `solution.length`.
-
-**Bảng "Nguồn Booster" — KHÔNG theo từng màn**: khác với Xu (tính được chính xác theo từng màn
-qua `computeWinCoins()`), Booster (Đổi khối/Hint) đến từ Nhiệm vụ hàng ngày + Điểm danh 30 ngày
-+ mua ở Cửa hàng — **không có màn nào tự nó phát Booster cả**. Vì vậy bảng này liệt kê từng
-NGUỒN (không phải từng màn) — xem chi tiết đầy đủ ở `GAME_DESIGN_DOCUMENT.md` mục 8.
-
-> ⚠️ **Phát hiện khi làm sheet này**: cột "Đổi khối"/"Hint" đã có sẵn từ trước trong sheet "Level
-> Difficulty" (field `level.boosterReroll`/`level.boosterHint` trong data màn) **không phản ánh
-> Booster thật người chơi nhận được** — đây là field CÒN SÓT LẠI từ 1 thiết kế cũ (cấp Booster
-> riêng theo từng level), đã bị thay bằng kho dùng chung từ trước, và `index.html` có hẳn 1
-> comment xác nhận việc này ("Booster giờ đọc từ kho DÙNG CHUNG toàn game (không còn theo
-> level.boosterReroll/..."). 2 cột đó vẫn giữ trong sheet "Level Difficulty" để không phá cấu
-> trúc đang có, nhưng **đừng dùng chúng để suy luận Booster người chơi nhận được** — dùng đúng
-> bảng "Nguồn Booster" trong sheet "Economy" mới này.
-
----
-
-## 10. Tài liệu liên quan
+## 9. Tài liệu liên quan
 
 - `puzzle-design-6-muc-tieu 1.md` — triết lý gốc (6 pillar/bổ sung), đặc biệt §3 (trục độ khó)
   và §4 (aesthetic/thẩm mỹ ASMR) là nền tảng cho mọi quy tắc ở tài liệu này.
 - `Final Outputs/GAME_DESIGN_DOCUMENT.md` — tài liệu nguồn cho cơ chế/gameplay/kiến trúc kỹ
-  thuật hiện hành (thay thế `07-GDD-TONG-HOP-TU-INDEX.md` cũ, đã xoá khỏi repo); đọc trước nếu
-  chưa quen Core Loop, các Goal Type, hay luật Seal kề-sát mới (mục 4 của file đó).
-- `PLAYTEST-AUDIT-50-LEVELS.md` — nhật ký lịch sử từng đợt cân bằng (trước đợt giới hạn số
-  loại mahjong này); dùng để tra "tại sao màn X lại như vậy" khi cần biết bối cảnh cũ. Lưu ý:
-  số màn trong tài liệu này viết TRƯỚC lần đổi chỗ Ch2/Ch3 (11/09/2026) — Lv11-30 nhắc tới
-  trong đó có thể chỉ nội dung nay đã đổi chỗ, quy đổi bằng ±10 tương ứng chiều di chuyển.
-- `Final Outputs/Mahjong_x_Block_Beatchart.xlsx` — số liệu sống, luôn là nguồn số chính xác nhất
-  tại bất kỳ thời điểm nào (tài liệu này chỉ trích một vài con số làm ví dụ, có thể lệch so
-  với xlsx nếu có màn được sửa sau ngày cập nhật ở đầu tài liệu). 3 sheet: "Đường cong độ khó"
-  (biểu đồ), "Level Difficulty" (7 thành phần điểm khó + chi tiết Nước thắng thật/Lock/Seal/Ô
-  Chắn từng màn), "Công thức" (định nghĩa công thức + ngưỡng tứ phân vị), và từ 11/09/2026 thêm
-  "Economy" (Xu/Booster theo màn, mục 9 ở trên).
+  thuật hiện hành; đọc trước nếu chưa quen Core Loop, các Goal Type, luật Seal/Lock hiện tại.
+- `PLAYTEST-AUDIT-50-LEVELS.md` — nhật ký lịch sử từng đợt cân bằng cũ; số màn trong đó có thể
+  không khớp bố cục hiện tại do nhiều lần đổi chỗ/thiết kế lại từ đó tới nay.
+- `Final Outputs/Mahjong_x_Block_Beatchart.xlsx` — **[Đổi 13/09/2026]** giờ chỉ còn **1 sheet
+  "Level Data"** chứa dữ liệu thô từng màn (không còn biểu đồ, không còn công thức điểm khó,
+  không còn Economy, không còn cột tên màn) — đây luôn là nguồn số chính xác nhất tại bất kỳ
+  thời điểm nào; tài liệu này chỉ trích một vài con số làm ví dụ.
 
 *Nguồn: `Final Outputs/index.html` (`P24M_LEVELS` qua `window.__digest24k1`) +
-`Final Outputs/Mahjong_x_Block_Beatchart.xlsx`, đối chiếu 2 vòng playtest feedback thật (08/09/2026)
-+ đợt đổi luật Seal/đổi chỗ Ch2·Ch3 theo yêu cầu người dùng (11/09/2026).*
+`Final Outputs/Mahjong_x_Block_Beatchart.xlsx`, đối chiếu trực tiếp ngày 13/09/2026 — không dùng
+lại số liệu suy diễn từ các bản tài liệu trước.*

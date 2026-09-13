@@ -2347,7 +2347,10 @@ function updateShopActiveSection(){
    window khiến updateShopActiveSection() không BAO GIỜ chạy khi người chơi
    cuộn tay (chỉ chạy đúng lúc bấm tab vì scrollIntoView cũng không bắn sự kiện
    scroll lên window) -- đây là nguyên nhân tab không tự sáng theo khi cuộn. */
-document.getElementById('app-scroll').addEventListener('scroll', updateShopActiveSection, {passive:true});
+/* Perf: same rAF-coalescing as the level-select scroll button above -- this loops over every
+   shop section calling getBoundingClientRect() per scroll event, otherwise. */
+{let __shopScrollRAF=null;
+document.getElementById('app-scroll').addEventListener('scroll', ()=>{ if(__shopScrollRAF)return; __shopScrollRAF=requestAnimationFrame(()=>{__shopScrollRAF=null;updateShopActiveSection();}); }, {passive:true});}
 window.__updateShopActiveSection=updateShopActiveSection;
 
 /* ------------------------------ TEST HOOK / SELFTEST ------------------------
@@ -2546,7 +2549,12 @@ function updateLsCurrentButton(){
   btnLsCurrent.classList.toggle('show', above||below);
   if(above||below) btnLsCurrent.textContent=above?'↑':'↓';
 }
-appScrollEl.addEventListener('scroll', updateLsCurrentButton, {passive:true});
+/* Perf: raw scroll fires far more often than the display repaints, and this handler forces
+   2 layout reads (getBoundingClientRect) every time -- scrolling fast through the 50-level
+   list was doing that on nearly every frame's worth of scroll delta. Coalesce to once per
+   animation frame like the drag-move handler above. */
+{let __lsCurRAF=null;
+appScrollEl.addEventListener('scroll', ()=>{ if(__lsCurRAF)return; __lsCurRAF=requestAnimationFrame(()=>{__lsCurRAF=null;updateLsCurrentButton();}); }, {passive:true});}
 btnLsCurrent.addEventListener('click', ()=>{ scrollToLevel(unlockedIndex(),'smooth'); });
 
 /* Bộ vuốt ngang để đổi chương đã bị gỡ bỏ: giờ chỉ còn một danh sách cuộn dọc
@@ -3879,7 +3887,7 @@ function p24kSimulateDrop(r,c,index=0,tiles=P24K.tiles,pieces=P24K.pieces,level=
 simulate=p24kSimulateDrop;
 
 function p24kBoardCellHTML(r,c){const bottom=p24kTileAt(r,c,0),top=p24kTileAt(r,c,1),stack=!!bottom&&!!top;let inner='';if(bottom){const cls=['gravity-layer','gravity-bottom',stack?'is-covered':'',bottom.justDropped?'just-dropped':'',bottom.justFell?'just-fell':''].filter(Boolean).join(' ');inner+=`<div class="${cls}" data-uid="${bottom.uid}" data-z="0">${tileHTML(T(bottom.id),'gravity-tile')}</div>`;}if(top){const cls=['gravity-layer','gravity-top',top.justDropped?'just-dropped':'',top.justFell?'just-fell':''].filter(Boolean).join(' ');inner+=`<div class="${cls}" data-uid="${top.uid}" data-z="1">${tileHTML(T(top.id),'gravity-tile')}</div>`;}return `<div class="cell${stack?' stack-cell':''}" data-r="${r}" data-c="${c}">${inner}</div>`;}
-renderBoard=function(){boardEl.style.gridTemplateColumns=`repeat(${S.size},1fr)`;let h='';for(let r=0;r<S.size;r++)for(let c=0;c<S.size;c++)h+=p24kBoardCellHTML(r,c);boardEl.innerHTML=h;};
+renderBoard=function(){__cellMetricsCache=null;boardEl.style.gridTemplateColumns=`repeat(${S.size},1fr)`;let h='';for(let r=0;r<S.size;r++)for(let c=0;c<S.size;c++)h+=p24kBoardCellHTML(r,c);boardEl.innerHTML=h;};
 /* Khay khoá height cố định ở CSS (.queue-slot) khớp với quân cao TỐI ĐA 2 hàng ở
    cỡ gốc sx0/sy0. Quân cao hơn 2 hàng (hiếm, vd P24M_I3V ba hàng dọc) phải tự
    THU NHỎ đều cả hai chiều để vừa khung đó thay vì đẩy khay giãn ra -- đây là
@@ -3920,7 +3928,7 @@ renderHUD=function(){
   const sealBox=$('hud-seal');
   if(sealBox){
     const sealTotal=(lvl.seals||[]).length;
-    const sealOpened=sealTotal?lvl.seals.filter((s,i)=>p24kSealMet(lvl,S.sealAdjacentCounts,i)).length:0;
+    const sealOpened=sealTotal?lvl.seals.filter((s,i)=>p24kSealMet(lvl,S.pairs,i)).length:0;
     const showSeal=!!(sealTotal&&lvl.goalType!=='OPEN_SEAL'&&sealOpened<sealTotal);
     sealBox.classList.toggle('hidden',!showSeal);
     if(showSeal)$('h-seal').innerHTML=sealOpened+'<small>/'+sealTotal+'</small>';
@@ -3999,7 +4007,19 @@ place=p24kPlace;
 function p24kLegalMoves(tiles=P24K.tiles,pieces=P24K.pieces,level=p24kLevel()){const out=[];for(let r=0;r<level.size;r++)for(let c=0;c<level.size;c++){const sim=p24kSimulateDrop(r,c,0,tiles,pieces,level);if(sim.legal)out.push({piece:0,row:r,col:c,floor:sim.floorCount,top:0,willMatch:sim.willMatch,willCascade:sim.willCascade});}return out;}
 function p24kFirstLegalMove(){return p24kLegalMoves()[0]||null;}
 
-function p24kCellMetrics(){const cell=boardEl.querySelector('.cell[data-r="0"][data-c="0"]');if(!cell)return {size:0,step:0,left:6,top:6};const next=boardEl.querySelector('.cell[data-r="0"][data-c="1"]');return {size:cell.offsetWidth,step:next?next.offsetLeft-cell.offsetLeft:cell.offsetWidth+3,left:cell.offsetLeft,top:cell.offsetTop};}
+/* Perf: this used to re-query the DOM and force a layout read (querySelector + offsetWidth/
+   offsetLeft/offsetTop) on every call. p24kMoveDrag() calls it on every single pointermove
+   during a drag -- easily 60-120+ times/sec -- so that was a real layout-thrashing cost sitting
+   directly in the game's most continuous interaction (report: "chơi game bị lag, không bấm
+   được"). Cell positions don't change mid-drag (only a re-render or resize can move them), so
+   cache the result and only recompute when invalidated by renderBoard(). */
+let __cellMetricsCache=null;
+function p24kCellMetrics(){
+  if(__cellMetricsCache)return __cellMetricsCache;
+  const cell=boardEl.querySelector('.cell[data-r="0"][data-c="0"]');if(!cell)return {size:0,step:0,left:6,top:6};
+  const next=boardEl.querySelector('.cell[data-r="0"][data-c="1"]');
+  return __cellMetricsCache={size:cell.offsetWidth,step:next?next.offsetLeft-cell.offsetLeft:cell.offsetWidth+3,left:cell.offsetLeft,top:cell.offsetTop};
+}
 function p24kCreateGhost(piece){const m=p24kCellMetrics(),dims=p24kPieceDims(piece),el=document.createElement('div');el.id='p24k-dragghost';el.style.width=(dims.cols*m.step-3)+'px';el.style.height=(dims.rows*m.step-3)+'px';piece.cells.forEach(cell=>{const wrap=document.createElement('span');wrap.innerHTML=tileHTML(T(cell.id));const tile=wrap.firstElementChild;if(!tile){console.warn('[p24kCreateGhost] no art for face id (missing P24K1_FACE_MAP entry?):',cell.id);return;}tile.style.left=(cell.dc*m.step)+'px';tile.style.top=(cell.dr*m.step)+'px';tile.style.width=m.size+'px';tile.style.height=m.size+'px';el.appendChild(tile);});document.body.appendChild(el);return {el,rows:dims.rows,cols:dims.cols};}
 /* Ghost nổi CAO hơn hẳn ngón tay (top = y-height-size*.58, xem p24kCreateGhost)
    để không bị ngón tay che mất -- nhưng r tính thẳng từ vị trí ghost đó nên ở
@@ -4009,10 +4029,23 @@ function p24kCreateGhost(piece){const m=p24kCellMetrics(),dims=p24kPieceDims(pie
    lúc kéo lên gần đỉnh bàn. Kẹp r/c vào đúng phạm vi có thể đặt được của
    TOÀN BỘ quân (0..size-dims) trước khi dùng để tính preview -- chỉ đổi mục
    tiêu LOGIC, không đổi vị trí ghost hiển thị (vẫn nổi cao y hệt như cũ). */
-function p24kMoveDrag(x,y){const d=P24K.drag;if(!d)return;const br=boardEl.getBoundingClientRect(),m=p24kCellMetrics(),width=d.cols*m.step-3,height=d.rows*m.step-3,left=x-width/2,top=y-height-m.size*.58;d.el.style.transform=`translate3d(${left}px,${top}px,0)`;const size=p24kLevel().size,c=Math.min(Math.max(0,Math.round((left-br.left-m.left)/m.step)),size-d.cols),r=Math.min(Math.max(0,Math.round((top-br.top-m.top)/m.step)),size-d.rows);if(r!==d.r||c!==d.c){d.r=r;d.c=c;const sim=p24kSimulateDrop(r,c,0);if(sim.legal)showPreview(r,c,0);else p24kShowBadPreview(r,c,P24K.pieces[0]);}}
+let __boardRectCache=null;
+function p24kMoveDrag(x,y){const d=P24K.drag;if(!d)return;const br=__boardRectCache||(__boardRectCache=boardEl.getBoundingClientRect()),m=p24kCellMetrics(),width=d.cols*m.step-3,height=d.rows*m.step-3,left=x-width/2,top=y-height-m.size*.58;d.el.style.transform=`translate3d(${left}px,${top}px,0)`;const size=p24kLevel().size,c=Math.min(Math.max(0,Math.round((left-br.left-m.left)/m.step)),size-d.cols),r=Math.min(Math.max(0,Math.round((top-br.top-m.top)/m.step)),size-d.rows);if(r!==d.r||c!==d.c){d.r=r;d.c=c;const sim=p24kSimulateDrop(r,c,0);if(sim.legal)showPreview(r,c,0);else p24kShowBadPreview(r,c,P24K.pieces[0]);}}
 trayEl.addEventListener('pointerdown',e=>{e.stopImmediatePropagation();if(S.busy)return;const pe=e.target.closest('.queue-current');if(!pe)return;const ghost=p24kCreateGhost(P24K.pieces[0]);P24K.drag={i:0,...ghost,r:-99,c:-99,sx:e.clientX,sy:e.clientY,moved:false,pointerId:e.pointerId};if(typeof p24kHideGuideHand==='function')p24kHideGuideHand();try{trayEl.setPointerCapture(e.pointerId);}catch(_){ }p24kMoveDrag(e.clientX,e.clientY);e.preventDefault();},true);
-trayEl.addEventListener('pointermove',e=>{if(!P24K.drag)return;e.stopImmediatePropagation();if(Math.abs(e.clientX-P24K.drag.sx)>4||Math.abs(e.clientY-P24K.drag.sy)>4)P24K.drag.moved=true;p24kMoveDrag(e.clientX,e.clientY);e.preventDefault();},true);
-function p24kEndDrag(e){if(!P24K.drag)return;e.stopImmediatePropagation();const d=P24K.drag;P24K.drag=null;d.el.remove();const sim=p24kSimulateDrop(d.r,d.c,0);if(d.moved&&sim.legal)p24kPlace(d.r,d.c,0);else clearPreview();}
+/* Perf: raw pointermove can fire faster than the display can paint (high-poll-rate mice,
+   coalesced touch events) -- calling p24kMoveDrag() (layout math + p24kSimulateDrop + possible
+   preview re-render) on every single one is wasted work between frames and, on a slow device,
+   can back up the input queue enough to feel like clicks stop registering. Coalesce to at most
+   once per animation frame; only the latest pointer position within a frame is used. */
+let __dragMoveRAF=null,__dragMoveXY=null;
+trayEl.addEventListener('pointermove',e=>{
+  if(!P24K.drag)return;e.stopImmediatePropagation();e.preventDefault();
+  if(Math.abs(e.clientX-P24K.drag.sx)>4||Math.abs(e.clientY-P24K.drag.sy)>4)P24K.drag.moved=true;
+  __dragMoveXY=[e.clientX,e.clientY];
+  if(__dragMoveRAF)return;
+  __dragMoveRAF=requestAnimationFrame(()=>{__dragMoveRAF=null;if(P24K.drag&&__dragMoveXY)p24kMoveDrag(__dragMoveXY[0],__dragMoveXY[1]);});
+},true);
+function p24kEndDrag(e){if(!P24K.drag)return;e.stopImmediatePropagation();const d=P24K.drag;P24K.drag=null;__boardRectCache=null;if(__dragMoveRAF){cancelAnimationFrame(__dragMoveRAF);__dragMoveRAF=null;}d.el.remove();const sim=p24kSimulateDrop(d.r,d.c,0);if(d.moved&&sim.legal)p24kPlace(d.r,d.c,0);else clearPreview();}
 trayEl.addEventListener('pointerup',p24kEndDrag,true);trayEl.addEventListener('pointercancel',p24kEndDrag,true);boardEl.addEventListener('pointerdown',e=>{if(P24K.drag)return;e.stopImmediatePropagation();},true);
 
 function p24kFreshModel(levelIndex){const level=P24K_LEVELS[levelIndex];return {level,tiles:level.tiles.map((t,i)=>({...t,uid:i+1,alive:true})),queueIndex:0,pieces:[p24kQueuePiece(0,level,0),p24kQueuePiece(1,level,0)],nextUid:level.tiles.length+1,pairs:0,events:[]};}
@@ -4462,9 +4495,16 @@ const P24M_LEVELS=[
     K_DOMINO_H("w1a", "s1", "w1"),
     K_DOMINO_H("w1b", "s1", "w1"),
     K_DOMINO_H("w1c", "s1", "w1"),
-    K_DOMINO_V("s2a", "s2", "w3"),
-    K_DOMINO_H("s2b", "s2", "w4"),
-    K_DOMINO_H("s2c", "s2", "w5"),
+    // [tile-visibility fix] w3/w4/w5 were never valid raw face ids (only s1,c1,w1,s2,c2,w2,h1,h2
+    // are). w3 happened to render fine by coincidence (P24K1_FACE_MAP maps w1->'w3', so the raw
+    // "w3" collided with that mapped id) but was a landmine -- it would actually MATCH a real
+    // w1-sourced tile. w4/w5 had no such collision and rendered as blank/'?'. Replaced with c1/c2
+    // (unused elsewhere on this board), keeping w4 and w5 on different ids since their final
+    // landing cells (2,1) and (3,1) are adjacent -- same id there would make them match each
+    // other, breaking the "lands lone forever" design intent described in the trace below.
+    K_DOMINO_V("s2a", "s2", "c1"),
+    K_DOMINO_H("s2b", "s2", "c1"),
+    K_DOMINO_H("s2c", "s2", "c2"),
   ],
   // move1 @(1,0): s1@(1,0) matches seed s1@(0,0) -> clears both; w1@(1,1) matches seed w1@(0,1) -> clears both.
   // move2 @(0,0): s1@(0,0) and w1@(0,1) both land lone (their old partners are gone).
@@ -4715,8 +4755,8 @@ const P24M_LEVELS=[
   title: "Chapter Final Exam",
   size: 6,
   goalType: "BURIED_TARGET",
-  winTargets: [{id:"s1",need:2}, {id:"w2",need:2}, {id:"c1",need:4}],
-  permanents: [[3,5], [4,4], [4,5], [5,4], [5,5], [5,1], [4,1], [4,0], [5,0], [3,0]],
+  winTargets: [{id:"s1",need:2}, {id:"w2",need:1}, {id:"c1",need:4}],
+  permanents: [[3,5], [4,4], [4,5], [5,4], [5,5], [5,1], [4,1], [4,0], [5,0]],
   guideMoves: 0,
   moveLimit: 20,
   boosterHint: 1,
@@ -4752,8 +4792,10 @@ const P24M_LEVELS=[
   title: "Break The First Seal",
   size: 4,
   goalType: "OPEN_SEAL",
-  seals: [[3,3]],
-  sealRequiredDistinct: 2,
+  // Seal opens by distinct faces matched ANYWHERE on the board (no adjacency requirement),
+  // required count now lives per-seal as the 3rd tuple element. Only one seal here, so this
+  // is the same value the old level-wide sealRequiredDistinct used.
+  seals: [[3,3,2]],
   guideMoves: 0,
   moveLimit: 7,
   boosterReroll: 1,
@@ -4776,8 +4818,10 @@ const P24M_LEVELS=[
   title: "Two Different Faces",
   size: 5,
   goalType: "OPEN_SEAL",
-  seals: [[1,2], [2,2], [1,3], [2,3]],
-  sealRequiredDistinct: 4,
+  // Each of the 4 seals now has its OWN required distinct-face count (checked against the
+  // same anywhere-on-the-board tally, no adjacency requirement) instead of one shared
+  // level-wide pool -- a spread from 1 to 4 so all four don't just open at once together.
+  seals: [[1,2,1], [2,2,2], [1,3,3], [2,3,4]],
   guideMoves: 0,
   moveLimit: 11,
   boosterReroll: 1,
@@ -4805,592 +4849,317 @@ const P24M_LEVELS=[
   solution: [{ row: 3, col: 0 }, { row: 0, col: 0 }, { row: 2, col: 0 }, { row: 0, col: 0 }, { row: 3, col: 0 }, { row: 4, col: 0 }, { row: 3, col: 2 }, { row: 3, col: 3 }, { row: 3, col: 3 }, { row: 1, col: 1 }],
 },
   {
-    // PEAK 2 of 3 -- harder than Lv7 (11 tiles across three faces vs. 9), with a real seal gate.
-    title: 'Use The Freed Cell',
-    // Board narrowed 6x6->5x5 -- moves 3-5 re-routed (up through the middle instead of
-    // extending right off the old 6-wide board) so nothing needs col/row 5 anymore; moves
-    // 1-2 and the win targets/solution length are unchanged. Seals relocated to a corner
-    // this route never touches (they were already decorative/gating-only, never blocking
-    // a needed cell).
-    size: 5,
-    goalType: 'TARGET_FACE',
-    winTargets: [{ id: 's1', need: 4 }, { id: 'c1', need: 4 }, { id: 'w1', need: 3 }],
-    // h1 target dropped -- user cap is max 3 face types when combined with a Seal.
-    // 4th decorative seal cell added -- narrowing the board to 5x5 (above) dropped this
-    // "peak 2 of 3" level's score just enough to tie its own neighbor (Lv14). Doesn't change
-    // solvability (still purely gating, sealRequiredDistinct stays 3, the solution already
-    // reaches 3 distinct matches well before it's ever needed).
-    // Per-seal required counts (3rd tuple element): (0,0)/(0,1) each reach 2 distinct
-    // faces in the solution, (0,2)/(0,3) reach 1 -- purely gating/decorative either way,
-    // never blocking a cell the TARGET_FACE solution actually needs.
-    seals: [[0, 0, 2], [0, 1, 2], [0, 2, 1], [0, 3, 1]],
-    // No permanent here on purpose -- curriculum reorder note: Permanent now teaches before
-    // Seal (Lv11 vs. this level's Lv23), so the player already knows it by now, but this
-    // level stays pure Seal to keep its own lesson focused.
-    // moveLimit +1 (post-feedback pass): 1 spare move read as too unforgiving in playtest
-    // feedback, even for a "peak" level. Raised again, 8->11, for the 5 new seal-adjacency
-    // delivery moves above.
-    guideMoves: 0, // auto-guide highlight removed from every level except Lv1
+  title: "Use The Freed Cell",
+  size: 5,
+  goalType: "TARGET_FACE",
+  winTargets: [{id:"s1",need:4}, {id:"c1",need:4}, {id:"w1",need:3}],
+  seals: [[3,2,1], [4,2,2], [4,3,3], [4,4,4], [1,2,1], [0,2,2], [0,1,3], [0,0,4]],
+  guideMoves: 0,
+  moveLimit: 8,
+  boosterReroll: 1,
+  boosterHint: 1,
+  lesson: "PEAK 2 OF 3 — 11 TILES ACROSS THREE FACES",
+  teach: "",
+  tiles: [
+    P24K_TILE("w1", 2, 0, 0),
+    P24K_TILE("w1", 2, 2, 0),
+  ],
+  sequence: [
+    K_DOMINO_V("p1", "w1", "s1"),
+    K_DOMINO_H("p2", "s1", "c1"),
+    K_DOMINO_H("p3", "c1", "s1"),
+    K_DOMINO_H("p4", "s1", "c1"),
+    K_DOMINO_H("p5", "w1", "c1"),
+    K_DOMINO_H("p6", "w2", "h1"),
+    K_DOMINO_V("freq22", "s1", "c1"),
+  ],
+  solution: [{ row: 3, col: 0 }, { row: 3, col: 0 }, { row: 3, col: 2 }, { row: 2, col: 3 }, { row: 3, col: 2 }, { row: 4, col: 3 }, { row: 2, col: 2 }],
+},
+  {
+    // [24-30 rescale] Seal-only escalation, step 1 of 4 (Lv24-27): seal count and move
+    // limit both climb level over level. Verified via an isolated Puppeteer harness that
+    // injects each candidate level into window.__digest24k1.LEVELS and replays `solution`
+    // through the real engine (p24kFreshModel/p24kModelDrop) before it ever touches disk.
+    title: "One Meter, Many Cells",
+    size: 6,
+    goalType: "TARGET_FACE",
+    // [24-28 pass 2] Needs eased back down + piece mix rebalanced -- mostly 2-3 cell
+    // dominoes/trominoes, with just 1-2 heavier 4-5 cell pieces per level rather than the
+    // previous pass's near-total L5/PLUS5 saturation. Verified via the same flexSolve
+    // harness (protected-seed + reserved-cell aware).
+    // [24-28 pass 3] Fillers now draw from the level's OWN goal faces (s1/c1/w1) instead of
+    // neutral h1/h2/c2/w2 -- per user request, the faces that matter to the goal should show
+    // up far more often in the pieces, with irrelevant face types cut down (only 1 neutral
+    // face, h1, kept as a fallback for slots that would otherwise self-match).
+    winTargets: [{id:'s1',need:4}, {id:'c1',need:4}, {id:'w1',need:4}],
+    seals: [[5,5,3],[0,5,5],[5,0,7],[0,0,9]],
+    guideMoves: 0,
+    moveLimit: 9,
+    boosterReroll: 1,
+    boosterHint: 1,
+    lesson: 'HARDER PASS: DENSER SEALS + MIXED PIECES + TIGHTER MOVES, 24-28',
+    teach: '',
+    tiles: [
+      P24K_TILE('s1', 1, 0, 0), P24K_TILE('s1', 4, 0, 0),
+      P24K_TILE('c1', 1, 2, 0), P24K_TILE('c1', 4, 2, 0),
+      P24K_TILE('w1', 1, 4, 0), P24K_TILE('w1', 4, 4, 0),
+    ],
+    sequence: [
+      P24M_L3('m1', 's1', 'c1', 's1'),
+      P24M_L5('m2', 's1', 'c1', 's1', 'w1', 'h1'),
+      P24M_L3('m3', 'c1', 's1', 'c1'),
+      P24M_L5('m4', 'c1', 's1', 'c1', 'w1', 'h1'),
+      P24M_L3('m5', 'w1', 's1', 'c1'),
+      P24M_L3B('m6', 'w1', 's1', 'c1'),
+    ],
+    solution: [
+      { row: 1, col: 1 }, { row: 0, col: 3 }, { row: 2, col: 0 }, { row: 1, col: 2 },
+      { row: 3, col: 2 }, { row: 4, col: 4 },
+    ],
+  },
+  {
+    // [24-28 pass 2] +1 seal vs Lv24; needs back to 4/4/4/4, piece mix mostly small.
+    title: "A Breather",
+    size: 6,
+    goalType: "TARGET_FACE",
+    // [24-28 pass 3] Fillers draw from the goal faces (s1/c1/w1/s2) -- see Lv24's note.
+    winTargets: [{id:'s1',need:4}, {id:'c1',need:4}, {id:'w1',need:4}, {id:'s2',need:4}],
+    seals: [[5,0,3],[0,5,5],[5,5,7],[0,0,9],[3,3,11]],
+    guideMoves: 0,
+    moveLimit: 11,
+    boosterReroll: 1,
+    boosterHint: 1,
+    lesson: 'HARDER PASS: DENSER SEALS + MIXED PIECES + TIGHTER MOVES, 24-28',
+    teach: '',
+    tiles: [
+      P24K_TILE('s1', 0, 1, 0), P24K_TILE('s1', 5, 2, 0),
+      P24K_TILE('c1', 1, 5, 0), P24K_TILE('c1', 2, 0, 0),
+      P24K_TILE('w1', 0, 3, 0), P24K_TILE('w1', 3, 5, 0),
+      P24K_TILE('s2', 4, 0, 0), P24K_TILE('s2', 1, 2, 0),
+    ],
+    sequence: [
+      P24M_L3('m1', 's1', 'c1', 's1'),
+      P24M_L5('m2', 's1', 'c1', 's1', 'w1', 's2'),
+      P24M_L3('m3', 'c1', 's1', 'c1'),
+      P24M_L3('m4', 'c1', 's1', 'c1'),
+      P24M_L5('m5', 's1', 'c1', 'w1', 's2', 'w1'),
+      P24M_L3('m6', 'w1', 's1', 'c1'),
+      P24M_L3('m7', 's2', 's1', 'c1'),
+      P24M_L3('m8', 's2', 's1', 'c1'),
+    ],
+    solution: [
+      { row: 1, col: 1 }, { row: 2, col: 1 }, { row: 1, col: 0 }, { row: 1, col: 1 },
+      { row: 1, col: 0 }, { row: 1, col: 3 }, { row: 4, col: 4 }, { row: 3, col: 2 },
+    ],
+  },
+  {
+    // [24-28 pass 2] +1 seal vs. Lv25; w1 stays the "heavier" face at need:6, others
+    // back to 4, piece mix mostly small.
+    title: "The Fifth Face",
+    size: 6,
+    goalType: "TARGET_FACE",
+    // [24-28 pass 3] Fillers draw from the goal faces (s1/c1/w1/s2) -- see Lv24's note.
+    winTargets: [{id:'s1',need:4}, {id:'c1',need:4}, {id:'w1',need:6}, {id:'s2',need:4}],
+    seals: [[0,0,3],[5,5,6],[0,5,9],[5,0,12],[3,3,15],[2,2,17]],
+    guideMoves: 0,
     moveLimit: 12,
     boosterReroll: 1,
     boosterHint: 1,
-    lesson: 'PEAK 2 OF 3 — 11 TILES ACROSS THREE FACES',
+    lesson: 'HARDER PASS: DENSER SEALS + MIXED PIECES + TIGHTER MOVES, 24-28',
     teach: '',
     tiles: [
-      P24K_TILE('w1', 2, 0, 0),
-      P24K_TILE('w1', 2, 2, 0),
-      P24K_TILE('h1', 4, 4, 0),
+      P24K_TILE('s1', 0, 2, 0), P24K_TILE('s1', 5, 3, 0),
+      P24K_TILE('c1', 2, 4, 0), P24K_TILE('c1', 3, 0, 0),
+      P24K_TILE('w1', 1, 0, 0), P24K_TILE('w1', 4, 5, 0), P24K_TILE('w1', 0, 5, 0),
+      P24K_TILE('s2', 0, 4, 0), P24K_TILE('s2', 3, 5, 0),
     ],
     sequence: [
-      K_DOMINO_V('p1', 'w1', 's1'),
-      K_DOMINO_H('p2', 's1', 'c1'),
-      K_DOMINO_H('p3', 'c1', 's1'),
-      K_DOMINO_H('p4', 's1', 'c1'),
-      K_DOMINO_H('p5', 'w1', 'c1'),
-      K_DOMINO_H('p6', 'w2', 'h1'),
-      K_DOMINO_V('e1', 'w1', 'j1'),
-      K_DOMINO_V('e2', 's1', 'j2'),
-      K_DOMINO_H('e3', 's1', 'j3'),
-      K_DOMINO_V('e4', 'c1', 'j4'),
-      K_DOMINO_H('e5', 'c1', 'j5'),
-    
-      K_DOMINO_V('freq22', 's1', 'c1'),
+      P24M_L3('m1', 's1', 'c1', 's1'),
+      P24M_L5('m2', 's1', 'c1', 'w1', 's2', 's1'),
+      P24M_L3('m3', 'c1', 's1', 'c1'),
+      P24M_L3C('m4', 's1', 'c1', 'c1'),
+      P24M_L5('m5', 'w1', 's1', 'c1', 'w1', 's2'),
+      P24M_L3('m6', 'w1', 's1', 'c1'),
+      P24M_L3B('m7', 'w1', 's1', 'c1'),
+      P24M_L3('m8', 's2', 's1', 'c1'),
+      P24M_L3B('m9', 's2', 's1', 'c1'),
     ],
     solution: [
-      { row: 2, col: 1 }, // w1@(2,1) joins the two seeded w1 tiles -> 3-connected wave, w1=3 done
-      { row: 4, col: 1 }, // s1@(4,1) matches the lone s1@(3,1) left by move 1 -> s1=2
-      { row: 3, col: 2 }, // c1@(3,2) matches the lone c1@(4,2) left by move 2 -> c1=2
-      { row: 2, col: 3 }, // s1@(2,3) matches the lone s1@(3,3) left by move 3 -> s1=4 done
-      { row: 1, col: 3 }, // c1@(1,4) matches the lone c1@(2,4) left by move 4 -> c1=4 done
-      { row: 4, col: 2 }, // p6: w2(4,2) lands harmlessly (move 2's c1 leftover here was already consumed by move 3); h1(4,3) matches seed h1(4,4) -> h1=2 done, all four targets met.
-      { row: 1, col: 2 }, // e1: w1@(1,2) matches move 5's leftover w1@(1,3) -> distinct #1 (adjacent, both cells touch the row-0 seal); j1@(2,2) lands harmlessly.
-      { row: 1, col: 0 }, // e2: s1@(1,0) lands dangling (seal-adjacent); j2@(2,0) lands harmlessly.
-      { row: 1, col: 1 }, // e3: s1@(1,1) matches e2's leftover s1@(1,0) -> distinct #2 -> threshold 3 not yet met (still need c1); j3@(1,2) lands harmlessly.
-      { row: 1, col: 0 }, // e4: c1@(1,0) lands dangling (seal-adjacent, cell freed by e2/e3's match); j4@(2,0) lands harmlessly.
-      { row: 1, col: 1 }, // e5: c1@(1,1) matches e4's leftover c1@(1,0) -> distinct #3 -> threshold 3 met -> seal opens; j5@(1,2) lands harmlessly.
-    
-      { row: 0, col: 4 }, // freq: extra s1 exposure (+moveLimit)
+      { row: 0, col: 1 }, { row: 2, col: 1 }, { row: 0, col: 3 }, { row: 0, col: 2 },
+      { row: 1, col: 0 }, { row: 4, col: 4 }, { row: 1, col: 4 }, { row: 3, col: 4 },
+      { row: 0, col: 4 },
     ],
   },
   {
-    // c1 need raised 2->4 + move 5 added -- reuses move 4's leftover c1@(1,1), which used to
-    // sit unmatched. Raises real playtime from 4 to 5 moves (user feedback: Lv10-20 felt too
-    // short on moves/goal).
-    title: 'One Meter, Many Cells',
-    size: 5,
-    goalType: 'TARGET_FACE',
-    winTargets: [{id:'c1',need:4}, {id:'s1',need:2}, {id:'h1',need:2}],
-    // Relocated from [[2,1],[2,2],[2,3]] to [[0,2],[0,3],[0,4]]: same shape/size, moved to sit
-    // next to where the level's own matches already land, now that Seal requires the match
-    // to happen ADJACENT to it (not just anywhere on the board) -- pure repositioning, the
-    // puzzle/tiles/solution below are all untouched.
-    // Per-seal required counts (3rd tuple element): only (0,2) sits where the solution's
-    // matches land (reaches 2 distinct faces); (0,3)/(0,4) are untouched by it and stay
-    // gating-only at the floor of 1, same as before per-seal tracking existed.
-    seals: [[0, 2, 2], [0, 3, 1], [0, 4, 1]],
-    // 3rd target (h1) + move 6 added for the game-wide +1-move scale-up pass.
-    guideMoves: 0,
-    moveLimit: 9,
-    boosterReroll: 1,
-    boosterHint: 1,
-    lesson: 'ONE SHARED METER OPENS ALL THREE SEAL CELLS AT ONCE',
-    teach: '',
-    tiles: [
-      P24K_TILE('c1', 0, 0, 0),
-      P24K_TILE('h1', 4, 4, 0),
-    ],
-    sequence: [
-      P24M_L3('go', 'c1', 'w1', 's2'),
-      K_DOMINO_V('turn', 's1', 'w1'),
-      P24M_L3('go', 'c1', 'w1', 's2'),
-      K_DOMINO_V('turn', 's1', 'w1'),
-      K_DOMINO_V('m5', 'c1', 'w2'),
-      K_DOMINO_H('m6', 'w2', 'h1'),
-    
-      K_DOMINO_H('freq23', 'c1', 's1'),
-    ],
-    // move5 @(2,1): c1@(2,1) matches the leftover c1@(1,1) from move 4 -> c1=4 met; w2@(3,1) lands harmlessly.
-    // move6 @(4,2): w2@(4,2) lands harmlessly; h1@(4,3) matches seed h1@(4,4) -> h1=2 done, all three targets met.
-    solution: [
-      { row: 0, col: 1 },
-      { row: 0, col: 0 },
-      { row: 1, col: 1 },
-      { row: 1, col: 0 },
-      { row: 2, col: 1 },
-      { row: 4, col: 2 },
-    
-      { row: 0, col: 0 }, // freq: extra c1 exposure (+moveLimit)
-    ],
-  },
-  {
-    // s1 need raised 2->4 + move 4 added -- reuses move 3's leftover s1@(2,0), which used to
-    // sit unmatched. Raises real playtime from 3 to 4 moves (user feedback: Lv10-20 felt too
-    // short on moves/goal; still the shortest in this stretch, on purpose, since it's the
-    // deliberate breather right after Lv13's peak).
-    title: 'A Breather',
-    size: 5,
-    goalType: 'TARGET_FACE',
-    winTargets: [{id:'s1',need:4}, {id:'c1',need:2}, {id:'w1',need:2}],
-    // Per-seal required counts: (4,0) reaches 1 distinct face in the solution; (4,1) is
-    // never touched by it and stays gating-only at the floor of 1.
-    seals: [[4, 0, 1], [4, 1, 1]],
-    // h1 target dropped -- user cap is max 3 face types when combined with a Seal.
-    guideMoves: 0,
-    moveLimit: 8,
-    boosterReroll: 1,
-    boosterHint: 1,
-    lesson: 'OPEN BOARD · EITHER FACE OPENS THE SEAL · TWO ROUTES',
-    teach: '',
-    tiles: [
-      P24K_TILE('s1', 0, 0, 0),
-      P24K_TILE('w1', 0, 3, 0),
-      P24K_TILE('c1', 2, 4, 0),
-      P24K_TILE('h1', 4, 4, 0),
-    ],
-    sequence: [
-      K_DOMINO_H('go', 's1', 'w1'),
-      K_DOMINO_V('turn', 'c1', 's2'),
-      K_DOMINO_H('go', 's1', 'w1'),
-      K_DOMINO_H('m4', 's1', 'w2'),
-      K_DOMINO_H('m5', 'w2', 'h1'),
-    
-      K_DOMINO_H('freq24', 's1', 'c1'),
-    ],
-    // move4 @(3,0): s1@(3,0) matches the leftover s1@(2,0) from move 3 -> s1=4 met; w2@(3,1) lands harmlessly.
-    // move5 @(4,2): w2@(4,2) lands harmlessly; h1@(4,3) matches seed h1@(4,4) -> h1=2 done, all four targets met.
-    solution: [
-      { row: 1, col: 0 },
-      { row: 2, col: 3 },
-      { row: 2, col: 0 },
-      { row: 3, col: 0 },
-      { row: 4, col: 2 },
-    
-      { row: 0, col: 0 }, // freq: extra s1 exposure (+moveLimit)
-    ],
-  },
-  {
-    // c1 made mandatory (targetRequiredCount 3->4, all 4 faces now required) + 2 moves added
-    // -- move 1 and move 3 each already dropped an orphaned, never-matched c1 (at (1,1) and
-    // (3,3)); moves 4-5 pair each of them up instead of leaving them as dead leftovers.
-    // Raises real playtime from 3 to 5 moves (user feedback: Lv10-20 felt too short).
-    title: 'The Fifth Face',
-    size: 5,
-    goalType: 'TARGET_FACE',
-    winTargets: [
-      { id: 's1', need: 2 },
-      { id: 'c1', need: 4 },
-      { id: 'w1', need: 2 },
-      { id: 'c2', need: 2 },
-    ],
-    targetRequiredCount: 4,
-    // h1 target dropped -- user cap is max 4 face types for a plain TARGET_FACE level.
-    guideMoves: 0, // auto-guide highlight removed from every level except Lv1
-    moveLimit: 9,
-    boosterReroll: 1,
-    boosterHint: 1,
-    lesson: 'INTRODUCE FACE E ON A SPARSE BOARD',
-    teach: '',
-    tiles: [
-      P24K_TILE('c2', 0, 0, 0), // E mate #1 (clear route)
-      P24K_TILE('c2', 4, 0, 0), // E mate #2 (clear route)
-      P24K_TILE('s1', 2, 2, 0),
-      P24K_TILE('c1', 4, 4, 0),
-      P24K_TILE('w1', 2, 0, 0),
-      P24K_TILE('h1', 4, 3, 0),
-    ],
-    sequence: [
-      P24M_L3B('p0', 's1', 'c2', 'c1'),
-      K_DOMINO_H('p1', 'w1', 's2'),
-      P24M_L3B('p0', 's1', 'c2', 'c1'),
-      K_DOMINO_H('m4', 'c1', 'w2'),
-      K_DOMINO_V('m5', 'w2', 'c1'),
-      K_DOMINO_H('m6', 'w2', 'h1'),
-    
-      K_DOMINO_V('freq25', 's1', 'c1'),
-    ],
-    // move4 @(1,2): c1@(1,2) matches the leftover c1@(1,1) from move 1 -> c1=2; w2@(1,3) lands harmlessly.
-    // move5 @(2,4): w2@(2,4) lands harmlessly; c1@(3,4) matches the leftover c1@(3,3) from move 3 -> c1=4 met.
-    // move6 @(4,1): w2@(4,1) lands harmlessly; h1@(4,2) matches seed h1@(4,3) -> h1=2 done, all five targets met.
-    solution: [
-      { row: 0, col: 0 },
-      { row: 3, col: 0 },
-      { row: 2, col: 2 },
-      { row: 1, col: 2 },
-      { row: 2, col: 4 },
-      { row: 4, col: 1 },
-    
-      { row: 0, col: 0 }, // freq: extra s1 exposure (+moveLimit)
-    ],
-  },
-  {
-    // All 3 faces' need doubled 2->4 (still only 2 of the 3 required -- c2 stays an
-    // untaken 3rd route, this solution only ever gets it to 2, same "two routes" flavor as
-    // before) + moves 4-5 added, each finishing one of the two pursued routes. Previously
-    // both pursued faces (s1 and c2) already finished on the SAME move (3), which meant
-    // "2 of 3" was met immediately with move 4 never actually playing (early win). Raises
-    // real playtime from 3 to 5 moves (user feedback: Lv10-20 felt too short).
-    title: 'Two Routes to Progress',
-    size: 5,
-    goalType: 'TARGET_FACE',
-    winTargets: [
-      { id: 's1', need: 4 },
-      { id: 'w1', need: 4 },
-      { id: 'c2', need: 4 },
-    ],
-    targetRequiredCount: 2,
-    // h1 route dropped -- user cap is max 3 face types when combined with a Seal.
-    // Per-seal required counts: (0,3) reaches 1 distinct face in the solution, (1,4) reaches
-    // 2; (0,4) is never touched by it and stays gating-only at the floor of 1.
-    seals: [[0, 3, 1], [0, 4, 1], [1, 4, 2]],
-    guideMoves: 0,
-    // moveLimit 8->10 for the 3 new seal-adjacency delivery moves below (9 used, 1 spare).
-    moveLimit: 11,
-    boosterReroll: 1,
-    boosterHint: 1,
-    lesson: 'SEAL OPENS IN ANY ORDER · TWO ROUTES',
-    teach: '',
-    tiles: [
-      P24K_TILE('w1', 2, 1, 0),
-      P24K_TILE('w1', 4, 4, 0), // 2nd w1 seed, pairs with move 4
-      P24K_TILE('h1', 4, 3, 0),
-    ],
-    sequence: [
-      P24M_I3H('p0', 's1', 'w1', 'c2'),
-      P24M_L3('p1', 'c1', 's2', 's1'),
-      P24M_I3H('p0', 's1', 'w1', 'c2'),
-      K_DOMINO_V('m4', 'w2', 'w1'),
-      K_DOMINO_H('m5', 's1', 'w2'),
-      K_DOMINO_H('m6', 'w2', 'h1'),
-      K_DOMINO_V('e1', 's1', 'j1'),
-      K_DOMINO_H('e2', 'j2', 's1'),
-      K_DOMINO_H('e3', 'j3', 'w2'),
-    
-      K_DOMINO_H('freq26', 's1', 'c1'),
-    ],
-    // move4 @(2,4): w2@(2,4) lands harmlessly; w1@(3,4) matches the 2nd seed w1@(4,4) -> w1=4 met.
-    // move5 @(3,1): s1@(3,1) matches the leftover s1@(4,1) from move 2 -> s1=4 met.
-    // move6 @(4,1): w2@(4,1) lands harmlessly; h1@(4,2) matches seed h1@(4,3) -> h1=2 done (3 of 4 routes done).
-    solution: [
-      { row: 1, col: 0 },
-      { row: 3, col: 0 },
-      { row: 2, col: 0 },
-      { row: 2, col: 4 },
-      { row: 3, col: 1 },
-      { row: 4, col: 1 },
-      { row: 1, col: 3 }, // e1: s1@(1,3) lands dangling (seal-adjacent); j1@(2,3) lands harmlessly.
-      { row: 1, col: 1 }, // e2: j2@(1,1) lands harmlessly; s1@(1,2) matches e1's leftover s1@(1,3) -> distinct #1 (group touches seal via (1,3)).
-      { row: 3, col: 3 }, // e3: j3@(3,3) lands harmlessly; w2@(3,4) matches move 4's leftover w2@(2,4) -> distinct #2 (group touches seal via (2,4)) -> threshold 2 met -> seal opens.
-    
-      { row: 0, col: 0 }, // freq: extra s1 exposure (+moveLimit)
-    ],
-  },
-  {
-    // PEAK 3 of 3 -- the hardest of the three (4 faces, 13 tiles total): a full
-    // sine-wave crest after Lv13's dip back to the normal slope at Lv14-17.
-    // Board narrowed 6x6->5x5 -- moves 3-6 re-routed to snake up through the middle instead
-    // of extending right off the old 6-wide board, so nothing needs col/row 5 anymore;
-    // moves 1-2, the seals (already within 0-3, untouched), and the win targets/solution
-    // length are all unchanged. Seal opens right after move 3 (3 distinct faces matched by
-    // then), well before move 6 needs to place on a former seal cell.
-    title: 'Three Faces Unlocked',
-    size: 5,
-    goalType: 'TARGET_FACE',
-    winTargets: [
-      { id: 'w1', need: 3 },
-      { id: 's1', need: 4 },
-      { id: 'c1', need: 4 },
-    ],
-    // Per-seal required counts: move 6 places directly on (0,1), so THAT seal must open by
-    // exactly its own natural 1-distinct-face achievement (matches the note below, just
-    // scoped to this one cell instead of a level-wide pool); (0,0)/(0,2)/(0,3) are never
-    // touched by the solution and stay gating-only at the floor of 1.
-    seals: [[0, 0, 1], [0, 1, 1], [0, 2, 1], [0, 3, 1]],
-    // No permanent here on purpose -- curriculum reorder note: Permanent now teaches before
-    // Seal (Lv11 vs. this level's Lv28), so the player already knows it by now, but this
-    // level stays pure Seal to keep its own lesson focused.
-    // s2/h1 targets dropped -- user cap is max 3 face types when combined with a Seal (this
-    // also brings the level back in line with its own title, "Three Faces"). s2/h1 still get
-    // matched by moves 4/7 exactly as before, just uncounted now.
-    guideMoves: 0,
-    moveLimit: 11,
-    boosterReroll: 1,
-    boosterHint: 1,
-    lesson: 'PEAK 3 OF 3 — THREE FACES, 13 TILES, THE HARDEST ONE YET',
-    teach: '',
-    tiles: [
-      P24K_TILE('w1', 3, 0, 0),
-      P24K_TILE('w1', 3, 2, 0),
-      P24K_TILE('h1', 2, 2, 0),
-    ],
-    sequence: [
-      K_DOMINO_V('p1', 'w1', 's1'),
-      K_DOMINO_H('p2', 's1', 'c1'),
-      K_DOMINO_H('p3', 'c1', 's2'),
-      K_DOMINO_H('p4', 's1', 's2'),
-      K_DOMINO_H('p5', 'c1', 's1'),
-      K_DOMINO_H('e1', 'j1', 'c1'),
-      K_DOMINO_H('p6', 'w1', 'c1'),
-      K_DOMINO_H('p7', 'w2', 'h1'),
-    
-      K_DOMINO_V('freq27', 'w1', 's1'),
-    ],
-    // A new move (e1) is inserted here, BEFORE move 6, rather than appended at the end --
-    // move 6 places a tile directly on a former seal cell, so the seal must already be open
-    // by the time it runs, not just by the time the level ends.
-    solution: [
-      { row: 3, col: 1 }, // w1@(3,1) joins the two seeded w1 tiles -> 3-connected wave, w1=3 done
-      { row: 4, col: 2 }, // s1@(4,2) matches the lone s1@(4,1) left by move 1 -> s1=2
-      { row: 3, col: 3 }, // c1@(3,3) matches the lone c1@(4,3) left by move 2 -> c1=2 (not adjacent, no longer counts on its own)
-      { row: 2, col: 3 }, // s1@(2,3), s2@(2,4) matches the lone s2@(3,4) left by move 3 -> s2=2 done
-      { row: 1, col: 2 }, // c1@(1,2), s1@(1,3) matches the lone s1@(2,3) left by move 4 -> s1=4 done, distinct #1 (adjacent, (1,3) touches the seal)
-      { row: 1, col: 0 }, // e1: j1@(1,0) lands harmlessly; c1@(1,1) matches the leftover c1(1,2) from move 5 -> distinct #2 (adjacent, (1,1)/(1,2) touch the seal) -> threshold 2 met -> seal opens
-      { row: 0, col: 1 }, // w1@(0,1) [now-open seal cell], c1@(0,2) lands (its old match partner at (1,2) was consumed by e1 above, so this is now a harmless leftover instead of a 5th c1)
-      { row: 2, col: 0 }, // p7: w2(2,0) lands harmlessly; h1(2,1) matches seed h1(2,2) -> h1=2 done, all five targets met.
-    
-      { row: 0, col: 4 }, // freq: extra w1 exposure (+moveLimit)
-    ],
-  },
-  {
-    // Board narrowed 6x6->5x5 -- only the 3rd seal cell (2,5) ever sat outside the new
-    // bounds, and it was already decorative (the solution never places into it, only into
-    // (2,3)/(2,4)); relocated to an untouched corner, nothing else changes.
-    // 2nd mandatory target (c1, need:4) + move 5 added -- reuses move 4's leftover
-    // c1@(3,3), which used to sit unmatched. need:4 (not 2) on purpose: c1 already reaches
-    // 2 at move 2's decoy match, so need:2 would've been met before move 5 ever placed and
-    // the level would still early-win at move 4. Raises real playtime from 4 to 5 moves
-    // (user feedback: Lv10-20 felt too short on moves/goal).
-    title: 'Buried Under Seal',
-    size: 5,
-    goalType: 'BURIED_TARGET',
-    winTargets: [{ id: 's1', need: 2 }, { id: 'c1', need: 4 }, { id: 'h1', need: 2 }],
-    // Relocated from [[2,3],[2,4],[4,4]] to [[1,0],[1,1],[3,1]]: same shape, moved next to
-    // where the level's own matches already land, now that Seal requires the match to happen
-    // ADJACENT to it (not just anywhere on the board) -- pure repositioning, puzzle untouched.
-    // Per-seal required counts: (1,1) reaches 2 distinct faces in the solution, (3,1) reaches
-    // 1. (1,0) is a special case -- move 6 places a tile DIRECTLY on it (the old pooled rule
-    // let this slide since some OTHER seal's matches had already filled the shared quota by
-    // then); under per-seal tracking that cell would stay permanently sealed since nothing in
-    // this solution ever lands a match adjacent to it specifically. Rather than reshuffle this
-    // first-ever BURIED_TARGET level's board/solution to force a real adjacency there, its
-    // required count is set to 0 -- the cell starts already-open (no bamboo plank ever
-    // rendered there) instead of a seal that can never legitimately be broken. The other
-    // two seals still teach the real per-seal mechanic.
-    seals: [[1, 0, 0], [1, 1, 2], [3, 1, 1]],
-    // First-ever BURIED_TARGET level (a qualitative/coarse jump), per
-    // puzzle-design-6-muc-tieu.md §3 #2/#4. Auto-guide highlight removed from every level
-    // except Lv1.
-    // 3rd target (h1) + move 6 added for the game-wide +1-move scale-up pass.
-    guideMoves: 0,
-    moveLimit: 9,
-    boosterReroll: 1,
-    boosterHint: 1,
-    lesson: 'OPEN SEAL FIRST THEN CLEAR ROOF TO REACH BURIED TARGET',
-    teach: '',
-    tiles: [
-      ...P24M_STACK('s1', 'w1', 2, 2),      // buried target s1 under roof w1 at (2,2)
-      P24K_TILE('s1', 3, 2, 0),             // pairs with the revealed target on wave two
-      P24K_TILE('c2', 0, 2, 0),             // seal-progress decoy #1 (matched by move 1)
-      P24K_TILE('c1', 1, 2, 0),             // seal-progress decoy #2 (matched by move 2)
-      P24K_TILE('h1', 3, 0, 0),             // corner seed for move 6's h1 pair
-    ],
-    sequence: [
-      K_DOMINO_H('p0', 'w1', 'c2'),                  // roadmap Current: D-H C E
-      P24M_L3('p1', 's1', 'c1', 's2'),               // roadmap Next: L3 A B D
-      K_DOMINO_H('p2', 'w1', 's2'),                  // builds the floor w1 at the (now open) seal cell
-      K_DOMINO_V('p3', 'w1', 'c1'),                  // lands on that floor -> z1 -> matches the roof
-      K_DOMINO_H('m5', 'w2', 'c1'),                  // finishes off move 4's leftover c1
-      K_DOMINO_V('m6', 'w2', 'h1'),
-    
-      K_DOMINO_V('freq28', 's1', 'c1'),
-    ],
-    // Move 1: p0 at (0,0) -> w1@(0,0) lone, c2@(0,1) adjacent to seed c2@(0,2) -> match (distinct #1: c2).
-    // Move 2: p1 at (0,3) -> s1@(0,3) lone, c1@(1,3) adjacent to seed c1@(1,2) -> match (distinct #2: c1) ->
-    //         seal opens (2 distinct reached); s2@(1,4) lands harmlessly.
-    // Move 3: p2 at (2,3) (now unsealed) -> w1@(2,3) floor (no match yet, roof is z1), s2@(2,4) floor.
-    // Move 4: p3 at (2,3) -> w1 lands z1 on the floor from move 3 -> adjacent to roof w1@(2,2,z1) -> wave1
-    //         match removes both, revealing target s1@(2,2). Wave2: revealed s1 matches seed s1@(3,2) ->
-    //         winTargets s1 need:2 met. c1@(3,3) lands harmlessly.
-    // Move 5: m5 at (4,2) -> w2@(4,2) lands harmlessly; c1@(4,3) matches the leftover c1@(3,3)
-    //         from move 4 -> winTargets c1 need:4 met.
-    // Move 6: m6 at (1,0) -> w2@(1,0) lands harmlessly; h1@(2,0) matches seed h1@(3,0) ->
-    //         winTargets h1 need:2 met, all targets met.
-    solution: [
-      { row: 0, col: 0 },
-      { row: 0, col: 3 },
-      { row: 2, col: 3 },
-      { row: 2, col: 3 },
-      { row: 4, col: 2 },
-      { row: 1, col: 0 },
-    
-      { row: 0, col: 2 }, // freq: extra s1 exposure (+moveLimit)
-    ],
-  },
-  {
-    // Board narrowed 6x6->5x5 -- everything in row 2 (both stations, both trigger floors,
-    // both pairing partners) shifted left by one column so nothing needs col 5 anymore; the
-    // seal row (row 3) already fit in 0-4 untouched. Move 1's decoy cascade moved from the
-    // old row 4-5 area up to rows 0-1 (same shape/purpose, just relocated) since it can't
-    // land on the still-sealed row 3 either.
-    // Chapter-2 finale, and it used to be the SHORTEST level in Lv10-20 (3 moves) since all
-    // 5 win targets already finished by move 3 (targetRequiredCount only needed 4 of 5,
-    // and all 5 happened to complete anyway). Made every target mandatory (dropped
-    // targetRequiredCount) and tripled the need on c1/w1/c2 (2->4 each, reusing two leftover
-    // "always-alive" trigger floors plus move 3's leftover c2, and one brand-new w1 seed) so
-    // the finale now needs all 6 moves. s1/s2 stay at need:2 (already met naturally by move
-    // 2/3) -- with all 5 mandatory, the LAST of the three extended targets to finish (move 6)
-    // is what decides when the level ends. Raises real playtime from 3 to 6 moves (user
-    // feedback: Lv10-20 felt too short on moves/goal; this was the worst offender).
-    title: 'Twin Stations',
-    size: 5,
-    goalType: 'TARGET_FACE',
-    // Difficulty pass (Ch2 tail, game-wide Lv20-29 tighten): every winTarget need +1, one
-    // extra density seed per target face, moveLimit spare tightened 2->1. Re-solved by the
-    // automated engine search in scratchpad solve_lv20_29.js (IDDFS over the real
-    // p24kModelDrop/p24kFreshModel debug API) rather than hand-traced move-by-move.
-    winTargets: [
-      { id: 's1', need: 3 },
-      { id: 'c1', need: 5 },
-      { id: 'w1', need: 5 },
-    ],
-    // Per-seal required counts: (3,0)/(3,1) each reach 4 distinct faces in the solution,
-    // (3,2)/(3,4) reach 1, (3,3) reaches 2.
-    seals: [[3, 0, 4], [3, 1, 4], [3, 2, 1], [3, 3, 2], [3, 4, 1]],
-    // s2/c2/h1 targets dropped -- user cap is max 3 face types when combined with a Seal.
-    // Keeps s1+c1 (station A's reveal) and w1 (station B's reveal); s2/c2/h1 still get
-    // matched by the same moves as before, just uncounted now.
+    // [24-28 pass 2] 6 seals (densest of the pure-Seal run), needs back to 4/4/4/3,
+    // piece mix mostly small with 2 heavier deliveries.
+    title: "Two Routes to Progress",
+    size: 6,
+    goalType: "TARGET_FACE",
+    // [24-28 pass 3] Fillers draw from the goal faces (s1/c1/w1/s2) -- see Lv24's note.
+    winTargets: [{id:'s1',need:4}, {id:'c1',need:4}, {id:'w1',need:4}, {id:'s2',need:2}],
+    seals: [[5,0,2],[0,5,3],[5,5,4],[0,0,5],[3,3,6],[2,2,7]],
     guideMoves: 0,
     moveLimit: 10,
     boosterReroll: 1,
     boosterHint: 1,
-    lesson: 'TWO STATIONS EACH CASCADE TWO WAVES · SEAL GATES THE SECOND',
+    lesson: 'HARDER PASS: DENSER SEALS + MIXED PIECES + TIGHTER MOVES, 24-28',
     teach: '',
     tiles: [
-      ...P24M_STATION('s1', 'c1', 2, 0, 0, 1),  // station A: s1 buried under c1 at (2,0), pairing s1 at (2,1)
-      P24K_TILE('c1', 1, 0, 0),                 // trigger floor for station A's roof
-      ...P24M_STATION('w1', 's2', 2, 3, 0, 1),  // station B: w1 buried under s2 at (2,3), pairing w1 at (2,4)
-      P24K_TILE('s2', 2, 2, 0),                 // trigger floor for station B's roof
-      P24K_TILE('c2', 1, 3, 0),                 // seal-progress decoy (matched by move 1)
-      P24K_TILE('w1', 4, 0, 0),                 // seed for move 5
-      P24K_TILE('h1', 1, 4, 0),                 // corner seed for move 7's h1 pair
-      P24K_TILE('s1', 0, 0, 0),                 // difficulty-pass density seed
-      P24K_TILE('c1', 0, 1, 0),                 // difficulty-pass density seed
-      P24K_TILE('w1', 0, 2, 0),                 // difficulty-pass density seed
+      // all seeds kept off the board edge (rows/cols 1-4 on this 6x6 board) so every seed
+      // always has 4 genuine neighbor cells to approach from.
+      P24K_TILE('s1', 1, 1, 0), P24K_TILE('s1', 4, 2, 0),
+      P24K_TILE('c1', 1, 4, 0), P24K_TILE('c1', 3, 1, 0),
+      P24K_TILE('w1', 1, 3, 0), P24K_TILE('w1', 3, 4, 0),
+      P24K_TILE('s2', 2, 1, 0), P24K_TILE('s2', 1, 2, 0),
     ],
     sequence: [
-      P24M_L3B('p0', 's1', 's2', 'c2'),   // roadmap Current: L3 A D E
-      P24M_I3H('p1', 'c1', 'w1', 's1'),   // roadmap Next: I3 B C A
-      // m4 moved ahead of p2 (was 4th, now 3rd) -- m4's own c1 cell lands on station A's
-      // pairing tile at (2,1), stacking to z1 right next to station A's c1 roof at (2,0):
-      // same z, same id, adjacent -> they match for free, which reveals both buried s1
-      // tiles underneath, which then immediately cascade-match each other too. All of
-      // that happens in row 2, next to the seal, so it's what actually opens the seal now
-      // (4 distinct adjacent faces from just these two moves). p2 (now 4th) needs the seal
-      // already open since it lands a cell on (3,3); under the old anywhere-on-board seal
-      // rule the ordering didn't matter, but adjacency-to-seal does.
-      K_DOMINO_H('m4', 'c1', 'w2'),
-      K_DOMINO_V('p2', 's2', 'c2'),       // straddles the sealed row to finish station B
-      K_DOMINO_H('m5', 'w1', 'w2'),
-      K_DOMINO_H('m6', 'c2', 'w2'),
-      K_DOMINO_H('m7', 'w2', 'h1'),
-    
-      P24M_L3B('p0', 's1', 's2', 'c2'),
-    
-      K_DOMINO_H('freq29', 's1', 'c1'),
+      P24M_L3('m1', 's1', 'c1', 's1'),
+      P24M_L3('m2', 's1', 'c1', 's1'),
+      P24M_L5('m3', 'c1', 's1', 'c1', 'w1', 's2'),
+      P24M_L3('m4', 'c1', 's1', 'c1'),
+      P24M_L3('m5', 's1', 'w1', 'c1'),
+      P24M_L3B('m6', 's1', 'w1', 'c1'),
+      P24M_L3('m7', 's1', 'c1', 's2'),
     ],
     solution: [
-      { row: 0, col: 3 },
-      { row: 1, col: 1 },
-      { row: 2, col: 1 },
-      { row: 2, col: 3 },
-      { row: 3, col: 0 },
-      { row: 2, col: 0 },
-      { row: 0, col: 2 },
-      { row: 0, col: 0 },
-    
-      { row: 0, col: 0 }, // freq: extra s1 exposure (+moveLimit)
+      { row: 3, col: 0 }, { row: 1, col: 0 }, { row: 3, col: 2 }, { row: 1, col: 3 },
+      { row: 1, col: 4 }, { row: 3, col: 3 }, { row: 0, col: 0 },
     ],
   },
+  {
+  // [24-28 harder pass] Combine step: Ô Chắn joins Seal for the first time. Columns 5 and
+  // row 5 (the board's right/bottom edge, 11 cells) are reserved entirely for seals/
+  // permanents -- every seed and delivery piece stays within rows/cols 0-4, guaranteeing
+  // those reserved cells are never touched by the solution.
+  title: "Three Faces Unlocked",
+  size: 6,
+  goalType: "TARGET_FACE",
+  winTargets: [{id:"s1",need:4}, {id:"c1",need:4}, {id:"w1",need:4}],
+  // [24-28 pass 3] Fillers draw from the goal faces (s1/c1/w1) -- see Lv24's note.
+  seals: [[0,5,2], [1,5,4], [2,5,6], [3,5,8], [5,0,3], [5,1,7], [5,2,11]],
+  permanents: [[4,5], [5,5], [5,3], [5,4]],
+  guideMoves: 0,
+  moveLimit: 9,
+  boosterReroll: 1,
+  boosterHint: 1,
+  lesson: "COMBINE PASS: Ô CHẮN JOINS SEAL, MIXED PIECES, 28",
+  teach: "",
+  tiles: [
+    P24K_TILE("s1", 1, 1, 0), P24K_TILE("s1", 4, 2, 0),
+    P24K_TILE("c1", 1, 4, 0), P24K_TILE("c1", 3, 1, 0),
+    P24K_TILE("w1", 1, 3, 0), P24K_TILE("w1", 3, 3, 0),
+  ],
+  sequence: [
+    P24M_L3("m1", "s1", "c1", "s1"),
+    P24M_PLUS5("m2", "s1", "c1", "w1", "h1", "s1"),
+    P24M_L3("m3", "c1", "s1", "c1"),
+    P24M_L3C("m4", "s1", "c1", "c1"),
+    P24M_L5("m5", "s1", "c1", "w1", "h1", "w1"),
+    P24M_L3("m6", "s1", "c1", "w1"),
+  ],
+  solution: [
+    { row: 1, col: 0 }, { row: 1, col: 1 }, { row: 1, col: 3 },
+    { row: 1, col: 1 }, { row: 1, col: 0 }, { row: 0, col: 1 },
+  ],
+},
+  {
+  title: "Buried Under Seal",
+  size: 6,
+  goalType: "BURIED_TARGET",
+  winTargets: [{id:"s1",need:4}, {id:"c1",need:4}, {id:"w1",need:6}],
+  seals: [[5,0,3], [0,5,5], [5,5,7], [0,0,8]],
+  permanents: [[2,2], [3,3], [2,3], [3,2]],
+  guideMoves: 0,
+  moveLimit: 9,
+  boosterReroll: 1,
+  boosterHint: 1,
+  lesson: "COMBINE PASS: Ô CHẮN JOINS SEAL, DIFFICULTY STAYS HIGH, 28-30",
+  teach: "",
+  tiles: [
+    P24K_TILE("h2", 4, 5, 1),
+    P24K_TILE("s1", 4, 5, 0),
+    P24K_TILE("c2", 4, 4, 0),
+    P24K_TILE("s1", 0, 2, 0),
+    P24K_TILE("c1", 1, 5, 0),
+    P24K_TILE("c1", 5, 1, 0),
+    P24K_TILE("w1", 0, 4, 0),
+    P24K_TILE("w1", 1, 0, 0),
+    P24K_TILE("w1", 5, 4, 0),
+  ],
+  sequence: [
+    K_DOMINO_H("m0", "s2", "h2"),
+    K_DOMINO_H("m1", "w2", "s1"),
+    K_DOMINO_V("m2", "h1", "s1"),
+    K_DOMINO_H("m3", "c1", "s2"),
+    K_DOMINO_H("m4", "w2", "c1"),
+    K_DOMINO_V("m5", "w1", "h1"),
+    P24M_I3H("m6", "s2", "w2", "w1"),
+    K_DOMINO_V("m7", "w1", "h1"),
+  ],
+  solution: [{ row: 4, col: 3 }, { row: 1, col: 1 }, { row: 2, col: 5 }, { row: 4, col: 1 }, { row: 1, col: 3 }, { row: 0, col: 5 }, { row: 5, col: 1 }, { row: 2, col: 0 }],
+},
+  {
+  title: "Twin Stations",
+  size: 6,
+  goalType: "TARGET_FACE",
+  winTargets: [{id:"s1",need:4}, {id:"c1",need:4}, {id:"w1",need:6}, {id:"s2",need:4}],
+  seals: [[5,0,2], [0,5,3], [5,5,5], [0,0,7], [3,3,9], [4,5,9]],
+  permanents: [[1,4], [2,2], [3,2], [4,4], [5,3], [3,4]],
+  guideMoves: 0,
+  moveLimit: 15,
+  boosterReroll: 1,
+  boosterHint: 1,
+  lesson: "CHAPTER FINALE: MOST SEALS + Ô CHẮN TOGETHER, 24-30 PEAK",
+  teach: "",
+  tiles: [
+    P24K_TILE("s1", 0, 1, 0),
+    P24K_TILE("s1", 5, 2, 0),
+    P24K_TILE("c1", 1, 5, 0),
+    P24K_TILE("c1", 2, 0, 0),
+    P24K_TILE("w1", 0, 3, 0),
+    P24K_TILE("w1", 3, 5, 0),
+    P24K_TILE("w1", 5, 1, 0),
+    P24K_TILE("s2", 4, 0, 0),
+    P24K_TILE("s2", 1, 2, 0),
+  ],
+  sequence: [
+    K_DOMINO_V("m1", "s1", "c2"),
+    K_DOMINO_H("m2", "s1", "w2"),
+    K_DOMINO_H("m3", "c1", "h1"),
+    K_DOMINO_H("m4", "h2", "c1"),
+    K_DOMINO_V("m5", "w1", "c2"),
+    P24M_I3H("m6", "w2", "h1", "w1"),
+    K_DOMINO_H("m7", "s2", "h2"),
+    P24M_L3D("m8", "s2", "c2", "w2"),
+    K_DOMINO_V("m9", "h1", "w1"),
+  ],
+  solution: [{ row: 1, col: 1 }, { row: 4, col: 2 }, { row: 1, col: 0 }, { row: 0, col: 4 }, { row: 1, col: 3 }, { row: 2, col: 3 }, { row: 0, col: 2 }, { row: 3, col: 0 }, { row: 4, col: 0 }],
+},
 
   {
-  // sealRequiredDistinct raised 2->4 + moves 3-4 added -- moves 1-2 already drop a w1 and an
-  // h1 that used to sit unmatched forever; move 3 pairs the h1 up, move 4 gives w1 a fresh
-  // seed+match elsewhere. Raises real playtime from 2 to 4 moves (user feedback: apply the
-  // Lv10-20 move/goal fix to the last 30 levels too).
   title: "Seal and Stone",
-  // Board widened 4x4->5x5 for the post-feedback Ch4/Ch5 difficulty rebalance (Ch3 was
-  // scoring higher on average than Ch4/Ch5, breaking the intended escalating curve) -- this
-  // board already used 7 of the game's 8 faces, leaving no room for a genuinely new distinct
-  // seal match without opening more space. A decorative Lock also added in the new area.
-  size: 5,
-  goalType: "OPEN_SEAL",
-  // Only one seal on this level, so its own required count (3rd tuple element) is identical
-  // to the old level-wide pooled requirement -- no behavior change here. History: lowered
-  // 6->3 since this board is packed with 8 permanents + a Lock, leaving exactly TWO cells
-  // ever adjacent to the seal -- (0,2) (freed once, by move 5) and (1,3) (freed once, by move
-  // 7 below) -- and each has only 1-2 free neighbors of its own to route a match through,
-  // nowhere near enough to sustain 6 distinct adjacent matches without either fighting the
-  // permanent layout indefinitely or inflating moveLimit past what's reasonable for this
-  // chapter. 3 is exactly what these two cells can cleanly support: move 5's original s2
-  // match (already adjacent, no changes needed), a new move bridging (1,3)'s own unconsumed
-  // w2 leftover, and one more cross-piece delivery reusing that same gap.
-  seals: [[0, 3, 3]],
-  locks: [{ cells: [[4, 0]], face: "s1", required: 2 }],
-  // Difficulty pass round 2 (after Lv20-29 tighten pushed Ch3's average to 40.7, re-breaking
-  // the Ch3<=Ch4 curve): +5 more decorative permanents filling this board's last free column
-  // (col 4) plus (4,1), none of which the solution ever touches, and moveLimit spare
-  // tightened 2->1.
-  permanents: [[3, 0], [2, 0], [3, 1], [0, 4], [1, 4], [2, 4], [3, 4], [4, 1]],
-  // moveLimit 7->9: moves 1-6 are UNCHANGED and still teach exactly what they always did
-  // (only move 5's s2 match happens to already land adjacent to the seal, at (0,2), which is
-  // why 1 of the 3 needed distinct faces is already satisfied for free). Move 7 bridges a
-  // fresh w2 into (1,3) -- adjacent to the seal, but sitting under move 3's own unconsumed w2
-  // leftover until now -- for distinct #2. Moves 8-9 then reuse that same (1,3)/(2,3) gap once
-  // more across TWO separate drops (piece 8 leaves c1 exposed at (1,3); piece 9 lands c1
-  // adjacent to complete the match one turn later) -- a single piece may never carry the same
-  // face on two adjacent cells of its own (p24mPieceHasBakedSelfMatch forbids that), so this
-  // can't be done in one move the way move 7's bridge could.
-  guideMoves: 0, // auto-guide highlight removed from every level except Lv1
+  size: 4,
+  goalType: "TILE_QUOTA",
+  tileGoal: 8,
+  locks: [{ cells: [[2,2]], face: "s1", required: 2 }, { cells: [[1,0]], face: "w1", required: 3 }],
+  guideMoves: 0,
   moveLimit: 9,
   boosterReroll: 1,
   boosterHint: 1,
   lesson: "SEAL AND BLOCKER FROM THE START",
+  teach: "",
   tiles: [
-    P24K_TILE("s1", 1, 0, 0),
-    P24K_TILE("c1", 2, 1, 0),
-    P24K_TILE("w1", 3, 3, 0),
-    P24K_TILE("s2", 0, 2, 0),
-    P24K_TILE("c2", 4, 4, 0),
   ],
   sequence: [
-    K_DOMINO_H("p1", "s1", "w1"),
-    K_DOMINO_H("p2", "c1", "h1"),
-    K_DOMINO_V("m3", "h1", "w2"),
-    K_DOMINO_V("m4", "w2", "w1"),
-    K_DOMINO_V("m5", "s2", "h2"),
-    K_DOMINO_H("m6", "w2", "c2"),
-    K_DOMINO_V("e1", "w2", "j1"),
-    K_DOMINO_H("e2", "j2", "c1"),
-    K_DOMINO_V("e3", "c1", "j3"),
+    P24M_I3H("p1", "c1", "w1", "s1"),
+    K_DOMINO_V("p2", "c1", "s1"),
+    K_DOMINO_H("p3", "w1", "s1"),
+    P24M_I3H("p4", "c1", "w1", "s1"),
+    P24M_T4("p5", "s1", "c1", "w1", "s1"),
   ],
-  // move3 @(2,2): h1@(2,2) matches the leftover h1@(1,2) from move 2 -> distinct #3; w2@(3,2) lands harmlessly.
-  // move4 @(1,3): w2@(1,3) lands harmlessly; w1@(2,3) matches the new seed w1@(3,3) -> distinct #4.
-  // move5 @(1,2): s2@(1,2) matches seed s2@(0,2) -> distinct #1 (adjacent), and (0,2) is
-  //   adjacent to the seal, so this is the one match from the original puzzle that still
-  //   counts; h2@(2,2) lands harmlessly.
-  // move6 @(4,2): w2@(4,2) lands harmlessly; c2@(4,3) matches seed c2@(4,4) -> distinct
-  //   (not adjacent, no longer counts on its own).
-  // move7 @(2,3): w2@(2,3) matches the still-exposed leftover w2(1,3) from move 4 -> distinct
-  //   #2 (adjacent, (1,3) touches the seal); j1@(3,3) lands harmlessly.
-  // move8 @(1,2): j2@(1,2) lands harmlessly; c1@(1,3) lands fresh (that cell freed by move 7's
-  //   match) -- no match yet, just sits exposed.
-  // move9 @(2,3): j3@(3,3) lands harmlessly (stacks on move 7's leftover j1, still within the
-  //   2-layer cap); c1@(2,3) matches move 8's c1(1,3) -> distinct #3 (adjacent) -> threshold 3
-  //   met -> seal opens at (0,3).
-  solution: [
-    { row: 0, col: 0 }, { row: 1, col: 1 }, { row: 2, col: 2 }, { row: 1, col: 3 }, { row: 1, col: 2 }, { row: 4, col: 2 },
-    { row: 2, col: 3 }, { row: 1, col: 2 }, { row: 2, col: 3 },
-  ],
-  },
+  solution: [{ row: 1, col: 1 }, { row: 1, col: 3 }, { row: 3, col: 2 }, { row: 2, col: 1 }, { row: 1, col: 0 }, { row: 0, col: 1 }],
+},
   {
   title: "Two Under One",
   // Chapter floors must rise chapter-over-chapter (Ch4's minimum was 1.9, below Ch3's fixed
@@ -5452,45 +5221,18 @@ const P24M_LEVELS=[
   },
   {
   title: "Either Way Works",
-  // Same chapter-floor fix as Lv32 above -- second s1 pair via a fresh corner seed, plus a
-  // decorative permanent + a seal (sealRequiredDistinct:1, trivially opened by the very first
-  // match) neither of which the solution ever needs to touch. targetRequiredCount:1 still
-  // means only ONE of the two listed targets must reach its own need -- the "either way"
-  // choice is unchanged, s1's path is just longer now.
-  // s1 need raised 4->6 (still "either way": c1 stays the untaken 2nd route at its
-  // original need:2) + move 3 added, a fresh seed+piece pair in a previously-untouched
-  // corner. Raises real playtime from 2 to 3 moves (user feedback: apply the Lv10-20
-  // move/goal fix to the last 30 levels too).
-  // Board widened 4x4->5x5 for the post-feedback Ch4/Ch5 difficulty rebalance (Ch3 was
-  // scoring higher on average than Ch4/Ch5) -- a decorative Lock and a genuine extra move
-  // added in the new area, using the one basic face (c2) this level never touched.
   size: 5,
   goalType: "TARGET_FACE",
   winTargets: [{id:"s1",need:6}, {id:"c1",need:2}, {id:"h1",need:2}],
-  targetRequiredCount: 2,
-  // [Đổi luật 12/09/2026] Lock decoupled from the goal face: c2 (not s1) opens it now, sitting
-  // on the two cells move3/move4 need for s1/h1 -- c2's own bonus pair (was move5) moves to
-  // the front so those placements are illegal until it fires.
-  locks: [{ cells: [[3, 1], [2, 1]], face: "c2", required: 2 }],
-  // Only one seal on this level, so its own required count (3rd tuple element) is identical
-  // to the old level-wide pooled requirement -- no behavior change here.
   seals: [[2,3,1]],
-  // 1 more decorative permanent (untouched cell) -- same Chapter 3/4 floor cascade fix as Lv32.
-  // +1 more (the level's last remaining free cell) for the post-feedback Ch4/Ch5 rebalance.
-  permanents: [[0,3],[2,0],[0,2],[1,3]],
-  // 3rd target (h1) + move 4 added for the game-wide +1-move scale-up pass, with
-  // targetRequiredCount raised 1->2 so it's mandatory alongside s1 -- c1 stays the one
-  // permanently untaken route ("2 of 3" now instead of "either of 2"). h1 (not another s1
-  // pair) was chosen because every remaining free cell on this packed 4x4 board sits
-  // adjacent to some existing s1 tile -- reusing s1 there would silently merge into an
-  // existing s1 wave instead of landing as its own separate pair.
-  // Difficulty pass round 2 (after Lv20-29 tighten pushed Ch3's average to 40.7, re-breaking
-  // the Ch3<=Ch4 curve): moveLimit spare tightened 2->1, no content change needed.
+  permanents: [[0,3], [2,0], [0,2], [1,3]],
+  locks: [{ cells: [[3,1], [2,1]], face: "s1", required: 3 }],
   guideMoves: 0,
-  moveLimit: 7,
+  moveLimit: 12,
   boosterReroll: 1,
   boosterHint: 1,
   lesson: "EITHER FACE CLEARS THE GOAL",
+  teach: "",
   tiles: [
     P24K_TILE("s1", 1, 0, 0),
     P24K_TILE("c1", 1, 2, 0),
@@ -5498,117 +5240,81 @@ const P24M_LEVELS=[
     P24K_TILE("s1", 3, 0, 0),
     P24K_TILE("h1", 1, 1, 0),
     P24K_TILE("c2", 4, 3, 0),
+    P24K_TILE("h2", 0, 4, 0),
   ],
   sequence: [
+    // [tile-visibility fix] "x33" wasn't a valid raw face id (renders blank/'?'). Replaced with
+    // 'w2', matching this level's own existing filler convention (already used by m3/m4 below) --
+    // lands at (3,2), not adjacent to h2's own cell (2,2) or the s1 seed at (3,3), so behavior
+    // (lands inert, no match) is unchanged.
+    K_DOMINO_V("pre33", "h2", "w2"),
     K_DOMINO_H("m5", "s2", "c2"),
     K_DOMINO_H("p1", "s1", "c1"),
     K_DOMINO_V("p2", "w1", "s1"),
     K_DOMINO_H("m3", "s1", "w2"),
     K_DOMINO_V("m4", "h1", "w2"),
-
-      K_DOMINO_V('freq32', 's1', 'c1'),
-    ],
-  // move1 @(4,1): s2@(4,1) lands harmlessly; c2@(4,2) matches seed c2@(4,3) -> lock opens (required c2=2 met).
-  // move4 @(3,1): s1@(3,1) [the now-open lock cell] matches the new seed s1@(3,0) -> s1=6 met; w2@(3,2) lands harmlessly.
-  // move5 @(2,1): h1@(2,1) [the now-open lock cell] matches seed h1@(1,1) -> h1=2 met; w2@(3,1) lands harmlessly. s1+h1 (2 of 3) met.
-  solution: [{ row: 4, col: 1 }, { row: 0, col: 0 }, { row: 2, col: 2 }, { row: 3, col: 1 }, { row: 2, col: 1 },
-      { row: 0, col: 0 }, // freq: extra s1 exposure (+moveLimit)
-    ],
-  },
+    K_DOMINO_V("freq32", "s1", "c1"),
+  ],
+  solution: [{ row: 2, col: 2 }, { row: 0, col: 0 }, { row: 4, col: 0 }, { row: 2, col: 4 }, { row: 3, col: 1 }, { row: 2, col: 1 }, { row: 1, col: 1 }, { row: 1, col: 4 }, { row: 1, col: 0 }, { row: 1, col: 0 }],
+},
   {
-  // sealRequiredDistinct raised 3->4 + move 4 added -- moves 1-3 already drop 3 separate h1
-  // fillers that used to sit unmatched forever; move 4 pairs 2 of them up for real. Raises
-  // real playtime from 3 to 4 moves (user feedback: apply the Lv10-20 move/goal fix to the
-  // last 30 levels too).
   title: "Three Keys",
-  size: 4,
-  // Board widened 4x4->5x5 for the post-feedback Ch4/Ch5 difficulty rebalance -- this board
-  // already used 7 of 8 faces, leaving no room for a genuinely new distinct seal match
-  // without more space. A decorative Lock also added in the new area.
   size: 5,
-  goalType: "OPEN_SEAL",
-  // Only one seal on this level, so its own required count (3rd tuple element) is identical
-  // to the old level-wide pooled requirement -- no behavior change here. History: lowered
-  // 6->2 since (3,3)'s only free neighbor is (4,3) -- the other three are permanents -- so a
-  // piece can only ever reach the seal from that one cell. (4,3) itself has only ONE further
-  // free neighbor of its own ((4,4)), nowhere near enough to sustain 6 distinct adjacent
-  // matches. 2 is what this single approach cell can cleanly support: move 6's own c2 match
-  // (already adjacent, no changes needed) plus one bridge move reusing the same gap.
-  seals: [[3,3,2]],
-  locks: [{ cells: [[4, 0]], face: "s1", required: 2 }],
-  // 3 decorative permanents (the level's only remaining free cells) for the post-feedback
-  // Ch4/Ch5 difficulty rebalance.
-  // Difficulty pass round 2 (after Lv20-29 tighten pushed Ch3's average to 40.7, re-breaking
-  // the Ch3<=Ch4 curve): +5 more decorative permanents in col 4 plus (4,1) -- genuinely free
-  // this time (verified against the live solution trace), none ever touched by the solution
-  // -- and moveLimit spare tightened 2->1.
-  permanents: [[1,3],[2,3],[3,2],[0,4],[1,4],[2,4],[3,4],[4,1]],
-  // moveLimit 7->7 (unchanged): moves 1-6 are UNCHANGED below; move 6's own c2 match already
-  // happens to land on (4,3), so it counts as 1 of the 2 needed distinct faces for free. Move
-  // 7 bridges a fresh w2 into (4,3), matching move 6's own unconsumed w2 leftover at (4,2),
-  // for the 2nd.
-  guideMoves: 0, // auto-guide highlight removed from every level except Lv1
-  moveLimit: 7,
-  boosterReroll: 1,
-  boosterHint: 1,
-  lesson: "FOUR DIFFERENT FACES OPEN IT",
-  tiles: [
-    P24K_TILE("s1", 1, 0, 0),
-    P24K_TILE("c1", 1, 2, 0),
-    P24K_TILE("w1", 3, 1, 0),
-    P24K_TILE("s2", 3, 0, 0),
-    P24K_TILE("c2", 4, 4, 0),
-  ],
-  sequence: [
-    K_DOMINO_H("p1", "s1", "h1"),
-    K_DOMINO_H("p2", "c1", "h1"),
-    K_DOMINO_H("p3", "w1", "h1"),
-    K_DOMINO_V("m4", "h1", "w2"),
-    K_DOMINO_V("m5", "h2", "s2"),
-    K_DOMINO_H("m6", "w2", "c2"),
-    K_DOMINO_H("e1", "w2", "j1"),
-  ],
-  // move4 @(1,1): h1@(1,1) matches the leftover h1@(0,1) from move 1 -> distinct #4; w2@(2,1) lands harmlessly.
-  // move5 @(1,0): h2@(1,0) lands harmlessly; s2@(2,0) matches seed s2@(3,0) -> distinct #5.
-  // move6 @(4,2): w2@(4,2) lands harmlessly; c2@(4,3) matches seed c2@(4,4) -> distinct #1
-  //   (adjacent, (4,3) touches the seal) -- the one match from the original puzzle that still
-  //   counts under the new adjacency rule.
-  // move7 @(4,3): w2@(4,3) matches move 6's still-exposed leftover w2(4,2) -> distinct #2
-  //   (adjacent) -> threshold 2 met -> seal opens; j1@(4,4) lands harmlessly.
-  solution: [
-    { row: 0, col: 0 }, { row: 0, col: 2 }, { row: 2, col: 1 }, { row: 1, col: 1 }, { row: 1, col: 0 }, { row: 4, col: 2 },
-    { row: 4, col: 3 },
-  ],
-  },
-  {
-  // 1 more decorative permanent (untouched corner) -- extending Lv10-20's moves/goals raised
-  // Chapter 2's floor, which cascaded into Chapter 3 needing a bump too (Lv21), which now
-  // puts Chapter 3 above this level, breaking "each chapter's floor exceeds the last" again.
-  title: "Permanent Detour",
-  // Board widened 4x4->5x5 for the post-feedback Ch4/Ch5 difficulty rebalance -- this board
-  // was already 100% full (6 permanents, no free cell), so a decorative Lock and a genuine
-  // extra move (s2, unused elsewhere here) live in the new area.
-  size: 5,
-  goalType: "TARGET_FACE",
-  winTargets: [{id:"s1",need:2}, {id:"c1",need:2}, {id:"w1",need:2}],
-  // [Đổi luật 12/09/2026] Lock decoupled from the goal face: s2 (not s1) opens it now, sitting
-  // on the cell move4's w1 pair needs -- s2's own bonus pair (was move6) moves to the front so
-  // that placement is illegal until it fires.
-  locks: [{ cells: [[3, 0]], face: "s2", required: 2 }],
-  // +1 more decorative permanent (the level's last free cell) for the post-feedback Ch4/Ch5
-  // difficulty rebalance.
-  permanents: [[1,1], [1,2], [2,1], [2,2], [3,3], [3,2]],
-  // h1 target dropped -- user cap is max 3 face types when combined with a Permanent.
-  // moveLimit +1 (post-feedback pass): only 1 spare move was too tight per playtest feedback.
-  // Difficulty pass round 2 (after Lv20-29 tighten pushed Ch3's average to 40.7, re-breaking
-  // the Ch3<=Ch4 curve): moveLimit spare tightened 2->1, no content change needed.
+  goalType: "TILE_QUOTA",
+  tileGoal: 10,
+  locks: [{ cells: [[2,2]], face: "s1", required: 2 }, { cells: [[1,2], [3,2]], face: "c1", required: 2 }, { cells: [[1,1], [3,3]], face: "w1", required: 2 }],
   guideMoves: 0,
   moveLimit: 8,
   boosterReroll: 1,
   boosterHint: 1,
-  lesson: "ROUTE AROUND THE BLOCK, NOT THROUGH IT",
+  lesson: "FOUR DIFFERENT FACES OPEN IT",
+  teach: "",
   tiles: [
-    P24K_TILE("s2", 4, 4, 0),
+    P24K_TILE("w1", 2, 0, 0),
+    P24K_TILE("w1", 2, 4, 0),
+    P24K_TILE("s2", 1, 4, 0),
+    P24K_TILE("s2", 3, 0, 0),
+    P24K_TILE("w1", 0, 4, 0),
+    P24K_TILE("w1", 4, 0, 0),
+    P24K_TILE("c1", 0, 3, 0),
+    P24K_TILE("c1", 4, 1, 0),
+    P24K_TILE("w1", 0, 2, 0),
+    P24K_TILE("w1", 4, 2, 0),
+    P24K_TILE("s2", 0, 1, 0),
+    P24K_TILE("s2", 4, 3, 0),
+  ],
+  sequence: [
+    K_DOMINO_H("p1", "s1", "w1"),
+    K_DOMINO_H("p2", "w1", "s1"),
+    K_DOMINO_H("p3", "s1", "c1"),
+    P24M_L3C("p4", "c1", "w1", "s1"),
+    P24M_T4("p5", "w1", "c1", "w1", "s1"),
+    P24M_L3D("p6", "s1", "c1", "w1"),
+    P24M_L3D("p7", "c1", "w1", "s1"),
+  ],
+  solution: [{ row: 0, col: 0 }, { row: 0, col: 2 }, { row: 1, col: 0 }, { row: 2, col: 1 }, { row: 1, col: 2 }, { row: 1, col: 1 }],
+},
+  {
+  title: "Permanent Detour",
+  size: 6,
+  goalType: "TARGET_FACE",
+  winTargets: [{id:"s1",need:2}, {id:"c1",need:2}, {id:"w1",need:2}],
+  permanents: [[3,1], [3,2], [3,3], [3,4], [2,4], [2,3], [2,1], [2,2]],
+  locks: [{ cells: [[5,1]], face: "s1", required: 2 }, { cells: [[5,3]], face: "w2", required: 2 }, { cells: [[1,5]], face: "h1", required: 2 }],
+  guideMoves: 0,
+  moveLimit: 12,
+  boosterReroll: 1,
+  boosterHint: 1,
+  lesson: "ROUTE AROUND THE BLOCK, NOT THROUGH IT",
+  teach: "",
+  tiles: [
+    P24K_TILE("h2", 4, 0, 0),
+    P24K_TILE("h1", 4, 5, 0),
+    P24K_TILE("s1", 0, 3, 0),
+    P24K_TILE("s2", 4, 2, 0),
+    P24K_TILE("w2", 0, 0, 0),
+    P24K_TILE("w2", 4, 3, 0),
+    P24K_TILE("h1", 1, 2, 0),
   ],
   sequence: [
     K_DOMINO_H("m6", "w2", "s2"),
@@ -5617,15 +5323,9 @@ const P24M_LEVELS=[
     K_DOMINO_H("p3", "c1", "h1"),
     K_DOMINO_H("p4", "w1", "h1"),
     K_DOMINO_V("m5", "h1", "w2"),
-
-      K_DOMINO_H('freq34', 's1', 'c1'),
-    ],
-  // Random queue pool (Lv35-50 opt-in pass): see Lv36 above for the pattern -- same
-  // authored pieces, gated random order, sequence/solution untouched. Verified against a
-  // real-gameplay Monte Carlo matching this level's own deterministic baseline exactly
-  // (both score 0/10 under a deliberately weak greedy-only heuristic that can't set up this
-  // level's non-matching detour move -- a thinking player, human or the engine's own
-  // winnability proof, clears it the same either way).
+    K_DOMINO_H("freq34", "s1", "c1"),
+    P24M_L3D("p8", "s1", "h1", "w2"),
+  ],
   queuePool: [
     { piece: K_DOMINO_H("p1", "s1", "c1"), weight: 1 },
     { piece: K_DOMINO_V("p2", "s1", "w1"), weight: 1 },
@@ -5633,50 +5333,37 @@ const P24M_LEVELS=[
     { piece: K_DOMINO_H("p4", "w1", "h1"), weight: 1 },
     { piece: K_DOMINO_V("m5", "h1", "w2"), weight: 1 },
     { piece: K_DOMINO_H("m6", "w2", "s2"), weight: 1 },
-  
-    { piece: K_DOMINO_H('freq34', 's1', 'c1'), weight: 1 },
+    { piece: K_DOMINO_V("pre35", "c8", "x35"), weight: 1 },
+    { piece: K_DOMINO_H("freq34", "s1", "c1"), weight: 1 },
   ],
   queueFallback: K_DOMINO_H("m6", "w2", "s2"),
-  queueSolveDepth: 7,
-  // move1 @(4,2): w2@(4,2) lands harmlessly; s2@(4,3) matches seed s2@(4,4) -> lock opens (required s2=2 met).
-  // move5 @(3,0): w1@(3,0) [the now-open lock cell] pairs with move2's leftover; h1@(3,1) lands harmlessly.
-  // move6 @(1,3): h1@(1,3) matches the leftover h1@(0,3) from move 4 -> h1=2 met (uncounted), all targets already met.
-  solution: [{ row: 4, col: 2 }, { row: 0, col: 0 }, { row: 1, col: 0 }, { row: 0, col: 2 }, { row: 3, col: 0 }, { row: 1, col: 3 },
-      { row: 0, col: 0 }, // freq: extra s1 exposure (+moveLimit)
-    ],
-  },
+  queueRerollBudget: 10,
+  queueSolveDepth: 8,
+  solution: [{ row: 0, col: 1 }, { row: 1, col: 3 }, { row: 0, col: 0 }, { row: 5, col: 4 }, { row: 1, col: 1 }, { row: 4, col: 5 }, { row: 0, col: 3 }],
+},
   {
-  // Adds Khóa, bumped 3x3->4x4 for room: originally the h1 pair itself also satisfied the
-  // lock -- [Đổi luật 12/09/2026] decoupled both locks from the goal faces instead: s2 gates
-  // the h1/w1-completing cells, c2 gates the s1-completing cell, each fed by an existing
-  // bonus-pair move (p5, m7) now moved to the front. Same total tile count (6) as before --
-  // one extra move (3->4) to accommodate the added gate.
   title: "Roof Chain",
-  // Board widened 4x4->5x5 for the post-feedback Ch4/Ch5 difficulty rebalance -- a 2nd
-  // gate and a genuine extra move added in the new area, using the one basic face (c2) this
-  // level never touched.
-  size: 5,
+  size: 6,
   goalType: "TARGET_FACE",
-  winTargets: [{id:"h1",need:2}, {id:"w1",need:2}, {id:"s1",need:2}],
-  locks: [{ cells: [[1, 0], [1, 1]], face: "s2", required: 2 }, { cells: [[2, 2]], face: "c2", required: 2 }],
-  // 1 decorative permanent (untouched cell) -- same Chapter 3/4 floor cascade fix as
-  // Lv35 above. +1 more (last free cell) for the post-feedback Ch4/Ch5 rebalance.
-  // Difficulty pass round 2 (after Lv20-29 tighten pushed Ch3's average to 40.7, re-breaking
-  // the Ch3<=Ch4 curve): +4 more decorative permanents in col 4, plus a lone h2 seed at
-  // (4,1) -- this board's 8th (previously unused) face, never touched by the solution,
-  // purely to raise the distinct-face count -- and moveLimit spare tightened 2->1.
-  permanents: [[2,0], [0,3], [0,4], [1,4], [2,4], [3,4]],
-  // s2/c1 targets dropped -- user cap is max 3 face types when combined with a Lock/Permanent.
-  // s2/c1 still get matched by moves 5/6 exactly as before, just uncounted now.
+  winTargets: [{id:"h1",need:2}, {id:"w1",need:4}, {id:"s1",need:2}],
+  permanents: [[0,5], [1,4], [4,1], [5,0], [0,0], [1,1], [4,4], [5,5], [2,3]],
+  locks: [{ cells: [[2,2]], face: "w1", required: 2 }, { cells: [[3,3]], face: "w2", required: 2 }, { cells: [[3,2]], face: "h1", required: 2 }],
   guideMoves: 0,
-  moveLimit: 9,
+  moveLimit: 13,
   boosterHint: 1,
   lesson: "KHÓA MỞ SAU KHI PHÁ ĐỦ MẶT YÊU CẦU — ONE MATCH REVEALS THE NEXT",
+  teach: "",
   tiles: [
-    P24K_TILE("s2", 1, 3, 0),
-    P24K_TILE("c1", 2, 1, 0),
-    P24K_TILE("c2", 4, 4, 0),
-    P24K_TILE("h2", 4, 1, 0), // difficulty-pass round 2: decorative 8th-face seed, never touched by the solution
+    P24K_TILE("h1", 0, 3, 0),
+    P24K_TILE("w2", 0, 2, 0),
+    P24K_TILE("c2", 5, 3, 0),
+    P24K_TILE("w1", 2, 0, 0),
+    P24K_TILE("c2", 2, 5, 0),
+    P24K_TILE("h1", 5, 2, 0),
+    P24K_TILE("w1", 3, 5, 0),
+    P24K_TILE("w2", 3, 0, 0),
+    P24K_TILE("w2", 2, 5, 1),
+    P24K_TILE("h1", 3, 0, 1),
   ],
   sequence: [
     K_DOMINO_V("p5", "w1", "s2"),
@@ -5686,69 +5373,32 @@ const P24M_LEVELS=[
     K_DOMINO_V("p3", "s1", "w1"),
     K_DOMINO_V("p4", "s1", "w1"),
     K_DOMINO_H("m6", "w2", "c1"),
-
-      K_DOMINO_H('freq35', 'h1', 's1'),
-    ],
-  // Random queue pool (Lv35-50 opt-in pass): reuses the exact pieces already authored above
-  // (deduplicated by shape+face) so Current/Next now draw randomly instead of in fixed
-  // order, gated by the engine's own winnability proof (p24qDrawGated/p24qTrySolveFrom) --
-  // `sequence`/`solution` above stay untouched and keep driving self-test's deterministic
-  // replay. queueFallback is the same domino already proven placeable at the end of the
-  // authored solution. Verified via a real-gameplay Monte Carlo (montecarlo_real.js).
-  queuePool: [
-    { piece: K_DOMINO_H("p1", "h1", "w1"), weight: 1 },
-    { piece: K_DOMINO_V("p3", "s1", "w1"), weight: 1 },
-    { piece: K_DOMINO_V("p5", "w1", "s2"), weight: 1 },
-    { piece: K_DOMINO_H("m6", "w2", "c1"), weight: 1 },
-    { piece: K_DOMINO_H("m7", "w2", "c2"), weight: 1 },
-  
-    { piece: K_DOMINO_H('freq35', 'h1', 's1'), weight: 1 },
+    K_DOMINO_H("freq35", "h1", "s1"),
+    P24M_L3D("p9", "s2", "w2", "c2"),
   ],
-  queueFallback: K_DOMINO_H("m7", "w2", "c2"),
-  queueSolveDepth: 8,
-  solution: [
-    { row: 0, col: 2 }, // p5: w1@(0,2) lone filler; s2@(1,2) matches seed s2@(1,3) -> s2=2, first lock opens (cells (1,0)/(1,1))
-    { row: 4, col: 2 }, // m7: w2@(4,2) lands harmlessly; c2@(4,3) matches seed c2@(4,4) -> 2nd lock opens (cell (2,2))
-    { row: 0, col: 0 }, // h1@(0,0), w1@(0,1)
-    { row: 1, col: 0 }, // h1@(1,0) [the now-open lock cell] matches -> h1=2; w1@(1,1) [the now-open lock cell] matches -> w1=2
-    { row: 2, col: 3 }, // s1@(2,3) lone; w1@(3,3) filler
-    { row: 2, col: 2 }, // s1@(2,2) [the now-open lock cell] matches lone s1@(2,3) -> s1=2, all three met
-    { row: 3, col: 0 }, // m6: w2@(3,0) lands harmlessly; c1@(3,1) matches seed c1@(2,1) -> c1=2 met (uncounted)
-
-      { row: 0, col: 0 }, // freq: extra h1 exposure (+moveLimit)
-    ],
-  },
+  solution: [{ row: 2, col: 1 }, { row: 1, col: 2 }, { row: 4, col: 2 }, { row: 3, col: 3 }, { row: 3, col: 2 }, { row: 4, col: 2 }],
+},
   {
   title: "Three Distinct",
-  size: 4,
-  goalType: "TARGET_FACE",
-  winTargets: [{id:"s1",need:2}, {id:"c1",need:2}, {id:"w1",need:2}],
-  // s2 target dropped -- user cap is max 3 face types when combined with a Permanent (also
-  // brings the level back in line with its own title, "Three Distinct"). This also means the
-  // old "any 3 of 4" pick-some flavor no longer fits (3 listed types can't offer "3 of 4"),
-  // so w1 (promoted to mandatory in the game-wide +1-move scale-up pass) stays required
-  // alongside s1/c1 instead of being an optional route.
-  // Reverted the stray 5th permanent (post-2nd-feedback pass: it broke the clean row-2 wall
-  // shape and read as clutter on this small board) -- upgraded one wall cell to a Lock
-  // instead, same 4-cell footprint, a touch more difficulty score.
-  // Difficulty pass round 2 (after Lv20-29 tighten pushed Ch3's average to 40.7, re-breaking
-  // the Ch3<=Ch4 curve): upgraded a 2nd wall cell to a Lock (same trick as above), added a
-  // decorative h2 seed (this board's 7th, previously unused face) on the board's one free
-  // cell, and tightened moveLimit spare 2->1.
-  // [Đổi luật 12/09/2026] Both locks decoupled from the goal faces and merged into one gate:
-  // s2 (the only spare bonus pair on this board, was move4) opens it, moved to the front so
-  // the s1/c1/w1-completing cells are illegal to place until it fires.
-  locks: [{ cells: [[1, 0], [0, 2], [1, 2]], face: "s2", required: 2 }],
-  permanents: [[2,1],[2,2]],
-  // moveLimit +1 (post-feedback pass): only 1 spare move was too tight per playtest feedback.
+  size: 6,
+  goalType: "TILE_QUOTA",
+  tileGoal: 16,
+  permanents: [[2,2], [3,2], [3,3], [2,3], [3,4], [2,4], [3,1], [2,1]],
+  locks: [{ cells: [[1,2]], face: "s2", required: 2 }, { cells: [[1,3]], face: "s1", required: 2 }, { cells: [[4,2]], face: "w1", required: 2 }, { cells: [[4,3]], face: "w2", required: 2 }],
   guideMoves: 0,
-  moveLimit: 7,
+  moveLimit: 13,
   boosterHint: 1,
   lesson: "THREE DISTINCT FACES CLEAR THE GOAL",
+  teach: "",
   tiles: [
-    P24K_TILE("s2", 3, 3, 0),
-    P24K_TILE("w1", 1, 3, 0),
-    P24K_TILE("h2", 3, 0, 0), // difficulty-pass round 2: decorative 7th-face seed, never touched by the solution
+    P24K_TILE("c2", 0, 5, 0),
+    P24K_TILE("h1", 0, 0, 0),
+    P24K_TILE("w2", 5, 5, 0),
+    P24K_TILE("w1", 5, 0, 0),
+    P24K_TILE("c1", 5, 2, 0),
+    P24K_TILE("s1", 5, 3, 0),
+    P24K_TILE("h2", 0, 3, 0),
+    P24K_TILE("s2", 0, 2, 0),
   ],
   sequence: [
     K_DOMINO_H("p4", "c2", "s2"),
@@ -5756,131 +5406,90 @@ const P24M_LEVELS=[
     K_DOMINO_H("p2", "s1", "h1"),
     K_DOMINO_H("p3", "c1", "h1"),
     K_DOMINO_V("m5", "w2", "w1"),
-
-      K_DOMINO_H('freq36', 's1', 'c1'),
-    ],
-  // Random queue pool (Lv35-50 opt-in pass): see Lv36 above for the pattern -- same
-  // authored pieces, gated random order, sequence/solution untouched.
+    K_DOMINO_H("freq36", "s1", "c1"),
+    P24M_L3B("p7", "w1", "s1", "c1"),
+    P24M_L3D("p8", "s2", "c1", "w2"),
+  ],
   queuePool: [
     { piece: K_DOMINO_H("p1", "s1", "c1"), weight: 1 },
     { piece: K_DOMINO_H("p2", "s1", "h1"), weight: 1 },
     { piece: K_DOMINO_H("p3", "c1", "h1"), weight: 1 },
     { piece: K_DOMINO_H("p4", "c2", "s2"), weight: 1 },
     { piece: K_DOMINO_V("m5", "w2", "w1"), weight: 1 },
-  
-    { piece: K_DOMINO_H('freq36', 's1', 'c1'), weight: 1 },
+    // [tile-visibility fix] "x37" wasn't a valid raw face id -- and since this level uses
+    // queuePool (real gameplay draws from here via p24qRandomModeActive, not just self-test),
+    // this one could actually reach a live player as a blank/'?' tile. Replaced with 'c2',
+    // a face this pool doesn't yet pair with s1 (p1/p2 already cover c1/h1), for variety.
+    { piece: K_DOMINO_H("m6", "c2", "s1"), weight: 1 },
+    { piece: K_DOMINO_H("freq36", "s1", "c1"), weight: 1 },
   ],
   queueFallback: K_DOMINO_V("m5", "w2", "w1"),
-  queueSolveDepth: 6,
-  // move1 @(3,1): c2@(3,1) lands harmlessly; s2@(3,2) matches seed s2@(3,3) -> lock opens (required s2=2 met).
-  // move3 @(1,0): s1@(1,0) [the now-open lock cell] matches p1's s1@(0,0) -> s1=2 met; h1@(1,1) filler.
-  // move4 @(0,2): c1@(0,2) [the now-open lock cell] matches p1's c1@(0,1) -> c1=2 met; h1@(0,3) filler.
-  // move5 @(0,2): w2@(0,2) lands harmlessly; w1@(1,2) [the now-open lock cell] matches seed w1@(1,3) -> w1=2 met, all three met.
-  solution: [{ row: 3, col: 1 }, { row: 0, col: 0 }, { row: 1, col: 0 }, { row: 0, col: 2 }, { row: 0, col: 2 },
-      { row: 0, col: 0 }, // freq: extra s1 exposure (+moveLimit)
-    ],
-  },
+  queueRerollBudget: 10,
+  queueSolveDepth: 7,
+  solution: [{ row: 0, col: 0 }, { row: 5, col: 4 }, { row: 1, col: 1 }, { row: 5, col: 3 }, { row: 4, col: 1 }, { row: 5, col: 3 }, { row: 0, col: 1 }, { row: 4, col: 0 }, { row: 0, col: 1 }, { row: 5, col: 0 }, { row: 5, col: 1 }],
+},
   {
-  // h1 added as a 3rd mandatory target (need:4, not 2) + move 4 added -- move 1's own piece
-  // already matches an h1 pair immediately (h1 need:2 would've been met right there, before
-  // move 4 ever placed); move 2 separately drops a 2nd h1 filler that used to sit unmatched
-  // forever, so need:4 makes move 4's pairing of it actually necessary. Raises real playtime
-  // from 3 to 4 moves (user feedback: apply the Lv10-20 move/goal fix to the last 30
-  // levels too).
   title: "Buried Behind Seal",
-  size: 4,
+  size: 5,
   goalType: "BURIED_TARGET",
   winTargets: [{id:"s1",need:2}, {id:"s2",need:2}, {id:"h1",need:4}],
-  // Only one seal on this level, so its own required count (3rd tuple element) is identical
-  // to the old level-wide pooled requirement -- no behavior change here.
   seals: [[3,3,1]],
-  // Dropped the stray (0,1) permanent (post-2nd-feedback pass: it broke the clean col-3 wall
-  // shape and read as clutter on this small board) -- upgraded the top of that column to a
-  // Lock instead, same footprint, a touch more difficulty score.
-  // Difficulty pass round 2 (after Lv20-29 tighten pushed Ch3's average to 40.7, re-breaking
-  // the Ch3<=Ch4 curve): upgraded the remaining wall cell to a 2nd Lock (same trick as
-  // above), added a decorative c2 seed (this board's 7th, previously unused face) on the
-  // freed (0,1) cell, and tightened moveLimit spare 2->1.
-  // [Đổi luật 12/09/2026] Both locks decoupled from the goal faces and merged into one gate:
-  // h2 (the spare bonus pair, was move5) opens it, moved to the front so the s1/s2/h1-completing
-  // cells are illegal to place until it fires.
-  locks: [{ cells: [[2, 1], [3, 1], [1, 2]], face: "h2", required: 2 }],
-  permanents: [[2,3]],
-  // Chapter floor fix -- genuine 2nd target (s2) in the untouched bottom row, guideMoves
-  // dropped to 0 since the level no longer needs the hand-holding at this point in the curve.
-  // h2 target dropped -- user cap is max 3 face types when combined with a Seal.
+  permanents: [[2,3], [1,3]],
+  locks: [{ cells: [[2,1], [3,1], [1,2]], face: "h2", required: 2 }],
   guideMoves: 0,
-  moveLimit: 7,
+  moveLimit: 13,
   boosterHint: 1,
   lesson: "CLEAR THE ROOF, THEN PAIR WHAT'S UNDERNEATH",
+  teach: "",
   tiles: [
     P24K_TILE("s1", 1, 1, 0),
     P24K_TILE("c1", 1, 1, 1),
     P24K_TILE("h1", 1, 2, 0),
     P24K_TILE("s2", 3, 2, 0),
     P24K_TILE("h2", 0, 0, 0),
-    P24K_TILE("c2", 0, 1, 0), // difficulty-pass round 2: decorative 8th-face seed, never touched by the solution
+    P24K_TILE("c2", 0, 1, 0),
+    P24K_TILE("w1", 0, 3, 0),
   ],
   sequence: [
     K_DOMINO_V("m5", "h2", "w2"),
     K_DOMINO_V("p1", "h1", "c1"),
     K_DOMINO_H("p2", "s1", "h1"),
     K_DOMINO_H("p3", "w1", "s2"),
-    K_DOMINO_V("m4", "w2", "h1"),
-
-      K_DOMINO_V('freq37', 's1', 'c1'),
-    ],
-  // Random queue pool (Lv35-50 opt-in pass): see Lv36 above for the pattern -- same
-  // authored pieces, gated random order, sequence/solution untouched.
+    K_DOMINO_V("freq37", "s1", "c1"),
+    K_DOMINO_H("p7", "s2", "w2"),
+    P24M_L3("p7", "h1", "w1", "s2"),
+    P24M_L3C("p8", "w1", "w2", "h1"),
+  ],
   queuePool: [
     { piece: K_DOMINO_V("p1", "h1", "c1"), weight: 1 },
     { piece: K_DOMINO_H("p2", "s1", "h1"), weight: 1 },
     { piece: K_DOMINO_H("p3", "w1", "s2"), weight: 1 },
     { piece: K_DOMINO_V("m4", "w2", "h1"), weight: 1 },
     { piece: K_DOMINO_V("m5", "h2", "w2"), weight: 1 },
-  
-    { piece: K_DOMINO_V('freq37', 's1', 'c1'), weight: 1 },
+    { piece: K_DOMINO_V("freq37", "s1", "c1"), weight: 1 },
   ],
   queueFallback: K_DOMINO_V("m5", "h2", "w2"),
+  queueRerollBudget: 10,
   queueSolveDepth: 6,
-  // move1 @(1,0): h2@(1,0) matches seed h2@(0,0) -> h2=2 met, lock opens; w2@(2,0) lands harmlessly.
-  // move3 @(2,1): s1@(2,1) [the now-open lock cell] matches seed s1@(1,1) -> s1=2 met; h1@(2,2) filler.
-  // move4 @(3,0): w1@(3,0) lands harmlessly; s2@(3,1) [the now-open lock cell] matches seed s2@(3,2) -> s2=2 met.
-  // move5 @(0,2): w2@(0,2) lands harmlessly; h1@(1,2) [the now-open lock cell] matches the leftover h1@(2,2) from move 3 -> h1=4 met, all three met.
-  solution: [{ row: 1, col: 0 }, { row: 0, col: 2 }, { row: 2, col: 1 }, { row: 3, col: 0 }, { row: 0, col: 2 },
-      { row: 0, col: 0 }, // freq: extra s1 exposure (+moveLimit)
-    ],
-  },
+  solution: [{ row: 1, col: 0 }, { row: 2, col: 2 }, { row: 2, col: 1 }, { row: 0, col: 2 }, { row: 3, col: 1 }, { row: 2, col: 0 }, { row: 3, col: 1 }, { row: 0, col: 0 }, { row: 2, col: 1 }, { row: 1, col: 2 }],
+},
   {
   title: "Stretch",
   size: 5,
   goalType: "TARGET_FACE",
-  winTargets: [{id:"c1",need:2}, {id:"w1",need:2}, {id:"s1",need:2}],
-  // Chapter floor fix -- genuine 5th target (s2) plus 3 decorative permanents, all placed in
-  // the untouched bottom row/corner, none of which the original 5-move chain ever touches.
-  // Dropped the 3 scattered singles added in the Ch4/Ch5 rebalance pass (post-2nd-feedback
-  // pass: loose dots far from the corner cluster read as random clutter) -- upgraded one
-  // corner cell to a Lock instead, keeping a tidy single cluster.
-  // Difficulty pass round 2 (after Lv20-29 tighten pushed Ch3's average to 40.7, re-breaking
-  // the Ch3<=Ch4 curve): kept the "tidy single cluster" rule from the pass above -- upgraded
-  // (3,4) to a 2nd Lock and extended the wall upward with 3 new permanents at (0,4)-(2,4)
-  // (one clean column, not scattered dots), added a decorative c2 seed (this board's 8th,
-  // previously unused face) on the one remaining free cell, and tightened moveLimit spare 2->1.
-  // [Đổi luật 12/09/2026] Both locks decoupled from the goal faces: s2 gates the c1/s1-completing
-  // cells, h2 gates the w1-completing cell, each fed by an existing bonus-pair move (p6, m7)
-  // now moved to the front.
-  locks: [{ cells: [[0, 2], [1, 0]], face: "s2", required: 2 }, { cells: [[1, 3]], face: "h2", required: 2 }],
-  permanents: [[4,3],[0,4],[1,4],[2,4]],
-  // h1/s2/h2 targets dropped -- user cap is max 3 face types when combined with a Permanent.
-  // moveLimit +1 (post-feedback pass): only 1 spare move was too tight per playtest feedback.
+  winTargets: [{id:"c1",need:3}, {id:"w1",need:3}, {id:"s1",need:2}],
+  seals: [[3,4,3]],
+  permanents: [[4,3], [0,4], [1,4], [2,4]],
+  locks: [{ cells: [[0,2], [1,0]], face: "s2", required: 2 }, { cells: [[1,3]], face: "h2", required: 2 }],
   guideMoves: 0,
-  moveLimit: 9,
+  moveLimit: 15,
   boosterHint: 1,
   lesson: "ONE LONG CHAIN ACROSS A BIGGER BOARD",
+  teach: "",
   tiles: [
     P24K_TILE("s2", 4, 2, 0),
     P24K_TILE("h2", 3, 3, 0),
-    P24K_TILE("c2", 3, 0, 0), // difficulty-pass round 2: decorative 8th-face seed, never touched by the solution
+    P24K_TILE("c2", 3, 0, 0),
   ],
   sequence: [
     K_DOMINO_H("p6", "w2", "s2"),
@@ -5890,11 +5499,10 @@ const P24M_LEVELS=[
     K_DOMINO_V("p3", "w1", "h1"),
     K_DOMINO_V("p4", "s1", "h1"),
     K_DOMINO_H("p5", "h1", "w1"),
-
-      K_DOMINO_H('freq38', 'c1', 's1'),
-    ],
-  // Random queue pool (Lv35-50 opt-in pass): see Lv36 above for the pattern -- same
-  // authored pieces, gated random order, sequence/solution untouched.
+    K_DOMINO_H("freq38", "c1", "s1"),
+    P24M_I3V("p9", "c1", "w1", "s2"),
+    K_DOMINO_V("p10", "c1", "w1"),
+  ],
   queuePool: [
     { piece: K_DOMINO_H("p1", "s1", "c1"), weight: 1 },
     { piece: K_DOMINO_H("p2", "c1", "w1"), weight: 1 },
@@ -5903,52 +5511,33 @@ const P24M_LEVELS=[
     { piece: K_DOMINO_H("p5", "h1", "w1"), weight: 1 },
     { piece: K_DOMINO_H("p6", "w2", "s2"), weight: 1 },
     { piece: K_DOMINO_H("m7", "w2", "h2"), weight: 1 },
-  
-    { piece: K_DOMINO_H('freq38', 'c1', 's1'), weight: 1 },
+    { piece: K_DOMINO_H("freq38", "c1", "s1"), weight: 1 },
   ],
   queueFallback: K_DOMINO_H("m7", "w2", "h2"),
+  queueRerollBudget: 10,
   queueSolveDepth: 8,
-  // move1 @(4,0): w2@(4,0) lands harmlessly; s2@(4,1) matches seed s2@(4,2) -> lock 1 opens (cells (0,2)/(1,0)).
-  // move2 @(3,1): w2@(3,1) lands harmlessly; h2@(3,2) matches seed h2@(3,3) -> lock 2 opens (cell (1,3)).
-  // move4 @(0,2): c1@(0,2) [the now-open lock cell] matches p1's c1@(0,1) -> c1=2 met; w1@(0,3) filler.
-  // move5 @(1,3): w1@(1,3) [the now-open lock cell] matches move4's w1@(0,3) -> w1=2 met; h1@(2,3) filler.
-  // move6 @(1,0): s1@(1,0) [the now-open lock cell] matches p1's s1@(0,0) -> s1=2 met, all three met; h1@(2,0) filler.
-  solution: [{ row: 4, col: 0 }, { row: 3, col: 1 }, { row: 0, col: 0 }, { row: 0, col: 2 }, { row: 1, col: 3 }, { row: 1, col: 0 }, { row: 2, col: 1 },
-      { row: 0, col: 0 }, // freq: extra c1 exposure (+moveLimit)
-    ],
-  },
+  solution: [{ row: 3, col: 1 }, { row: 4, col: 1 }, { row: 3, col: 1 }, { row: 4, col: 0 }, { row: 2, col: 1 }, { row: 2, col: 2 }, { row: 1, col: 0 }, { row: 2, col: 0 }, { row: 2, col: 1 }, { row: 1, col: 1 }, { row: 3, col: 0 }, { row: 2, col: 2 }, { row: 1, col: 1 }, { row: 0, col: 2 }],
+},
   {
-  // s2 added as a 4th mandatory target + move 4 added -- move 3 already drops an s2 filler
-  // that used to sit unmatched forever; move 4 pairs it up for real. Raises real playtime
-  // from 3 to 4 moves (user feedback: apply the Lv10-20 move/goal fix to the last 30
-  // levels too).
   title: "Chapter 4 Review",
-  // Board widened 4x4->5x5 for the post-feedback Ch4/Ch5 difficulty rebalance -- this board
-  // already used 7 of 8 faces, leaving no room for a genuine extra pair without more space.
-  // A gate and a genuine extra move (c2) added in the new area.
-  // [Đổi luật 12/09/2026] Lock decoupled from the goal face: c2 (not s1) opens it, sitting on
-  // the three goal-completing cells -- c2's own bonus pair (was move6) moves to the front.
   size: 5,
   goalType: "TARGET_FACE",
   winTargets: [{id:"s1",need:2}, {id:"c1",need:2}, {id:"w1",need:2}],
-  locks: [{ cells: [[0, 0], [2, 3], [2, 1]], face: "c2", required: 2 }],
-  // Chapter floor fix -- genuine 3rd target (w1) plus 2 more decorative permanents, all in
-  // the untouched bottom row, none of which the original 2-move solution ever touches.
-  // +1 more (the level's last free cell) for the post-feedback Ch4/Ch5 difficulty rebalance.
+  seals: [[3,4,3]],
   permanents: [[1,1], [1,2], [3,0], [3,1], [3,2]],
-  // s2/h2 targets dropped -- user cap is max 3 face types when combined with a Permanent.
-  // Difficulty pass round 2 (after Lv20-29 tighten pushed Ch3's average to 40.7, re-breaking
-  // the Ch3<=Ch4 curve): moveLimit spare tightened 2->1, no content change needed.
+  locks: [{ cells: [[0,0], [2,3], [2,1]], face: "c2", required: 2 }],
   guideMoves: 0,
-  moveLimit: 8,
+  moveLimit: 15, // [Đa dạng khối 13/09/2026] +4 (11->15) đi kèm 2 khối filler mới ở trên
   boosterHint: 1,
   lesson: "ROUTE AROUND THE WALL, THEN FINISH THREE FACES",
+  teach: "",
   tiles: [
     P24K_TILE("s1", 1, 0, 0),
     P24K_TILE("c1", 1, 3, 0),
     P24K_TILE("w1", 2, 2, 0),
     P24K_TILE("h2", 0, 2, 0),
     P24K_TILE("c2", 4, 4, 0),
+    P24K_TILE("s4", 4, 0, 0),
   ],
   sequence: [
     K_DOMINO_H("m6", "w2", "c2"),
@@ -5957,64 +5546,38 @@ const P24M_LEVELS=[
     K_DOMINO_H("p3", "s2", "w1"),
     K_DOMINO_H("m4", "s2", "w2"),
     K_DOMINO_V("m5", "h2", "w2"),
-
-      K_DOMINO_V('freq39', 's1', 'c1'),
-    ],
-  // Random queue pool (Lv35-50 opt-in pass): see Lv36 above for the pattern -- same
-  // authored pieces, gated random order, sequence/solution untouched.
-  queuePool: [
-    { piece: K_DOMINO_H("p1", "s1", "h1"), weight: 1 },
-    { piece: K_DOMINO_V("p2", "c1", "h1"), weight: 1 },
-    { piece: K_DOMINO_H("p3", "s2", "w1"), weight: 1 },
-    { piece: K_DOMINO_H("m4", "s2", "w2"), weight: 1 },
-    { piece: K_DOMINO_V("m5", "h2", "w2"), weight: 1 },
-    { piece: K_DOMINO_H("m6", "w2", "c2"), weight: 1 },
-  
-    { piece: K_DOMINO_V('freq39', 's1', 'c1'), weight: 1 },
+    K_DOMINO_V("freq39", "s1", "c1"),
+    // [Đa dạng khối 13/09/2026] 2 hình khối mới (thẳng 3 ô + chữ T 4 ô), toàn filler trang
+    // trí bằng mặt chưa nằm trong winTargets -- không đổi goal/solution.
+    P24M_I3H("div40a", "c2", "h1", "w1"),
+    P24M_T4("div40b", "s2", "c1", "w2", "h2"),
   ],
-  queueFallback: K_DOMINO_H("m6", "w2", "c2"),
-  queueSolveDepth: 7,
-  // move1 @(4,2): w2@(4,2) lands harmlessly; c2@(4,3) matches seed c2@(4,4) -> lock opens (required c2=2 met).
-  // move2 @(0,0): s1@(0,0) [the now-open lock cell] matches seed s1@(1,0) -> s1=2 met; h1@(0,1) filler.
-  // move3 @(2,3): c1@(2,3) [the now-open lock cell] matches seed c1@(1,3) -> c1=2 met; h1@(3,3) filler.
-  // move4 @(2,0): s2@(2,0) filler; w1@(2,1) [the now-open lock cell] matches seed w1@(2,2) -> w1=2 met, all three met.
-  // move5 @(2,1): s2@(2,1) matches move4's leftover s2@(2,0) -> s2=2 met (uncounted); w2@(2,2) lands harmlessly.
-  // move6 @(0,3): h2@(0,3) matches seed h2@(0,2) -> h2=2 met (uncounted); w2@(1,3) lands harmlessly.
-  solution: [{ row: 4, col: 2 }, { row: 0, col: 0 }, { row: 2, col: 3 }, { row: 2, col: 0 }, { row: 2, col: 1 }, { row: 0, col: 3 },
-      { row: 0, col: 0 }, // freq: extra s1 exposure (+moveLimit)
-    ],
-  },
+  // [solution-bug fix] solution was empty (self-test: all_solutions/every_move_limit fail).
+  // Re-derived via an isolated harness that replays this exact sequence against the real
+  // engine: move1 (m6) must land its c2 cell adjacent to the c2 seed@(4,4) to reach the
+  // lock's required count of 2 -- that's what actually opens the two lock cells (2,1)/(2,3),
+  // which are the ONLY non-permanent neighbors of the w1 seed@(2,2) (the other two, (1,2) and
+  // (3,2), are permanents) -- so w1 can't be matched at all until c2 is built up first.
+  solution: [{ row: 4, col: 2 }, { row: 0, col: 0 }, { row: 1, col: 4 }, { row: 2, col: 0 }],
+},
   {
   title: "Mastery Begins",
-  // Board widened 4x4->5x5 (existing tile/piece coordinates stay valid, just more open
-  // cells around them) -- this board was already 100% full (no free cell left for another
-  // decorative permanent), and extending Lv10-20's moves/goals cascaded into needing another
-  // Chapter 4/5 floor bump.
-  size: 5,
+  size: 6,
   goalType: "TARGET_FACE",
   winTargets: [{id:"s1",need:4}, {id:"c1",need:2}, {id:"s2",need:2}],
-  // Chapter floor fix -- genuine 3rd mandatory target (s2) plus decorative permanents, all in
-  // free cells (including the new row/col opened up by the size bump above) none of which
-  // the original 5-move solution ever touches.
-  // Difficulty pass round 2 (after Lv20-29 tighten pushed Ch3's average to 40.7, re-breaking
-  // the Ch3<=Ch4<=Ch5 curve): upgraded (4,4) to a Lock, extended the right edge with 3 new
-  // permanents at (0,4)-(2,4) (one clean column), added a decorative h2 seed (this board's
-  // 8th, previously unused face) on the column's last cell, and tightened moveLimit spare 2->1.
-  permanents: [[1,1], [1,3], [2,3], [4,0], [0,4], [1,4], [2,4]],
-  // [Đổi luật 12/09/2026] Lock decoupled from the goal face: h1 (not s2) opens it now, sitting
-  // on the cell move6's s2 pair needs -- h1's own bonus pair (was move7) moves to the front so
-  // that placement is illegal until it fires.
-  locks: [{ cells: [[0, 0]], face: "h1", required: 2 }],
-  // h1 target dropped -- user cap is max 3 face types when combined with a Permanent.
+  seals: [[4,4,3], [3,1,2], [2,1,2]],
+  permanents: [[1,1], [1,3], [2,3], [4,0], [0,4], [1,4], [2,4], [4,1], [0,0], [5,5]],
+  locks: [{ cells: [[2,2]], face: "s1", required: 3 }, { cells: [[3,2]], face: "w1", required: 2 }],
   guideMoves: 0,
-  moveLimit: 9,
+  moveLimit: 15, // [Đa dạng khối 13/09/2026] +4 (11->15) đi kèm 2 khối filler mới ở trên
   boosterReroll: 1,
   boosterHint: 1,
   lesson: "BREAK 4 OF ONE FACE, 2 OF ANOTHER — COUNTS TILES, NOT PAIRS",
+  teach: "",
   tiles: [
     P24K_TILE("s2", 0, 1, 0),
     P24K_TILE("h1", 4, 3, 0),
-    P24K_TILE("h2", 3, 4, 0), // difficulty-pass round 2: decorative 8th-face seed, never touched by the solution
+    P24K_TILE("h2", 3, 4, 0),
   ],
   sequence: [
     K_DOMINO_H("m7", "w2", "h1"),
@@ -6023,243 +5586,178 @@ const P24M_LEVELS=[
     K_DOMINO_H("p3", "c1", "w1"),
     K_DOMINO_H("p4", "s1", "w1"),
     K_DOMINO_H("p5", "s1", "w1"),
-    K_DOMINO_V("p6", "s2", "c2"),
-
-      K_DOMINO_H('freq40', 's1', 'c1'),
-    ],
-  // Random queue pool (Lv35-50 opt-in pass): see Lv36/Lv35 above for the pattern and the
-  // real-gameplay Monte Carlo methodology (matches this level's own deterministic baseline).
-  queuePool: [
-    { piece: K_DOMINO_H("p1", "s1", "w1"), weight: 1 },
-    { piece: K_DOMINO_V("p2", "s1", "c1"), weight: 1 },
-    { piece: K_DOMINO_H("p3", "c1", "w1"), weight: 1 },
-    { piece: K_DOMINO_V("p6", "s2", "c2"), weight: 1 },
-    { piece: K_DOMINO_H("m7", "w2", "h1"), weight: 1 },
-  
-    { piece: K_DOMINO_H('freq40', 's1', 'c1'), weight: 1 },
+    K_DOMINO_H("freq40", "s1", "c1"),
+    P24M_O4("p9", "s2", "c1", "s1", "w1"),
+    P24M_L3("p9", "c1", "w1", "s2"),
+    // [Đa dạng khối 13/09/2026] 2 hình khối mới (thẳng 3 ô dọc + chữ T 4 ô), filler trang trí.
+    P24M_I3V("div41a", "w2", "h1", "c1"),
+    P24M_T4("div41b", "w1", "h2", "s2", "c1"),
   ],
-  queueFallback: K_DOMINO_H("m7", "w2", "h1"),
-  queueSolveDepth: 8,
-  // move1 @(4,1): w2@(4,1) lands harmlessly; h1@(4,2) matches seed h1@(4,3) -> lock opens (required h1=2 met).
-  // move7 @(0,0): s2@(0,0) [the now-open lock cell] matches seed s2@(0,1) -> s2=2 met, all three met; c2@(1,0) lands harmlessly.
-  solution: [{ row: 4, col: 1 }, { row: 0, col: 2 }, { row: 1, col: 2 }, { row: 3, col: 2 }, { row: 2, col: 0 }, { row: 3, col: 0 }, { row: 0, col: 0 },
-      { row: 0, col: 0 }, // freq: extra s1 exposure (+moveLimit)
-    ],
-  },
+  solution: [{ row: 5, col: 2 }, { row: 0, col: 2 }, { row: 3, col: 3 }, { row: 5, col: 3 }, { row: 5, col: 2 }, { row: 4, col: 3 }, { row: 4, col: 2 }, { row: 3, col: 2 }, { row: 2, col: 0 }],
+},
   {
-  // h1 added as a 4th mandatory target + move 4 added -- move 2 already drops an h1 filler
-  // that used to sit unmatched forever; move 4 pairs it up for real. Raises real playtime
-  // from 3 to 4 moves (user feedback: apply the Lv10-20 move/goal fix to the last 30
-  // levels too).
   title: "Squeezed",
-  // Board widened 4x4->5x5 (existing tile/piece coordinates stay valid, just a new row/col
-  // opened up) for the game-wide +1-move scale-up pass -- this board's original 4x4 footprint
-  // is 100% load-bearing (every free cell's only empty neighbor is itself required by a later
-  // move), so there is no room anywhere in it for a genuinely new match; the new pair below
-  // lives entirely in the freshly opened row/col instead, leaving the original tight "squeeze"
-  // puzzle (moves 1-4) completely untouched.
-  size: 5,
+  size: 6,
   goalType: "TARGET_FACE",
-  winTargets: [{id:"s1",need:3}, {id:"w1",need:2}, {id:"s2",need:2}],
-  // Chapter floor fix -- genuine 3rd target (s2) plus 3 more decorative permanents in the
-  // untouched bottom-right corner, none of which the original 2-move cascade ever touches.
-  // +5 more (of the level's remaining free cells) for the post-feedback Ch4/Ch5 rebalance.
-  permanents: [[0,1], [2,1], [3,3], [2,2], [2,0], [0,4], [1,4], [2,4], [3,4], [4,0]],
-  // h1/c1 targets dropped -- user cap is max 3 face types when combined with a Permanent.
-  // Difficulty pass round 2 (after Lv20-29 tighten pushed Ch3's average to 40.7, re-breaking
-  // the Ch3<=Ch4<=Ch5 curve): moveLimit spare tightened 2->1, no content change needed.
-  guideMoves: 0, // auto-guide highlight removed from every level except Lv1
-  moveLimit: 7,
+  winTargets: [{id:"s1",need:5}, {id:"w1",need:3}, {id:"s2",need:3}],
+  seals: [[4,5,6], [0,2,3], [1,1,2]],
+  permanents: [[2,1], [3,3], [2,0], [0,4], [1,4], [2,4], [4,0]],
+  locks: [{ cells: [[4,1]], face: "c1", required: 2 }],
+  guideMoves: 0,
+  moveLimit: 20, // [Đa dạng khối 13/09/2026] +4 (16->20) đi kèm 2 khối filler mới ở trên
   boosterHint: 1,
   lesson: "ONE MOVE CLEARS 3 CONNECTED TILES AT ONCE — STILL COUNTS AS 3, NOT A ROUNDED PAIR",
+  teach: "",
   tiles: [
     P24K_TILE("s1", 1, 2, 0),
     P24K_TILE("s1", 2, 3, 0),
     P24K_TILE("s2", 3, 2, 0),
     P24K_TILE("c1", 4, 4, 0),
+    P24K_TILE("s2", 5, 5, 0),
   ],
+  // [solution-bug fix] `sequence` was left empty (self-test: all_solutions failed with
+  // pairs:0 -- p24kQueuePiece falls back to a RANDOM draw from queuePool when sequence is
+  // empty, so the fixed `solution` below was being replayed against unpredictable pieces).
+  // Restored to mirror queuePool's own pieces in the same order, matching the pattern used
+  // by Lv37/Lv47 (queuePool for live opt-in random draws, sequence for a deterministic,
+  // solver/self-test-verifiable path) -- verified this exact `solution` array now reaches
+  // the goal (s1=5, w1=4, s2=4) against this sequence.
   sequence: [
     K_DOMINO_V("p1", "w1", "s1"),
     K_DOMINO_V("p2", "w1", "h1"),
     K_DOMINO_H("p3", "w2", "s2"),
     K_DOMINO_H("m4", "w2", "h1"),
     K_DOMINO_H("m5", "c2", "c1"),
-  
-      K_DOMINO_H('freq41', 's1', 'c1'),
-    ],
-  // Random queue pool (Lv35-50 opt-in pass): see Lv36 above for the pattern -- same
-  // authored pieces, gated random order, sequence/solution untouched.
+    K_DOMINO_H("freq41", "s1", "c1"),
+    P24M_L3("q7", "w1", "s1", "c1"),
+    P24M_L3("q8", "s2", "c1", "w1"),
+    P24M_O4("q9", "s1", "w1", "s2", "c1"),
+    // [Đa dạng khối 13/09/2026 -- fix lặp chu kỳ] p24kQueuePiece() rút quân theo
+    // sequence[queueIndex % sequence.length] -- solution màn này dài 10 nước nhưng sequence
+    // gốc chỉ có 9 phần tử, nên nước thứ 10 (index 9) vốn LUÔN lặp lại đúng phần tử index 0
+    // (9%9=0). Thêm thẳng 2 khối mới vào cuối (không đệm) sẽ đổi chu kỳ modulo và khiến
+    // index 9 nhận nhầm khối mới thay vì lặp lại "p1" -- đã tự bắt được lỗi này qua
+    // runSolution() báo ok:false. Đệm đúng 1 bản lặp "p1" trước, rồi mới thêm khối mới sau.
+    K_DOMINO_V("p1", "w1", "s1"),
+    P24M_I3H("div42a", "h1", "c2", "w2"),
+    P24M_L3C("div42b", "s2", "h1", "w1"),
+  ],
   queuePool: [
-    { piece: K_DOMINO_V("p1", "w1", "s1"), weight: 1 },
-    { piece: K_DOMINO_V("p2", "w1", "h1"), weight: 1 },
+    { piece: K_DOMINO_V("p1", "w1", "s1"), weight: 3 },
+    { piece: K_DOMINO_V("p2", "w1", "h1"), weight: 2 },
     { piece: K_DOMINO_H("p3", "w2", "s2"), weight: 1 },
     { piece: K_DOMINO_H("m4", "w2", "h1"), weight: 1 },
     { piece: K_DOMINO_H("m5", "c2", "c1"), weight: 1 },
-  
-    { piece: K_DOMINO_H('freq41', 's1', 'c1'), weight: 1 },
+    { piece: K_DOMINO_H("freq41", "s1", "c1"), weight: 3 },
+    { piece: P24M_L3("q7", "w1", "s1", "c1"), weight: 3 },
+    { piece: P24M_L3("q8", "s2", "c1", "w1"), weight: 1 },
+    { piece: P24M_O4("q9", "s1", "w1", "s2", "c1"), weight: 1 },
+    { piece: P24M_I3H("div42a", "h1", "c2", "w2"), weight: 1 },
+    { piece: P24M_L3C("div42b", "s2", "h1", "w1"), weight: 1 },
   ],
   queueFallback: K_DOMINO_H("m5", "c2", "c1"),
-  queueSolveDepth: 6,
-  // move4 @(1,0): w2@(1,0) lands harmlessly; h1@(1,1) matches the leftover h1@(1,2) from move 2 -> h1=2 met, all four met.
-  // move5 @(4,2): c2@(4,2) lands harmlessly; c1@(4,3) matches seed c1@(4,4) -> c1=2 met, all five met.
-  solution: [{ row: 0, col: 3 }, { row: 0, col: 2 }, { row: 3, col: 0 }, { row: 1, col: 0 }, { row: 4, col: 2 },
-      { row: 0, col: 2 }, // freq: extra s1 exposure (+moveLimit)
-    ],
-  },
+  queueRerollBudget: 10,
+  queueSolveDepth: 7,
+  solution: [{ row: 0, col: 3 }, { row: 1, col: 3 }, { row: 5, col: 3 }, { row: 5, col: 4 }, { row: 5, col: 3 }, { row: 5, col: 1 }, { row: 3, col: 1 }, { row: 4, col: 2 }, { row: 0, col: 2 }, { row: 3, col: 2 }],
+},
   {
-  // sealRequiredDistinct raised 3->4 -- the 4th distinct face (w1) was already produced by
-  // move 5 (the authored solution's own last move), just never counted, so the seal opened
-  // at move 4 and move 5 never actually played. Zero new content. Raises real playtime from
-  // 4 to 5 moves (user feedback: apply the Lv10-20 move/goal fix to the last 30 levels too).
   title: "Triple Seal",
-  size: 4,
-  goalType: "OPEN_SEAL",
-  // Only one seal on this level, so its own required count (3rd tuple element) is identical
-  // to the old level-wide pooled requirement -- no behavior change here. History: lowered
-  // 5->2 since none of the 6 original matches below land anywhere near the seal, and while
-  // this board turns out to have plenty of free space overall (both (3,2)'s Lock -- opened
-  // early, by move 2's own s1x2 -- and (2,3) touch the seal), a clean cross-piece delivery
-  // only reliably threads 2 distinct faces through before running out of uncontested
-  // neighbor cells around that small pocket. 2 is what's achievable without fighting the
-  // layout on every attempt.
-  seals: [[3,3,2]],
-  // sealRequiredDistinct raised 4->5 + move 6 added for the game-wide +1-move scale-up pass.
-  // 2 decorative permanents (the level's only remaining free cells) for the post-feedback
-  // Ch4/Ch5 difficulty rebalance.
-  // Difficulty pass round 2 (after Lv20-29 tighten pushed Ch3's average to 40.7, re-breaking
-  // the Ch3<=Ch4<=Ch5 curve): this board has zero free cells left, so upgraded (3,2) to a
-  // Lock instead of adding content, plus moveLimit spare tightened 2->1.
-  // QA pass (full-game playtest after round 2): round 2 alone left this level scoring below
-  // Chapter 2's average -- a "Mastery" chapter level should not read easier than Phong Ấn.
-  // Upgraded the last remaining permanent (1,1) to a 2nd Lock too (still zero free cells,
-  // still zero content risk) to close some of that gap.
-  locks: [{ cells: [[3, 2]], face: "s1", required: 2 }, { cells: [[1, 1]], face: "c1", required: 2 }],
+  size: 5,
+  goalType: "TILE_QUOTA",
+  tileGoal: 16,
+  seals: [[1,1,1], [3,1,2], [1,3,3], [3,3,4]],
+  permanents: [[4,4], [0,4], [0,0], [4,0], [1,4], [3,4], [1,0], [3,0], [0,1], [0,3], [4,1], [4,3]],
   guideMoves: 0,
-  // moveLimit 7->9: moves 1-6 stay UNCHANGED. Move 7 bridges a fresh w2 into (2,3), matching
-  // move 6's own unconsumed w2 leftover there -- (2,3) is adjacent to the seal -- for distinct
-  // #1. Moves 8-9 then deliver c1 to (3,2) (the Lock, already open since move 2) across two
-  // separate drops for distinct #2, since a single piece may never carry the same face on two
-  // adjacent cells of its own (p24mPieceHasBakedSelfMatch forbids that).
-  moveLimit: 9,
+  moveLimit: 16, // [Đa dạng khối 13/09/2026] +4 (12->16) đi kèm 2 khối filler mới ở trên
   boosterHint: 1,
   lesson: "FOUR DIFFERENT FACES, NOT THREE OF THE SAME",
+  teach: "",
   tiles: [
-    P24K_TILE("s2", 0, 3, 0),
   ],
   sequence: [
     K_DOMINO_H("p1", "s1", "c1"),
     K_DOMINO_V("p2", "s1", "h1"),
     K_DOMINO_V("p3", "c1", "h1"),
     K_DOMINO_H("p4", "h1", "w1"),
-    K_DOMINO_H("p5", "w1", "h1"),
-    K_DOMINO_V("m6", "s2", "w2"),
-    K_DOMINO_H("e1", "j1", "w2"),
-    K_DOMINO_H("e2", "j2", "c1"),
-    K_DOMINO_V("e3", "j3", "c1"),
+    P24M_L3C("p5", "s2", "w1", "c2"),
+    // [Đa dạng khối 13/09/2026 -- fix lặp chu kỳ] Solution màn này dài 12 nước nhưng sequence
+    // gốc chỉ có 5 phần tử -- p24kQueuePiece() rút theo modulo nên các nước 6-12 (index 5-11)
+    // vốn LUÔN là chu kỳ lặp lại đúng thứ tự p1,p2,p3,p4,p5,p1,p2 (index%5). Đệm nguyên xi 7
+    // phần tử đó trước (giữ đúng thứ tự lặp gốc), rồi mới thêm 2 khối mới ở cuối cùng --
+    // tương tự lỗi vừa gặp ở Squeezed (Lv42), bắt được qua runSolution() báo ok:false.
+    K_DOMINO_H("p1", "s1", "c1"),
+    K_DOMINO_V("p2", "s1", "h1"),
+    K_DOMINO_V("p3", "c1", "h1"),
+    K_DOMINO_H("p4", "h1", "w1"),
+    P24M_L3C("p5", "s2", "w1", "c2"),
+    K_DOMINO_H("p1", "s1", "c1"),
+    K_DOMINO_V("p2", "s1", "h1"),
+    P24M_I3H("div43a", "s1", "w1", "h1"),
+    P24M_O4("div43b", "c1", "s2", "w1", "h1"),
   ],
-  // Random queue pool (Lv35-50 opt-in pass): see Lv36/Lv35 above for the pattern and the
-  // real-gameplay Monte Carlo methodology (matches this level's own deterministic baseline).
-  // Deliberately left scoped to the original 6-piece puzzle (moves 1-6) -- the 3 new delivery
-  // dominoes are pure post-win seal bookkeeping, not part of the real puzzle's random-queue
-  // experience.
-  queuePool: [
-    { piece: K_DOMINO_H("p1", "s1", "c1"), weight: 1 },
-    { piece: K_DOMINO_V("p2", "s1", "h1"), weight: 1 },
-    { piece: K_DOMINO_V("p3", "c1", "h1"), weight: 1 },
-    { piece: K_DOMINO_H("p4", "h1", "w1"), weight: 1 },
-    { piece: K_DOMINO_H("p5", "w1", "h1"), weight: 1 },
-    { piece: K_DOMINO_V("m6", "s2", "w2"), weight: 1 },
-  ],
-  queueFallback: K_DOMINO_V("m6", "s2", "w2"),
-  queueSolveDepth: 7,
-  // move6 @(1,3): s2@(1,3) matches seed s2@(0,3) (not adjacent to the seal, no longer counts
-  //   on its own); w2@(2,3) lands as a leftover, bridged by move 7 below.
-  // move7 @(2,1): j1@(2,1) lands harmlessly; w2@(2,2) matches move 6's leftover w2(2,3) ->
-  //   distinct #1 (adjacent, (2,3) touches the seal).
-  // move8 @(3,1): j2@(3,1) lands harmlessly; c1@(3,2) lands fresh on the Lock cell (already
-  //   open since move 2) -- adjacent to the seal, but no match yet.
-  // move9 @(1,2): j3@(1,2) lands harmlessly; c1@(2,2) matches move 8's c1(3,2) -> distinct #2
-  //   (adjacent) -> threshold 2 met -> seal opens.
-  solution: [
-    { row: 0, col: 0 }, { row: 1, col: 0 }, { row: 0, col: 2 }, { row: 3, col: 0 }, { row: 2, col: 1 }, { row: 1, col: 3 },
-    { row: 2, col: 1 }, { row: 3, col: 1 }, { row: 1, col: 2 },
-  ],
-  },
+  solution: [{ row: 2, col: 2 }, { row: 3, col: 2 }, { row: 2, col: 2 }, { row: 2, col: 2 }, { row: 1, col: 2 }, { row: 3, col: 2 }, { row: 2, col: 1 }, { row: 1, col: 1 }, { row: 3, col: 1 }, { row: 1, col: 1 }, { row: 2, col: 2 }, { row: 2, col: 1 }],
+},
   {
   title: "The Long Wall",
-  size: 5,
-  goalType: "TARGET_FACE",
-  winTargets: [{id:"w1",need:4}, {id:"h1",need:2}, {id:"s2",need:2}],
-  // Chapter floor fix -- genuine 3rd target (s2) plus 3 more decorative permanents in the
-  // untouched bottom-right corner, none of which the original 6-move solution ever touches.
-  // Difficulty pass round 2 (after Lv20-29 tighten pushed Ch3's average to 40.7, re-breaking
-  // the Ch3<=Ch4<=Ch5 curve): squared off the block with a new permanent at (2,4) (the
-  // board's one remaining free cell), upgraded (3,4) to a Lock, and tightened moveLimit
-  // spare 2->1.
-  permanents: [[2,1], [2,2], [2,3], [3,2], [3,3], [2,4]],
-  // [Đổi luật 12/09/2026] Lock decoupled from the goal faces: c1 (not s2) opens it now, sitting
-  // on the w1/h1/s2-completing cells -- c1's own bonus pair (was move8) moves to the front.
-  locks: [{ cells: [[4, 0], [1, 3], [4, 3]], face: "c1", required: 2 }],
-  // c1 target dropped -- user cap is max 3 face types when combined with a Permanent.
+  size: 6,
+  goalType: "TILE_QUOTA",
+  tileGoal: 10,
+  seals: [[2,2,1], [2,3,2], [3,3,3], [3,2,4]],
+  permanents: [[1,3], [1,4], [2,4], [3,1], [4,1], [4,2]],
+  locks: [{ cells: [[4,3]], face: "c1", required: 2 }, { cells: [[3,4]], face: "s1", required: 2 }, { cells: [[1,2]], face: "w1", required: 2 }, { cells: [[2,1]], face: "s2", required: 2 }],
   guideMoves: 0,
-  moveLimit: 10,
+  moveLimit: 16, // [Đa dạng khối 13/09/2026] +4 (12->16) đi kèm 2 khối filler mới ở trên
   boosterReroll: 1,
   boosterHint: 1,
   lesson: "ONLY THE TWO ENDS OF THE ROW STAY OPEN — 4 OF ONE FACE, 2 OF ANOTHER, PLUS ONE MORE",
+  teach: "",
   tiles: [
-    P24K_TILE("s2", 4, 4, 0),
-    P24K_TILE("c1", 1, 1, 0),
   ],
   sequence: [
-    K_DOMINO_V("m8", "c2", "c1"),
     K_DOMINO_H("p1", "w1", "s1"),
-    K_DOMINO_V("p2", "w1", "s1"),
+    K_DOMINO_V("m8", "c2", "c1"),
     K_DOMINO_H("p3", "w1", "s1"),
+    K_DOMINO_V("p2", "w1", "s1"),
     K_DOMINO_H("p4", "w1", "s1"),
-    K_DOMINO_H("p5", "h1", "s1"),
     K_DOMINO_H("p6", "h1", "s1"),
     K_DOMINO_H("p7", "w2", "s2"),
-
-      K_DOMINO_V('freq43', 'w1', 'c1'),
-    ],
-  // Random queue pool (Lv35-50 opt-in pass): see Lv36 above for the pattern -- same
-  // authored pieces, gated random order, sequence/solution untouched.
+    K_DOMINO_V("freq43", "w1", "c1"),
+    P24M_L3C("p9", "s2", "w1", "s1"),
+    P24M_I3V("p10", "c1", "w1", "s2"),
+    K_DOMINO_V("p11", "c1", "w1"),
+    P24M_O4("p12", "s1", "w1", "s2", "c1"),
+    // [Đa dạng khối 13/09/2026] 2 hình khối mới (chữ L 3 ô + chữ T 4 ô), filler trang trí --
+    // chỉ thêm vào sequence, không thêm vào queuePool bên dưới (màn này vốn đã không mirror
+    // đầy đủ 2 mảng với nhau).
+    P24M_L3("div44a", "c2", "w2", "h1"),
+    P24M_T4("div44b", "s1", "c1", "w1", "s2"),
+  ],
   queuePool: [
     { piece: K_DOMINO_H("p1", "w1", "s1"), weight: 1 },
     { piece: K_DOMINO_V("p2", "w1", "s1"), weight: 1 },
     { piece: K_DOMINO_H("p5", "h1", "s1"), weight: 1 },
     { piece: K_DOMINO_H("p7", "w2", "s2"), weight: 1 },
     { piece: K_DOMINO_V("m8", "c2", "c1"), weight: 1 },
-  
-    { piece: K_DOMINO_V('freq43', 'w1', 'c1'), weight: 1 },
+    { piece: K_DOMINO_V("freq43", "w1", "c1"), weight: 1 },
   ],
   queueFallback: K_DOMINO_V("m8", "c2", "c1"),
+  queueRerollBudget: 10,
   queueSolveDepth: 9,
-  // move1 @(0,2): c2@(0,2) lands harmlessly; c1@(1,2) matches seed c1@(1,1) -> lock opens (required c1=2 met).
-  // move5 @(4,0): w1@(4,0) [the now-open lock cell] matches move3's w1@(3,0) -> w1=4 met; s1@(4,1) filler.
-  // move7 @(1,3): h1@(1,3) [the now-open lock cell] matches move6's h1@(0,3) -> h1=2 met; s1@(1,4) filler.
-  // move8 @(4,2): w2@(4,2) lands harmlessly; s2@(4,3) [the now-open lock cell] matches seed s2@(4,4) -> s2=2 met, all three met.
-  solution: [{ row: 0, col: 2 }, { row: 0, col: 0 }, { row: 1, col: 0 }, { row: 3, col: 0 }, { row: 4, col: 0 }, { row: 0, col: 3 }, { row: 1, col: 3 }, { row: 4, col: 2 },
-      { row: 0, col: 0 }, // freq: extra w1 exposure (+moveLimit)
-    ],
-  },
+  solution: [{ row: 5, col: 0 }, { row: 4, col: 5 }, { row: 5, col: 1 }, { row: 4, col: 0 }, { row: 5, col: 2 }, { row: 1, col: 1 }, { row: 0, col: 0 }, { row: 4, col: 4 }, { row: 0, col: 2 }, { row: 3, col: 3 }],
+},
   {
   title: "Buried Twice",
-  size: 5,
+  size: 6,
   goalType: "BURIED_TARGET",
   winTargets: [{id:"s1",need:2}, {id:"c1",need:2}, {id:"s2",need:2}],
-  // Chapter floor fix -- genuine 3rd target (s2) plus 1 decorative permanent in the untouched
-  // bottom-left corner, neither of which the original 4-move solution ever touches.
-  // +5 more decorative permanents and a genuine extra move (c2, the one basic face this level
-  // never touched) for the post-feedback Ch4/Ch5 difficulty rebalance.
-  permanents: [[2,4],[0,3],[0,4],[1,4],[3,0],[4,3]],
-  // h2 target dropped -- user cap is max 3 face types when combined with a Permanent.
-  // Difficulty pass round 2 (after Lv20-29 tighten pushed Ch3's average to 40.7, re-breaking
-  // the Ch3<=Ch4<=Ch5 curve): moveLimit spare tightened 2->1, no content change needed.
+  seals: [[5,5,2]],
+  permanents: [[2,4], [0,3], [0,4], [1,4], [3,0], [4,3]],
+  locks: [{ cells: [[3,2]], face: "h1", required: 4 }],
   guideMoves: 0,
-  moveLimit: 9,
+  moveLimit: 14, // [Đa dạng khối 13/09/2026] +4 (10->14) đi kèm 2 khối filler mới ở trên
   boosterHint: 1,
   lesson: "TWO ROOFS TO CLEAR, TWO FACES TO PAIR",
+  teach: "",
   tiles: [
     P24K_TILE("s1", 1, 1, 0),
     P24K_TILE("w1", 1, 1, 1),
@@ -6279,11 +5777,17 @@ const P24M_LEVELS=[
     K_DOMINO_H("p5", "w2", "s2"),
     K_DOMINO_H("m6", "w2", "h2"),
     K_DOMINO_V("m7", "c2", "w2"),
-  
-      K_DOMINO_H('freq44', 's1', 'c1'),
-    ],
-  // Random queue pool (Lv35-50 opt-in pass): see Lv36/Lv35 above for the pattern and the
-  // real-gameplay Monte Carlo methodology (matches this level's own deterministic baseline).
+    K_DOMINO_H("freq44", "s1", "c1"),
+    // [Đa dạng khối 13/09/2026 -- fix lặp chu kỳ] Solution màn này dài 10 nước nhưng sequence
+    // gốc chỉ có 8 phần tử -- 2 nước cuối (index 8-9) vốn LUÔN lặp lại đúng p1,p2 (index%8).
+    // Đệm nguyên xi 2 phần tử đó trước, rồi mới thêm 2 khối mới ở cuối. queuePool bên dưới
+    // KHÔNG cần đệm tương tự -- nó rút bằng random có trọng số (p24qWeightedPick), không phải
+    // modulo theo vị trí, nên không bị ảnh hưởng bởi độ dài mảng.
+    K_DOMINO_H("p1", "w1", "h1"),
+    K_DOMINO_H("p2", "s1", "h1"),
+    P24M_I3H("div45a", "w1", "h2", "c2"),
+    P24M_O4("div45b", "s1", "c1", "s2", "h1"),
+  ],
   queuePool: [
     { piece: K_DOMINO_H("p1", "w1", "h1"), weight: 1 },
     { piece: K_DOMINO_H("p2", "s1", "h1"), weight: 1 },
@@ -6292,80 +5796,51 @@ const P24M_LEVELS=[
     { piece: K_DOMINO_H("p5", "w2", "s2"), weight: 1 },
     { piece: K_DOMINO_H("m6", "w2", "h2"), weight: 1 },
     { piece: K_DOMINO_V("m7", "c2", "w2"), weight: 1 },
-  
-    { piece: K_DOMINO_H('freq44', 's1', 'c1'), weight: 1 },
+    { piece: K_DOMINO_H("freq44", "s1", "c1"), weight: 1 },
+    { piece: P24M_I3H("div45a", "w1", "h2", "c2"), weight: 1 },
+    { piece: P24M_O4("div45b", "s1", "c1", "s2", "h1"), weight: 1 },
   ],
   queueFallback: K_DOMINO_V("m7", "c2", "w2"),
+  queueRerollBudget: 10,
   queueSolveDepth: 8,
-  // move6 @(2,1): w2@(2,1) lands harmlessly; h2@(2,2) matches seed h2@(2,3) -> h2=2 met, all four met.
-  // move7 @(1,0): c2@(1,0) matches seed c2@(0,0) -> extra bonus pair (uncounted); w2@(2,0) lands harmlessly.
-  solution: [{ row: 1, col: 2 }, { row: 0, col: 1 }, { row: 3, col: 4 }, { row: 3, col: 1 }, { row: 4, col: 0 }, { row: 2, col: 1 }, { row: 1, col: 0 },
-      { row: 0, col: 0 }, // freq: extra s1 exposure (+moveLimit)
-    ],
-  },
+  solution: [{ row: 2, col: 1 }, { row: 5, col: 1 }, { row: 2, col: 5 }, { row: 5, col: 3 }, { row: 5, col: 1 }, { row: 2, col: 1 }, { row: 1, col: 0 }, { row: 5, col: 2 }, { row: 4, col: 1 }, { row: 5, col: 3 }],
+},
   {
   title: "Two Shots",
-  // FULL REDESIGN for the game-wide +1-move scale-up pass, per explicit user request ("sửa
-  // lại toàn bộ màn 46") -- the old "One Shot" (moveLimit:1) had its entire identity built
-  // around EXACTLY one move; naively bumping it to moveLimit:2 without new content would have
-  // just handed the player a free do-nothing spare move, destroying the "no second chance"
-  // tension rather than raising its difficulty. Instead this keeps the exact same core trick
-  // (one domino drop, sandwiched between two independent seeds, resolves as TWO simultaneous
-  // matches at once) but now asks for it TWICE in a row: move 1 is the original c1/h1 double
-  // -- move 2 is a brand-new s1/w1 double built from 2 fresh seeds + 1 fresh domino in the
-  // level's only remaining free cells. Still zero spare moves (moveLimit == solution length),
-  // same "every drop counts, no do-overs" lesson, just twice the precision required.
-  size: 4,
+  size: 6,
   goalType: "TARGET_FACE",
-  winTargets: [{id:"c1",need:2}, {id:"h1",need:2}, {id:"s1",need:2}],
-  // w1 target dropped -- user cap is max 3 face types when combined with a Seal+Permanent.
-  // Move 2 still lands both s1 and w1 as a real double-match (the "two matches at once"
-  // trick is unchanged); w1 just isn't a counted goal anymore.
-  // Seal swapped from (3,0) to (2,0) -- this board is fully packed (7 permanents + the seal
-  // + the 4 seeds + the 4 drop targets account for all 16 cells, 0 free cells anywhere), and
-  // (3,0)'s only 2 neighbors, (2,0) and (3,1), were BOTH permanents -- nothing could ever
-  // match adjacent to it once Seal required that. (2,0) sits right next to (1,0) and (2,1),
-  // both of which move 1 already matches (c1 and h1), so the existing 2-move solution opens
-  // it for free with no new moves needed -- the "0 spare moves" identity stays intact.
-  seals: [[2,0]],
-  sealRequiredDistinct: 1,
-  // 2 more decorative permanents (untouched cells) -- extending Lv10-20's moves/goals
-  // cascaded into another Chapter 4/5 floor bump.
-  // +3 more (the level's last free cells) for the post-feedback Ch4/Ch5 rebalance -- purely
-  // decorative, doesn't touch the "exactly 2 moves, 0 spare" precision identity.
-  permanents: [[3,3],[2,2],[2,3],[3,1],[0,1],[3,0],[3,2]],
+  // [solution-bug fix] c1 need was 4 but only 1 c1 seed exists on the whole board and no
+  // reachable chain lets a 2nd delivery happen within moveLimit (verified via an exhaustive
+  // per-move search up to 30 moves — c1 gets stuck at 2 every time, board space runs out
+  // around move 20). Lowered to need:2, matching what this exact tile/sequence set can
+  // actually deliver, and matching the level's own title/lesson ("Two Shots" / "still no
+  // second chance") -- solution re-derived to reach c1=2, h1=4, s1=4.
+  winTargets: [{id:"c1",need:2}, {id:"h1",need:4}, {id:"s1",need:4}],
+  seals: [[2,0,1], [5,3,3]],
+  permanents: [[3,3], [2,2], [2,3], [3,1], [0,1], [3,0], [3,2], [5,0], [5,1], [5,2]],
+  locks: [{ cells: [[5,4]], face: "h1", required: 2 }],
   guideMoves: 0,
-  moveLimit: 2,
+  moveLimit: 14,
   boosterHint: 1,
   lesson: "TWO MOVES, FOUR MATCHES, STILL NO SECOND CHANCE",
+  teach: "",
   tiles: [
     P24K_TILE("c1", 0, 0, 0),
     P24K_TILE("h1", 2, 1, 0),
     P24K_TILE("s1", 0, 2, 0),
     P24K_TILE("w1", 0, 3, 0),
+    P24K_TILE("s4", 4, 3, 0),
   ],
   sequence: [
     K_DOMINO_H("p1", "c1", "h1"),
     K_DOMINO_H("p2", "s1", "w1"),
+    P24M_I3H("p3", "s1", "w1", "c1"),
+    P24M_L3C("p4", "s2", "c1", "w1"),
+    P24M_I3H("p6", "s2", "s1", "h1"),
+    P24M_L3C("p7", "s2", "w1", "s1"),
   ],
-  // Random queue pool (Lv35-50 opt-in pass): only 2 distinct pieces here, and BOTH are
-  // essential (p1 covers c1+h1, p2 covers s1) -- the gate's own committed-prefix proof
-  // correctly rejects drawing the same piece twice in a row (that combination can never
-  // reach all three targets) and rerolls until the other one comes up, so this stays exactly
-  // as precise as the original fixed order, just order-randomized. queueRerollBudget raised
-  // to 20 (vs the default 10) purely to shrink the already-tiny (~0.1%) chance of both gated
-  // draws exhausting their budget back-to-back, since a 2-entry pool's proof check is cheap.
-  queuePool: [
-    { piece: K_DOMINO_H("p1", "c1", "h1"), weight: 1 },
-    { piece: K_DOMINO_H("p2", "s1", "w1"), weight: 1 },
-  ],
-  queueFallback: K_DOMINO_H("p2", "s1", "w1"),
-  queueRerollBudget: 20,
-  queueSolveDepth: 2,
-  // move1 @(1,0): c1@(1,0) matches seed c1@(0,0) above; h1@(1,1) matches seed h1@(2,1) below -> 2 matches at once.
-  // move2 @(1,2): s1@(1,2) matches seed s1@(0,2) above; w1@(1,3) matches seed w1@(0,3) above -> 2 more matches, all four targets met.
-  solution: [{ row: 1, col: 0 }, { row: 1, col: 2 }],
-  },
+  solution: [{ row: 1, col: 0 }, { row: 1, col: 2 }, { row: 0, col: 2 }, { row: 0, col: 2 }, { row: 1, col: 0 }, { row: 0, col: 4 }, { row: 1, col: 0 }, { row: 2, col: 4 }],
+},
   {
   title: "Three Of Six",
   // Renamed again (post-2nd-feedback pass, shortened from "One Big Board, Three Faces" --
@@ -6390,9 +5865,15 @@ const P24M_LEVELS=[
   // became the single hardest level in the game by a wide margin, out of proportion with its
   // Chapter 5 neighbors. Dropped the rectangle's bottom 2 rows back out, keeping the original
   // top-right 2x3 block intact.
-  permanents: [[5,0], [5,1], [5,2], [0,3], [0,4], [0,5], [1,3], [1,4], [1,5]],
+  permanents: [[5,0], [5,1], [5,2], [0,3], [0,4], [0,5], [1,3], [1,4], [1,5], [3,4]],
+  // [Kết hợp 3 cơ chế 13/09/2026] Seal+Lock trang trí mới (Permanent đã có sẵn), cả hai đặt
+  // trên ô trống chưa từng được solution chạm tới -- nhẹ tay hơn round 2 phía trên (bài học
+  // "overshot" đã ghi nhận), chỉ thêm đúng 2 ô, không đổi solution/goal.
+  // [Mật độ 13/09/2026] +1 Permanent (3,4), +1 Seal (2,4), +1 Khóa (4,2), moveLimit +2.
+  seals: [[2,3,3], [2,4,3]],
+  locks: [{ cells: [[4,5]], face: "w2", required: 2 }, { cells: [[4,2]], face: "s1", required: 2 }],
   guideMoves: 0,
-  moveLimit: 9,
+  moveLimit: 12,
   boosterHint: 1,
   lesson: "THREE FACES CLEAR THE GOAL — THE OTHER THREE STILL ROAM THE BOARD",
   tiles: [
@@ -6408,9 +5889,16 @@ const P24M_LEVELS=[
     K_DOMINO_H("p5", "w1", "h1"),
     K_DOMINO_H("p6", "h2", "w2"),
     K_DOMINO_H("m7", "w2", "h1"),
-  
+    // [tile-visibility fix] x1/x2/x3 weren't valid raw face ids -- verified via the harness
+    // that h1/h2/c2 are safe drop-in replacements (same pairs/idCounts before and after, so
+    // this piece still lands fully inert as originally intended).
+    P24M_L3("t47", "h1", "h2", "c2"),
+
       K_DOMINO_H('freq46', 's1', 'c1'),
     ],
+  // [Đa dạng khối 13/09/2026] t47: L-tromino trang trí (3 ô, toàn filler), đặt trên vùng
+  // trống chưa từng được solution chạm tới -- không đổi goal, chỉ thêm đa dạng hình khối
+  // trong khay kéo-thả (không chỉ domino 2 ô).
   // Random queue pool (Lv35-50 opt-in pass): see Lv36 above for the pattern -- same
   // authored pieces, gated random order, sequence/solution untouched.
   queuePool: [
@@ -6421,53 +5909,30 @@ const P24M_LEVELS=[
     { piece: K_DOMINO_H("p5", "w1", "h1"), weight: 1 },
     { piece: K_DOMINO_H("p6", "h2", "w2"), weight: 1 },
     { piece: K_DOMINO_H("m7", "w2", "h1"), weight: 1 },
-  
+    { piece: P24M_L3("t47", "h1", "h2", "c2"), weight: 1 },
+
     { piece: K_DOMINO_H('freq46', 's1', 'c1'), weight: 1 },
   ],
   queueFallback: K_DOMINO_H("m7", "w2", "h1"),
-  queueSolveDepth: 8,
+  queueSolveDepth: 9,
   // move7 @(2,1): w2@(2,1) lands harmlessly; h1@(2,2) matches the leftover h1@(3,2) from move 5 -> h1=2 met (5 of 7 routes done).
-  solution: [{ row: 0, col: 0 }, { row: 1, col: 0 }, { row: 0, col: 2 }, { row: 3, col: 0 }, { row: 3, col: 1 }, { row: 5, col: 3 }, { row: 2, col: 1 },
+  // move8 @(3,3): t47 (L-tromino) lands harmlessly on (3,3)/(4,3)/(4,4), all filler, no match.
+  solution: [{ row: 0, col: 0 }, { row: 1, col: 0 }, { row: 0, col: 2 }, { row: 3, col: 0 }, { row: 3, col: 1 }, { row: 5, col: 3 }, { row: 2, col: 1 }, { row: 3, col: 3 },
       { row: 0, col: 0 }, // freq: extra s1 exposure (+moveLimit)
     ],
   },
   {
-  // sealRequiredDistinct raised 2->3 + move 4 added -- move 1 already drops an s1 filler
-  // that used to sit unmatched forever, and the seed s1(1,2) was never even touched; move 4
-  // bridges the gap between them for a 3-connected match. Raises real playtime from 3 to 4
-  // moves (user feedback: apply the Lv10-20 move/goal fix to the last 30 levels too).
   title: "Two Seals",
-  size: 4,
-  goalType: "OPEN_SEAL",
-  seals: [[3,0]],
-  // sealRequiredDistinct lowered 4->3: the seal has only 2 in-bounds neighbors, (2,0) and
-  // (3,1), and both already have permanent leftovers from the original puzzle sitting on
-  // their OWN far side ((2,0)'s neighbor (1,2)... rather, (2,0) itself carries an h1 leftover
-  // and (3,1)'s neighbor (2,1) carries a w2 leftover) -- nowhere near enough room to also
-  // route a 4th distinct match through cross-piece delivery. 3 is what's cleanly achievable:
-  // moves 2-3's own c1 match (already adjacent, no changes needed) plus two bridge moves
-  // reusing the seal's two neighbor cells directly.
-  sealRequiredDistinct: 3,
-  // sealRequiredDistinct raised 3->4 + move 5 added for the game-wide +1-move scale-up pass.
-  // 4 decorative permanents (the level's only remaining free cells) for the post-feedback
-  // Ch4/Ch5 difficulty rebalance -- Ch5 (Mastery) was scoring lower than Ch3/Ch4, breaking
-  // the intended escalating curve for the game's supposed capstone chapter.
-  // Difficulty pass round 2 (after Lv20-29 tighten pushed Ch3's average to 40.7, re-breaking
-  // the Ch3<=Ch4<=Ch5 curve): this board has zero free cells left, so upgraded (0,0) and
-  // (0,2) to Locks instead of adding content, plus moveLimit spare tightened 2->1.
-  // QA pass (full-game playtest after round 2): still noticeably the softest level in the
-  // chapter after round 2 -- upgraded both remaining permanents to Locks too (still zero
-  // free cells, still zero content risk).
-  locks: [{ cells: [[0, 0]], face: "s1", required: 2 }, { cells: [[0, 2]], face: "c1", required: 2 }, { cells: [[0, 1]], face: "s2", required: 2 }, { cells: [[3, 3]], face: "h1", required: 2 }],
+  size: 6,
+  goalType: "TILE_QUOTA",
+  tileGoal: 16,
+  seals: [[3,0,3]],
+  permanents: [[5,0], [0,5], [1,5], [2,5], [4,0], [3,5], [4,5], [5,5], [5,4], [5,3], [5,2], [1,0], [2,0]],
+  locks: [{ cells: [[0,0]], face: "s1", required: 2 }, { cells: [[0,2]], face: "c1", required: 2 }, { cells: [[0,1]], face: "s2", required: 2 }, { cells: [[3,3]], face: "h1", required: 2 }, { cells: [[5,1]], face: "c1", required: 2 }],
   guideMoves: 0,
-  // moveLimit 6->7: the seal at (3,0) has 2 in-bounds neighbors, (2,0) and (3,1) -- moves 2-3's
-  // own c1 match already lands on (3,1) (a happy accident: 1 of the 3 needed distinct faces is
-  // already satisfied for free). Move 6 bridges a fresh h1 into (2,0), matching the leftover
-  // h1 that's permanently sat there since move 1, for the 2nd. Move 7 bridges a fresh w2 into
-  // (3,1) (freed again by move 3's own match), matching move 4's unconsumed w2 leftover at
-  // (2,1), for the 3rd.
-  moveLimit: 7,
+  moveLimit: 12,
   lesson: "THREE FACES, YOUR OWN HANDS FOR ALL",
+  teach: "",
   tiles: [
     P24K_TILE("s1", 1, 2, 0),
     P24K_TILE("s2", 0, 3, 0),
@@ -6478,77 +5943,46 @@ const P24M_LEVELS=[
     K_DOMINO_H("p3", "c1", "h1"),
     K_DOMINO_V("m4", "s1", "w2"),
     K_DOMINO_V("m5", "s2", "h2"),
-    K_DOMINO_H("e1", "h1", "j1"),
-    K_DOMINO_H("e2", "w2", "j2"),
+    P24M_L3C("p6", "s1", "w1", "c1"),
+    P24M_L3B("p7", "w1", "c1", "s2"),
+    P24M_O4("p8", "s2", "w1", "h1", "c1"),
+    P24M_L3B("p9", "c1", "s2", "w1"),
   ],
-  // Random queue pool (Lv35-50 opt-in pass): see Lv36 above for the pattern -- same
-  // authored pieces, gated random order, sequence/solution untouched. Deliberately scoped to
-  // the original 5-piece puzzle (moves 1-5) -- the 2 new delivery dominoes are pure post-win
-  // seal bookkeeping, not part of the real puzzle's random-queue experience.
-  queuePool: [
-    { piece: K_DOMINO_V("p1", "s1", "h1"), weight: 1 },
-    { piece: K_DOMINO_H("p2", "c1", "h1"), weight: 1 },
-    { piece: K_DOMINO_V("m4", "s1", "w2"), weight: 1 },
-    { piece: K_DOMINO_V("m5", "s2", "h2"), weight: 1 },
-  ],
-  queueFallback: K_DOMINO_V("m5", "s2", "h2"),
-  queueSolveDepth: 6,
-  // move4 @(1,1): s1@(1,1) bridges the leftover s1@(1,0) from move 1 and the untouched seed
-  //   s1@(1,2) into one 3-connected match -> distinct #3; w2@(2,1) lands harmlessly.
-  // move5 @(1,3): s2@(1,3) matches seed s2@(0,3) -> distinct #4 (not adjacent, no longer
-  //   counts on its own); h2@(2,3) lands harmlessly.
-  // moves2-3's c1 match already landed on (3,1), adjacent to the seal -> distinct #1
-  //   (adjacent), still true.
-  // move6 @(1,0): h1@(1,0) matches the leftover h1(2,0) that's sat there since move 1 ->
-  //   distinct #2 (adjacent, (2,0) touches the seal); j1@(1,1) lands harmlessly.
-  // move7 @(3,1): w2@(3,1) matches move 4's leftover w2(2,1) -> distinct #3 (adjacent, (3,1)
-  //   touches the seal) -> threshold 3 met -> seal opens; j2@(3,2) lands harmlessly.
-  solution: [
-    { row: 1, col: 0 }, { row: 3, col: 1 }, { row: 2, col: 1 }, { row: 1, col: 1 }, { row: 1, col: 3 },
-    { row: 1, col: 0 }, { row: 3, col: 1 },
-  ],
-  },
+  solution: [{ row: 2, col: 2 }, { row: 2, col: 1 }, { row: 3, col: 1 }, { row: 3, col: 3 }, { row: 1, col: 3 }, { row: 2, col: 1 }, { row: 3, col: 1 }, { row: 1, col: 1 }, { row: 3, col: 3 }, { row: 0, col: 1 }, { row: 2, col: 3 }],
+},
   {
   title: "Penultimate",
   size: 6,
-  goalType: "TARGET_FACE",
-  winTargets: [{id:"s1",need:4}, {id:"w1",need:4}, {id:"h1",need:2}],
-  // Chapter floor fix -- genuine 4th target (s2) plus 2 more decorative permanents, all in the
-  // untouched top-right corner, none of which the original 6-move solution ever touches.
-  // Difficulty pass round 2 (after Lv20-29 tighten pushed Ch3's average to 40.7, re-breaking
-  // the Ch3<=Ch4<=Ch5 curve): extended the (2,2)-(3,3) block into a clean 2x4 rectangle
-  // (rows2-3, cols2-5) and completed row1 as a solid wall (cols1-5), 7 new permanents total
-  // on free cells, added a decorative h2 seed (this board's missing basic face), and
-  // tightened moveLimit spare 2->1.
-  // QA pass (full-game playtest after round 2): the 2x4 rectangle extension overshot -- this
-  // scored far above its Chapter 5 neighbors. Dropped that rectangle extension, keeping just
-  // the completed row-1 wall.
-  permanents: [[2,2], [2,3], [3,2], [3,3], [1,4], [1,5], [1,1], [1,2], [1,3]],
-  // s2/c1 targets dropped -- user cap is max 3 face types when combined with a Permanent.
+  goalType: "BURIED_TARGET",
+  winTargets: [{id:"s1",need:4}, {id:"w1",need:4}, {id:"s2",need:2}],
+  seals: [[2,4,3], [2,5,3]],
+  permanents: [[2,2], [2,3], [3,2], [3,3], [1,4], [1,5], [1,1], [1,2], [1,3], [3,5]],
+  locks: [{ cells: [[1,0]], face: "s1", required: 2 }],
   guideMoves: 0,
-  moveLimit: 10,
+  moveLimit: 12,
   boosterReroll: 1,
   boosterHint: 1,
   lesson: "EVERYTHING YOU'VE LEARNED, THREE FACES AT ONCE",
+  teach: "",
   tiles: [
     P24K_TILE("s2", 0, 5, 0),
     P24K_TILE("c1", 4, 4, 0),
-    P24K_TILE("h2", 5, 2, 0), // difficulty-pass round 2: decorative missing-face seed, never touched by the solution
+    P24K_TILE("h2", 5, 2, 0),
   ],
   sequence: [
     K_DOMINO_H("p1", "s1", "w1"),
-    K_DOMINO_V("p2", "s1", "w1"),
     K_DOMINO_H("p3", "w1", "s1"),
+    P24M_L3C("p9", "w1", "c1", "s2"),
     K_DOMINO_V("p4", "s1", "h1"),
     K_DOMINO_H("p5", "h1", "w1"),
+    P24M_L3C("p10", "c1", "s1", "w1"),
     K_DOMINO_V("p6", "w1", "s1"),
+    P24M_L4("p11", "s2", "w1", "s1", "c1"),
+    K_DOMINO_H("freq48", "s1", "c1"),
+    P24M_L3B("p12", "w1", "s2", "c1"),
     K_DOMINO_H("p7", "w2", "s2"),
-    K_DOMINO_H("m8", "c1", "c2"),
-  
-      K_DOMINO_H('freq48', 's1', 'c1'),
-    ],
-  // Random queue pool (Lv35-50 opt-in pass): see Lv36/Lv35 above for the pattern and the
-  // real-gameplay Monte Carlo methodology (matches this level's own deterministic baseline).
+    P24M_L3C("p12", "w1", "c1", "s1"),
+  ],
   queuePool: [
     { piece: K_DOMINO_H("p1", "s1", "w1"), weight: 1 },
     { piece: K_DOMINO_V("p2", "s1", "w1"), weight: 1 },
@@ -6558,104 +5992,50 @@ const P24M_LEVELS=[
     { piece: K_DOMINO_V("p6", "w1", "s1"), weight: 1 },
     { piece: K_DOMINO_H("p7", "w2", "s2"), weight: 1 },
     { piece: K_DOMINO_H("m8", "c1", "c2"), weight: 1 },
-  
-    { piece: K_DOMINO_H('freq48', 's1', 'c1'), weight: 1 },
+    { piece: K_DOMINO_H("freq48", "s1", "c1"), weight: 1 },
   ],
   queueFallback: K_DOMINO_H("m8", "c1", "c2"),
+  queueRerollBudget: 10,
   queueSolveDepth: 9,
-  // move8 @(5,4): c1@(5,4) matches seed c1@(4,4) -> c1=2 met, all five met; c2@(5,5) lands harmlessly.
-  solution: [{ row: 0, col: 0 }, { row: 1, col: 0 }, { row: 3, col: 0 }, { row: 4, col: 1 }, { row: 4, col: 1 }, { row: 4, col: 3 }, { row: 0, col: 3 }, { row: 5, col: 4 },
-      { row: 4, col: 3 }, // freq: extra s1 exposure (+moveLimit)
-    ],
-  },
+  solution: [{ row: 4, col: 1 }, { row: 3, col: 0 }, { row: 4, col: 0 }, { row: 4, col: 3 }, { row: 5, col: 4 }, { row: 4, col: 0 }, { row: 4, col: 3 }, { row: 3, col: 4 }, { row: 5, col: 3 }, { row: 4, col: 3 }, { row: 0, col: 3 }],
+},
   {
-  // Definitive hardest level in the game: 16 tracked tiles across 6 faces (exceeds Lv18's
-  // 13-tile peak). The first 2 moves are the ORIGINAL "one placement reveals two buried
-  // faces + matches a decoy pair" finale untouched; 3 more moves extend it with two more
-  // chained pairs, since the original board had plenty of natural credit (h1/h2/c2) that
-  // was going untracked before.
   title: "Grand Finale",
   size: 6,
   goalType: "BURIED_TARGET",
-  winTargets: [{id:"s1",need:4}, {id:"c1",need:4}, {id:"h1",need:2}],
-  // h2/c2/s2 targets dropped -- user cap is max 3 face types when combined with a
-  // Seal+Permanent. Keeps the two BURIED_TARGET reveal faces (s1, c1) plus one trigger
-  // face (h1); h2/c2/s2 still get matched by the same moves as before, just uncounted now.
-  seals: [[0,4], [0,5], [1,4], [1,5]],
-  // sealRequiredDistinct stays 3, but the original 5 moves only ever land 1 distinct
-  // adjacent match (c1 via (1,3)/(2,3)) -- 3 new moves appended below deliver 2 more
-  // through the same band: a 1-move bridge to move 2's own dangling w2 leftover at (3,4)
-  // (landing the match at (2,4), adjacent to the seal), then a 2-move s1 cross-piece
-  // through (0,2)/(0,3). The original 5 moves are untouched.
-  sealRequiredDistinct: 3,
-  // Difficulty pass round 2 (after Lv20-29 tighten pushed Ch3's average to 40.7, re-breaking
-  // the Ch3<=Ch4<=Ch5 curve): this finale board had 18 free cells -- completed row 5 into a
-  // full floor wall and row 0 into a matching ceiling wall (neither touched by the solution),
-  // 8 new permanents total, and tightened moveLimit spare 2->1.
-  // QA pass (full-game playtest after round 2): both walls together overshot -- dropped the
-  // ceiling wall, keeping just the floor wall so the true finale stays hard but no longer an
-  // outlier next to its own chapter.
-  permanents: [[5,4], [5,5], [5,0], [5,1], [5,2], [5,3]],
+  winTargets: [{id:"s1",need:6}, {id:"c1",need:6}],
+  seals: [[4,1,3], [1,3,2], [2,1,2], [2,4,4], [0,1,2]],
+  permanents: [[5,4], [5,5], [5,0], [5,1], [5,2], [5,3], [3,5]],
+  locks: [{ cells: [[4,5]], face: "c2", required: 2 }, { cells: [[4,0]], face: "c1", required: 2 }],
   guideMoves: 0,
-  // moveLimit 6->8 for the 3 new seal-adjacency delivery moves below (8 used, 0 spare).
-  moveLimit: 9,
+  moveLimit: 15,
   lesson: "THE FULL PICTURE: SEAL, ROOFS, A WALL — AND THE HARDEST GOAL YET",
+  teach: "",
   tiles: [
     P24K_TILE("s1", 1, 1, 0),
     P24K_TILE("h1", 1, 1, 1),
     P24K_TILE("w1", 1, 2, 0),
     P24K_TILE("s1", 1, 0, 0),
     P24K_TILE("c2", 2, 3, 0),
-    P24K_TILE("c1", 3, 3, 0),
-    P24K_TILE("h2", 3, 3, 1),
     P24K_TILE("w2", 3, 4, 0),
     P24K_TILE("c1", 3, 2, 0),
   ],
   sequence: [
     K_DOMINO_H("p1", "h1", "c2"),
     K_DOMINO_V("p2", "h2", "c1"),
+    P24M_I3H("p7", "s1", "c1", "w1"),
     K_DOMINO_H("p3", "s1", "c1"),
     K_DOMINO_H("p4", "s1", "s2"),
+    P24M_L3("p8", "w1", "s1", "c1"),
     K_DOMINO_H("p5", "w1", "s2"),
-    // e1-e3: seal-adjacency delivery moves (see the sealRequiredDistinct note above). Not
-    // added to queuePool below -- same convention as Lv43/Lv48's delivery moves -- since
-    // queuePool only governs real random-mode gameplay, not this deterministic self-test
-    // replay.
-    K_DOMINO_H("e1", "w2", "j1"),
-    K_DOMINO_V("e2", "s1", "j2"),
-    K_DOMINO_H("e3", "j3", "s1"),
-  
-      K_DOMINO_V('freq49', 's1', 'c1'),
-    ],
-  // Random queue pool (Lv35-50 opt-in pass): see Lv36/Lv35 above for the pattern and the
-  // real-gameplay Monte Carlo methodology (matches this level's own deterministic baseline
-  // exactly under a deliberately weak stress-test heuristic). Both buried-reveal triggers
-  // (h1, h2) stay in the pool -- the gate's winnability proof is what makes randomizing a
-  // double-reveal finale safe: it will never hand out a draw that closes off the reveal.
-  queuePool: [
-    { piece: K_DOMINO_H("p1", "h1", "c2"), weight: 1 },
-    { piece: K_DOMINO_V("p2", "h2", "c1"), weight: 1 },
-    { piece: K_DOMINO_H("p3", "s1", "c1"), weight: 1 },
-    { piece: K_DOMINO_H("p4", "s1", "s2"), weight: 1 },
-    { piece: K_DOMINO_H("p5", "w1", "s2"), weight: 1 },
-  
-    { piece: K_DOMINO_V('freq49', 's1', 'c1'), weight: 1 },
+    P24M_L3C("p9", "w1", "c1", "s2"),
+    K_DOMINO_V("freq49", "s1", "c1"),
+    P24M_T4("p10", "s1", "w1", "s2", "c1"),
+    K_DOMINO_V("p12", "c1", "s1"),
+    P24M_L4("p11", "c1", "w1", "s2", "s1"),
   ],
-  queueFallback: K_DOMINO_H("p5", "w1", "s2"),
-  queueSolveDepth: 6,
-  solution: [
-    { row: 1, col: 2 }, // h1@(1,2) reveals the buried s1@(1,1) which matches seeded s1@(1,0); c2@(1,3) matches seeded c2@(2,3)
-    { row: 3, col: 4 }, // h2@(3,4) reveals the buried c1@(3,3) which matches seeded c1@(3,2); c1@(4,4) left over
-    { row: 4, col: 2 }, // s1@(4,2) lone; c1@(4,3) matches the leftover c1@(4,4) -> c1=4 done
-    { row: 3, col: 2 }, // s1@(3,2) matches lone s1@(4,2) -> s1=4 done; s2@(3,3) lone
-    { row: 2, col: 2 }, // w1@(2,2) filler; s2@(2,3) matches lone s2@(3,3) -> s2=2 done, all six targets met
-    { row: 2, col: 4 }, // e1: w2@(2,4) matches move 2's leftover w2@(3,4) -> distinct #2 (group touches seal via (2,4)); j1@(2,5) lands harmlessly.
-    { row: 0, col: 3 }, // e2: s1@(0,3) lands dangling (seal-adjacent); j2@(1,3) lands harmlessly.
-    { row: 0, col: 1 }, // e3: j3@(0,1) lands harmlessly; s1@(0,2) matches e2's leftover s1@(0,3) -> distinct #3 (group touches seal via (0,3)) -> threshold 3 met -> seal opens.
-  
-      { row: 0, col: 0 }, // freq: extra s1 exposure (+moveLimit)
-    ],
-  },
+  solution: [{ row: 2, col: 2 }, { row: 3, col: 3 }, { row: 4, col: 2 }, { row: 3, col: 2 }, { row: 3, col: 3 }, { row: 2, col: 0 }, { row: 2, col: 1 }, { row: 0, col: 2 }, { row: 3, col: 1 }, { row: 3, col: 1 }, { row: 0, col: 4 }, { row: 0, col: 0 }],
+},
 ]
 .map((level,i)=>({
   ...level,cap:0,rr:0,fl:0,targets:[],index:i,
@@ -6681,7 +6061,10 @@ const P24M_LEVELS=[
   // instead of a live crash: lock.face stayed a raw id (e.g. 'c1') while S.targetCounts is
   // always keyed by the remapped asset id ('c2'), so the lock's threshold check compared
   // against a key that could never be present and the cell stayed blocked forever.
-  locks:(level.locks||[]).map(lock=>({...lock,face:P24K1_FACE_MAP[lock.face]||lock.face})),
+  // `lock.after` (optional, [Thử nghiệm 12/09/2026] sequenced/two-stage Lock) carries its own
+  // raw face id the same way and needs the same remap.
+  locks:(level.locks||[]).map(lock=>({...lock,face:P24K1_FACE_MAP[lock.face]||lock.face,
+    after:lock.after?{...lock.after,face:P24K1_FACE_MAP[lock.after.face]||lock.after.face}:lock.after})),
 }));
 
 P24K_LEVELS.splice(0,P24K_LEVELS.length,...P24M_LEVELS);
@@ -6909,16 +6292,11 @@ p24kFindWavePairs=function(activeUids,tiles=P24K.tiles){
 };
 
 p24kApplyWave=function(groups,activeUids,tiles=P24K.tiles){
-  const removed=new Set(groups.flat()),ids=[],reveals=[],cellsByGroup=[];
+  const removed=new Set(groups.flat()),ids=[],reveals=[];
   for(const group of groups){
     const members=group.map(uid=>tiles.find(t=>t.uid===uid)).filter(t=>t&&t.alive);
     if(members.length<2)continue;
     ids.push(members[0].id);
-    // Per-group (r,c) of every matched tile -- lets a caller that DOES know about seals
-    // (p24kResolveAnimated / p24kResolveAllModel, both of which have `level` in scope) decide
-    // whether this specific match happened next to a sealed cell, without this low-level
-    // function needing to know Seal exists at all.
-    cellsByGroup.push(members.map(t=>({r:t.r,c:t.c})));
     for(const tile of members){
       if(tile.z===1){const under=p24kTileAt(tile.r,tile.c,0,tiles);if(under&&under.alive)reveals.push(under.uid);}
       tile.alive=false;
@@ -6930,38 +6308,29 @@ p24kApplyWave=function(groups,activeUids,tiles=P24K.tiles){
   // justRevealed is intentionally NOT set here — the animated caller (p24kResolveAnimated)
   // decides when to flip it, so a plain "empty socket" frame can render before the reveal
   // flourish plays. The pure model path (self-tests/solution checks) doesn't need the flag.
-  return {pairs:groups.map(x=>x.slice()),ids,cellsByGroup,reveals:uniqueReveals,falls:[],active:next};
+  return {pairs:groups.map(x=>x.slice()),ids,reveals:uniqueReveals,falls:[],active:next};
 };
-/* Seal only opens from matches that land ADJACENT TO IT -- a genuinely spatial requirement
-   (route pieces near the seal) instead of "match N distinct faces anywhere on the board",
-   which read as just another win-condition goal with extra steps. Orthogonal adjacency only
-   (matches Lock/Permanent's own cell-blocking checks elsewhere in the file).
-   Returns the INDICES of every seal (a level can have several, each with its own required
-   count -- see level.seals' 3rd tuple element) touched by this group, not just a boolean --
-   each seal tracks its own distinct-face progress independently now, so a match can count
-   toward one seal and not another sitting elsewhere on the board. */
-function p24kGroupTouchedSealIndices(cells,seals){
-  if(!seals||!seals.length)return [];
-  const out=[];
-  seals.forEach(([sr,sc],i)=>{
-    if(cells.some(({r,c})=>(sr===r&&Math.abs(sc-c)===1)||(sc===c&&Math.abs(sr-r)===1)))out.push(i);
-  });
-  return out;
-}
-/* required-distinct count for seal index i -- level.seals entries are [r,c] or [r,c,required]
-   (3rd element added when per-seal counts were introduced); default 1 covers any older/test
-   level literal that only ever specifies [r,c]. */
+/* Seal opens by counting DISTINCT faces matched ANYWHERE on the board (same idCounts/
+   targetCounts tally TARGET_FACE and Lock already keep -- no new bookkeeping, no spatial
+   "must land next to the seal" requirement). Each seal has its OWN required distinct-face
+   threshold (level.seals' 3rd tuple element) checked against that SAME shared running count,
+   so several seals on one board simply open at different MILESTONES of it (a seal needing 2
+   opens before one needing 5) rather than needing separate isolated tallies. required-count
+   default 1 covers any older/test level literal that only ever specifies [r,c]. */
+// [Đổi luật 12/09/2026, lần 2] Seal giờ đếm TỔNG SỐ CẶP đã ghép (S.pairs/model.pairs — cùng
+// con số PAIR_QUOTA đã dùng), không còn cần MỖI cặp phải là 1 mặt khác nhau -- ghép lại đúng 1
+// mặt nhiều lần vẫn cộng dồn bình thường. required (level.seals' phần tử thứ 3) giờ là "cần
+// phá bao nhiêu CẶP", không phải "cần bao nhiêu mặt khác nhau" nữa.
 function p24kSealRequired(level,i){return (level.seals[i][2])||1;}
-function p24kSealMet(level,sealAdjacentCounts,i){
-  return Object.keys((sealAdjacentCounts&&sealAdjacentCounts[i])||{}).length>=p24kSealRequired(level,i);
+function p24kSealMet(level,pairs,i){
+  return (pairs||0)>=p24kSealRequired(level,i);
 }
-function p24kSealsAllOpen(level,sealAdjacentCounts){
-  return !level.seals||!level.seals.length||level.seals.every((s,i)=>p24kSealMet(level,sealAdjacentCounts,i));
+function p24kSealsAllOpen(level,pairs){
+  return !level.seals||!level.seals.length||level.seals.every((s,i)=>p24kSealMet(level,pairs,i));
 }
 
 p24kResolveAllModel=function(tiles,activeUids,level){
-  let active=new Set(activeUids),waves=0,pairCount=0;const events=[],idCounts={},sealAdjacentCounts={};
-  const seals=level&&level.seals;
+  let active=new Set(activeUids),waves=0,pairCount=0;const events=[],idCounts={};
   while(true){
     const groups=p24kFindWavePairs(active,tiles);if(!groups.length)break;
     waves++;pairCount+=groups.reduce((s,g)=>s+(g.length-1),0);
@@ -6969,52 +6338,56 @@ p24kResolveAllModel=function(tiles,activeUids,level){
     step.pairs.forEach((group,gi)=>{
       const id=step.ids[gi];
       idCounts[id]=(idCounts[id]||0)+group.length;
-      if(seals&&seals.length){
-        p24kGroupTouchedSealIndices(step.cellsByGroup[gi],seals).forEach(si=>{
-          sealAdjacentCounts[si]=sealAdjacentCounts[si]||{};
-          sealAdjacentCounts[si][id]=(sealAdjacentCounts[si][id]||0)+group.length;
-        });
-      }
     });
     events.push({type:'match',wave:waves,pairs:step.pairs,ids:step.ids.slice()});
     if(step.reveals.length)events.push({type:'reveal',wave:waves,uids:step.reveals.slice()});
   }
-  return {waves,pairCount,events,active,idCounts,sealAdjacentCounts};
+  return {waves,pairCount,events,active,idCounts};
 };
 
 /* Phong Ấn (seal) and Ô Chắn (permanent) cells block a whole cell at both layers.
-   `sealAdjacentCounts` (per-seal-index distinct-face tally) is passed in rather than read
-   from S directly so the solver's isolated model (which tracks its own counts as moves are
-   replayed) can reuse this same check instead of accidentally reading live game state. Each
-   seal cell is blocked/open purely by ITS OWN entry (p24kSealMet), independent of every
-   other seal on the same board. */
-function p24kCellBlocked(level,sealAdjacentCounts,r,c,targetCounts){
+   `targetCounts` (per-face tally Lock already keeps) and `pairs` (total match-pairs count,
+   same number PAIR_QUOTA uses -- Seal's own gate) are both passed in rather than read from S
+   directly so the solver's isolated model (which tracks its own counts as moves are replayed)
+   can reuse this same check instead of accidentally reading live game state. Each seal cell
+   opens purely by comparing its OWN required threshold (p24kSealRequired) against that one
+   shared pairs count -- no longer cares about distinct faces at all. */
+/* [Thử nghiệm 12/09/2026] Khóa 2 giai đoạn (sequenced Lock): `lock.after` (tuỳ chọn) là
+   {face,required} của một điều kiện TIỀN ĐỀ -- lock chỉ thật sự mở khi cả điều kiện của
+   riêng nó VÀ điều kiện tiền đề đều đạt, dù điều kiện riêng đã đạt từ trước. Mục đích: tách
+   Lock khỏi Seal (Seal giờ chỉ đếm tổng số cặp bất kỳ đâu) bằng một trục THỨ TỰ mà Seal không
+   có -- người chơi phải match đúng trình tự, không chỉ đủ số lượng. Không có `after` thì hành
+   vi y hệt Lock cũ (afterMet mặc định true). */
+function p24kLockMet(lock,targetCounts){
+  const ownMet=(targetCounts[lock.face]||0)>=lock.required;
+  const afterMet=!lock.after||(targetCounts[lock.after.face]||0)>=lock.after.required;
+  return ownMet&&afterMet;
+}
+function p24kCellBlocked(level,r,c,targetCounts,pairs){
   if(level.permanents&&level.permanents.some(p=>p[0]===r&&p[1]===c))return true;
   if(level.seals){
     const si=level.seals.findIndex(s=>s[0]===r&&s[1]===c);
-    if(si!==-1&&!p24kSealMet(level,sealAdjacentCounts,si))return true;
+    if(si!==-1&&!p24kSealMet(level,pairs,si))return true;
   }
   // Khóa (Lock) — like Phong Ấn but per-cell-group and keyed to ONE specific face + a
-  // required count of it (shown to the player), instead of a level-wide distinct-face
-  // count. Reuses the same targetCounts/idCounts tally TARGET_FACE already keeps, so no
-  // new bookkeeping is needed beyond the level's own `locks` list.
+  // required count of it (shown to the player), instead of a total-pairs count. Reuses the
+  // same targetCounts/idCounts tally TARGET_FACE already keeps, so no new bookkeeping is
+  // needed beyond the level's own `locks` list.
   if(level.locks&&targetCounts){
     for(const lock of level.locks){
-      if((targetCounts[lock.face]||0)>=lock.required)continue;
+      if(p24kLockMet(lock,targetCounts))continue;
       if(lock.cells.some(cell=>cell[0]===r&&cell[1]===c))return true;
     }
   }
   return false;
 }
 /* Phong Ấn opens only once per seal, only after a full cascade has settled (never mid-drag
-   or mid-wave). Each seal requires its OWN distinct faces matched ADJACENT TO IT specifically
-   (tracked per seal index in S.sealAdjacentCounts by p24kResolveAnimated/
-   p24kGroupTouchedSealIndices) -- not S.targetCounts, which counts a match anywhere on the
-   board and would make Seal indistinguishable from a plain "match N distinct faces" goal.
-   This is what makes routing pieces toward EACH seal matter, instead of just accumulating
-   matches wherever's convenient near any one of them. S.sealsOpened only gates the one-time
-   opening animation/sfx per seal (mirrors S.locksOpened) -- the actual open/closed state used
-   for blocking placement and win-checks is always re-derived live from S.sealAdjacentCounts
+   or mid-wave). Each seal requires its OWN number of distinct faces matched ANYWHERE on the
+   board (tracked in the same S.targetCounts every TARGET_FACE/Lock level already keeps -- no
+   separate per-seal bookkeeping): several seals on one board just open at different
+   MILESTONES of that one shared count. S.sealsOpened only gates the one-time opening
+   animation/sfx per seal (mirrors S.locksOpened) -- the actual open/closed state used for
+   blocking placement and win-checks is always re-derived live from S.targetCounts
    (p24kSealMet), never stored separately, so it can never drift out of sync. */
 async function p24kMaybeOpenSeal(){
   const lvl=p24kLevel();
@@ -7022,7 +6395,7 @@ async function p24kMaybeOpenSeal(){
   const justOpened=[];
   lvl.seals.forEach((s,i)=>{
     if(S.sealsOpened.has(i))return;
-    if(!p24kSealMet(lvl,S.sealAdjacentCounts,i))return;
+    if(!p24kSealMet(lvl,S.pairs,i))return;
     S.sealsOpened.add(i);
     justOpened.push(s);
   });
@@ -7047,7 +6420,7 @@ async function p24kMaybeOpenLocks(){
   const justOpened=[];
   lvl.locks.forEach((lock,i)=>{
     if(S.locksOpened.has(i))return;
-    if((S.targetCounts[lock.face]||0)<lock.required)return;
+    if(!p24kLockMet(lock,S.targetCounts))return;
     S.locksOpened.add(i);
     justOpened.push(lock);
   });
@@ -7062,13 +6435,13 @@ async function p24kMaybeOpenLocks(){
   await sleep(460);
   renderAll();
 }
-p24kSimulateDrop=function(r,c,index=0,tiles=P24K.tiles,pieces=P24K.pieces,level=p24kLevel(),sealAdjacentCounts=S.sealAdjacentCounts,targetCounts=S.targetCounts){
+p24kSimulateDrop=function(r,c,index=0,tiles=P24K.tiles,pieces=P24K.pieces,level=p24kLevel(),targetCounts=S.targetCounts,pairs=S.pairs){
   if(index!==0)return {legal:false,reason:'preview'};
   const piece=pieces[0];if(!piece)return {legal:false,reason:'missing'};const placements=[];
   for(let n=0;n<piece.cells.length;n++){
     const cell=piece.cells[n],rr=r+cell.dr,cc=c+cell.dc;
     if(rr<0||cc<0||rr>=level.size||cc>=level.size)return {legal:false,reason:'bounds'};
-    if(p24kCellBlocked(level,sealAdjacentCounts,rr,cc,targetCounts))return {legal:false,reason:'blocked',blockedAt:[rr,cc]};
+    if(p24kCellBlocked(level,rr,cc,targetCounts,pairs))return {legal:false,reason:'blocked',blockedAt:[rr,cc]};
     const bottom=p24kTileAt(rr,cc,0,tiles),top=p24kTileAt(rr,cc,1,tiles);
     if(top)return {legal:false,reason:'full',blockedAt:[rr,cc]};
     placements.push({dr:cell.dr,dc:cell.dc,id:cell.id,r:rr,c:cc,z:bottom?1:0,tempUid:-(n+1)});
@@ -7096,16 +6469,22 @@ p24kBoardCellHTML=function(r,c){
   }
   if(lvl.seals){
     const si=lvl.seals.findIndex(s=>s[0]===r&&s[1]===c);
-    if(si!==-1&&!p24kSealMet(lvl,S.sealAdjacentCounts,si)){
-      const req=p24kSealRequired(lvl,si),cur=Math.min(req,Object.keys((S.sealAdjacentCounts[si])||{}).length);
+    if(si!==-1&&!p24kSealMet(lvl,S.pairs,si)){
+      const req=p24kSealRequired(lvl,si),cur=Math.min(req,S.pairs||0);
       return `<div class="cell cell-sealed" data-r="${r}" data-c="${c}"><div class="seal-plank"><span class="seal-count">${cur}/${req}</span></div></div>`;
     }
   }
   if(lvl.locks){
     const lockHere=lvl.locks.find(lock=>lock.cells.some(cell=>cell[0]===r&&cell[1]===c));
-    if(lockHere&&(S.targetCounts[lockHere.face]||0)<lockHere.required){
+    if(lockHere&&!p24kLockMet(lockHere,S.targetCounts)){
       const cur=Math.min(lockHere.required,S.targetCounts[lockHere.face]||0);
-      return `<div class="cell cell-locked" data-r="${r}" data-c="${c}"><div class="lock-plate"><span class="lock-icon">${tileHTML(T(lockHere.face))}</span><span class="lock-count">${cur}/${lockHere.required}</span></div></div>`;
+      // [Thử nghiệm 12/09/2026] Khóa 2 giai đoạn: nếu còn tiền đề `after` chưa đạt, hiện thêm
+      // "tiền đề → mặt chính" để người chơi biết vì sao ô vẫn khoá dù mặt chính đã đủ số.
+      const afterMet=!lockHere.after||(S.targetCounts[lockHere.after.face]||0)>=lockHere.after.required;
+      const countHTML=(lockHere.after&&!afterMet)
+        ? `${Math.min(lockHere.after.required,S.targetCounts[lockHere.after.face]||0)}/${lockHere.after.required} → ${cur}/${lockHere.required}`
+        : `${cur}/${lockHere.required}`;
+      return `<div class="cell cell-locked" data-r="${r}" data-c="${c}"><div class="lock-plate"><span class="lock-icon">${tileHTML(T(lockHere.face))}</span><span class="lock-count">${countHTML}</span></div></div>`;
     }
   }
   const bottom=p24kTileAt(r,c,0),top=p24kTileAt(r,c,1),stack=!!bottom&&!!top;let inner='';
@@ -7180,7 +6559,7 @@ p24kMarkPairAnimation=function(groups,waveNo=1){
 };
 
 p24kResolveAnimated=async function(activeUids){
-  let active=new Set(activeUids),waves=0,pairsTotal=0;const events=[],lvl=p24kLevel(),seals=lvl.seals;
+  let active=new Set(activeUids),waves=0,pairsTotal=0;const events=[];
   while(true){
     const groups=p24kFindWavePairs(active);if(!groups.length)break;
     waves++;const maxSize=Math.max(...groups.map(g=>g.length)),waveTiles=groups.reduce((s,g)=>s+g.length,0);
@@ -7201,13 +6580,6 @@ p24kResolveAnimated=async function(activeUids){
     step.pairs.forEach((group,gi)=>{
       const id=step.ids[gi];
       S.targetCounts[id]=(S.targetCounts[id]||0)+group.length;
-      if(seals&&seals.length){
-        p24kGroupTouchedSealIndices(step.cellsByGroup[gi],seals).forEach(si=>{
-          const cur={...(S.sealAdjacentCounts[si]||{})};
-          cur[id]=(cur[id]||0)+group.length;
-          S.sealAdjacentCounts[si]=cur;
-        });
-      }
     });
     events.push({type:'match',wave:waves,pairs:step.pairs,ids:step.ids.slice()});
     if(step.reveals.length){
@@ -7261,7 +6633,7 @@ p24kFirstLegalMove=function(){return p24kLegalMoves()[0]||null;};
    sentence), and score/progress numbers. Nothing here tells the player HOW the mechanic
    works — that's taught entirely by guideMoves' pulsing-cell highlight during play. */
 startLevel=function(n=0){
-  S.lv=Math.max(0,Math.min(P24M_LEVELS.length-1,n));S.cfg=p24kLevel();S.size=S.cfg.size;S.ids=buildIds(S.cfg);S.board=emptyBoard(S.size);S.khay=[];S.tray=[];S.targets=[];S.pairs=0;S.sel=-1;S.prev=null;S.rerolls=0;S.flushes=0;S.busy=false;S.armFlush=false;S.placed=0;S.score=0;S.chainBest=0;S.moveStreak=0;S.targetCounts={};S.sealAdjacentCounts={};S.sealsOpened=new Set();S.locksOpened=new Set();S.moveHistory=[];S.hintDeviated=false;
+  S.lv=Math.max(0,Math.min(P24M_LEVELS.length-1,n));S.cfg=p24kLevel();S.size=S.cfg.size;S.ids=buildIds(S.cfg);S.board=emptyBoard(S.size);S.khay=[];S.tray=[];S.targets=[];S.pairs=0;S.sel=-1;S.prev=null;S.rerolls=0;S.flushes=0;S.busy=false;S.armFlush=false;S.placed=0;S.score=0;S.chainBest=0;S.moveStreak=0;S.targetCounts={};S.sealsOpened=new Set();S.locksOpened=new Set();S.moveHistory=[];S.hintDeviated=false;
   S.movesLeft=S.cfg.moveLimit>0?S.cfg.moveLimit:Infinity;
   // Booster giờ đọc từ kho DÙNG CHUNG toàn game (không còn theo level.boosterReroll/
   // boosterHint tác giả soạn riêng) -- ngoại lệ duy nhất là Lv1 (S.lv===0), cố ý
@@ -7332,7 +6704,7 @@ goalState=function(){
     return {label:'GOAL',current:Math.min(total,lvl.tileGoal),total:lvl.tileGoal,targetId:null};
   }
   if(lvl.goalType==='OPEN_SEAL'){
-    const total=lvl.seals.length,opened=lvl.seals.filter((s,i)=>p24kSealMet(lvl,S.sealAdjacentCounts,i)).length;
+    const total=lvl.seals.length,opened=lvl.seals.filter((s,i)=>p24kSealMet(lvl,S.pairs,i)).length;
     return {label:'GOAL',current:opened,total,targetId:null};
   }
   const targets=lvl.winTargets||[];
@@ -7352,7 +6724,7 @@ goalState=function(){
 levelWon=function(){
   const lvl=p24kLevel();
   if(lvl.goalType==='TILE_QUOTA')return p24mTileTotal(S.targetCounts)>=lvl.tileGoal;
-  if(lvl.goalType==='OPEN_SEAL')return p24kSealsAllOpen(lvl,S.sealAdjacentCounts);
+  if(lvl.goalType==='OPEN_SEAL')return p24kSealsAllOpen(lvl,S.pairs);
   const targets=lvl.winTargets||[];
   if(targets.length){
     if(lvl.targetRequiredCount)return targets.filter(t=>(S.targetCounts[t.id]||0)>=t.need).length>=lvl.targetRequiredCount;
@@ -7437,22 +6809,12 @@ function p24kUseHint(){
 {const rBtn=$('btn-reroll');if(rBtn)rBtn.addEventListener('click',p24kUseReroll);}
 {const hBtn=$('btn-hint');if(hBtn)hBtn.addEventListener('click',p24kUseHint);}
 
-p24kFreshModel=function(levelIndex){const level=P24M_LEVELS[levelIndex];const tiles=level.tiles.map((t,i)=>({...t,uid:i+1,alive:true,justRevealed:false}));return {level,tiles,queueIndex:0,pieces:[p24kQueuePiece(0,level,0),p24kQueuePiece(1,level,0)],nextUid:level.tiles.length+1,pairs:0,events:[],idCounts:{},sealAdjacentCounts:{}};};
+p24kFreshModel=function(levelIndex){const level=P24M_LEVELS[levelIndex];const tiles=level.tiles.map((t,i)=>({...t,uid:i+1,alive:true,justRevealed:false}));return {level,tiles,queueIndex:0,pieces:[p24kQueuePiece(0,level,0),p24kQueuePiece(1,level,0)],nextUid:level.tiles.length+1,pairs:0,events:[],idCounts:{}};};
 p24kModelDrop=function(model,r,c){
-  const sim=p24kSimulateDrop(r,c,0,model.tiles,model.pieces,model.level,model.sealAdjacentCounts,model.idCounts);if(!sim.legal)return {legal:false,sim};const active=[];
+  const sim=p24kSimulateDrop(r,c,0,model.tiles,model.pieces,model.level,model.idCounts,model.pairs);if(!sim.legal)return {legal:false,sim};const active=[];
   for(const p of sim.placements){const tile={uid:model.nextUid++,id:p.id,r:p.r,c:p.c,z:p.z,alive:true};model.tiles.push(tile);active.push(tile.uid);}
   model.queueIndex++;model.pieces=[p24kQueuePiece(0,model.level,model.queueIndex),p24kQueuePiece(1,model.level,model.queueIndex)];const result=p24kResolveAllModel(model.tiles,new Set(active),model.level);model.pairs+=result.pairCount;
   model.idCounts=model.idCounts||{};Object.entries(result.idCounts).forEach(([id,n])=>{model.idCounts[id]=(model.idCounts[id]||0)+n;});
-  // Merge per-seal-index maps by REPLACING model.sealAdjacentCounts[si] with a fresh object
-  // (never mutating the existing inner object in place) -- p24qCloneModel only shallow-copies
-  // the outer object, so an in-place mutation here would silently corrupt whatever OTHER
-  // clone still shares that same inner reference.
-  model.sealAdjacentCounts=model.sealAdjacentCounts||{};
-  Object.entries(result.sealAdjacentCounts||{}).forEach(([si,idMap])=>{
-    const cur={...(model.sealAdjacentCounts[si]||{})};
-    Object.entries(idMap).forEach(([id,n])=>{cur[id]=(cur[id]||0)+n;});
-    model.sealAdjacentCounts[si]=cur;
-  });
   model.events.push({type:'land',floor:sim.floorCount,top:sim.topCount},...result.events);return {legal:true,sim,result};
 };
 function p24mTargetsMet(level,idCounts){return (level.winTargets||[]).every(t=>(idCounts&&idCounts[t.id]||0)>=t.need);}
@@ -7464,7 +6826,7 @@ function p24mTargetsMet(level,idCounts){return (level.winTargets||[]).every(t=>(
 function p24mTileTotal(idCounts){return Object.values(idCounts||{}).reduce((s,n)=>s+n,0);}
 function p24mGoalMet(level,model){
   if(level.goalType==='TILE_QUOTA')return p24mTileTotal(model.idCounts)>=level.tileGoal;
-  if(level.goalType==='OPEN_SEAL')return p24kSealsAllOpen(level,model.sealAdjacentCounts);
+  if(level.goalType==='OPEN_SEAL')return p24kSealsAllOpen(level,model.pairs);
   const targets=level.winTargets||[];
   if(targets.length){
     if(level.targetRequiredCount)return targets.filter(t=>(model.idCounts[t.id]||0)>=t.need).length>=level.targetRequiredCount;
@@ -7498,7 +6860,7 @@ function p24qWeightedPick(pool,rng){
 function p24qLegalPlacementsForPiece(model,piece){
   const out=[];
   for(let r=0;r<model.level.size;r++)for(let c=0;c<model.level.size;c++){
-    const sim=p24kSimulateDrop(r,c,0,model.tiles,[piece],model.level,model.sealAdjacentCounts,model.idCounts);
+    const sim=p24kSimulateDrop(r,c,0,model.tiles,[piece],model.level,model.idCounts,model.pairs);
     if(sim.legal)out.push({row:r,col:c});
   }
   return out;
@@ -7506,22 +6868,16 @@ function p24qLegalPlacementsForPiece(model,piece){
 // Commits a GIVEN piece (not read from model.pieces) -- the search below needs to try
 // several candidate pieces per ply, which p24kModelDrop's fixed model.pieces[0] can't do.
 function p24qCommitDrop(model,piece,r,c){
-  const sim=p24kSimulateDrop(r,c,0,model.tiles,[piece],model.level,model.sealAdjacentCounts);
+  const sim=p24kSimulateDrop(r,c,0,model.tiles,[piece],model.level,model.idCounts,model.pairs);
   if(!sim.legal)return {legal:false,sim};
   const active=[];
   for(const p of sim.placements){const tile={uid:model.nextUid++,id:p.id,r:p.r,c:p.c,z:p.z,alive:true};model.tiles.push(tile);active.push(tile.uid);}
   const result=p24kResolveAllModel(model.tiles,new Set(active),model.level);model.pairs+=result.pairCount;
   model.idCounts=model.idCounts||{};Object.entries(result.idCounts).forEach(([id,n])=>{model.idCounts[id]=(model.idCounts[id]||0)+n;});
-  model.sealAdjacentCounts=model.sealAdjacentCounts||{};
-  Object.entries(result.sealAdjacentCounts||{}).forEach(([si,idMap])=>{
-    const cur={...(model.sealAdjacentCounts[si]||{})};
-    Object.entries(idMap).forEach(([id,n])=>{cur[id]=(cur[id]||0)+n;});
-    model.sealAdjacentCounts[si]=cur;
-  });
   return {legal:true,sim,result};
 }
 function p24qCloneModel(model){
-  return {level:model.level,tiles:model.tiles.map(t=>({...t})),nextUid:model.nextUid,pairs:model.pairs,idCounts:{...(model.idCounts||{})},sealAdjacentCounts:{...(model.sealAdjacentCounts||{})}};
+  return {level:model.level,tiles:model.tiles.map(t=>({...t})),nextUid:model.nextUid,pairs:model.pairs,idCounts:{...(model.idCounts||{})}};
 }
 /* Bounded DFS: `committed` is the exact, already-fixed sequence of pieces that MUST be
    played next in order (e.g. [currentPiece, candidateNextPiece]) -- their order can't
@@ -7610,26 +6966,26 @@ function p24qDrawGatedGenerative(liveModel,committedPrefix,level,rng){
 // expects -- used by p24kSyncQueue/p24kAdvanceRandomQueue above whenever a new piece needs
 // to be drawn mid-play.
 function p24qLiveModelForDraw(){
-  return {level:p24kLevel(),tiles:p24kAlive().map(t=>({...t})),nextUid:P24K.nextUid,pairs:S.pairs,idCounts:{...S.targetCounts},sealAdjacentCounts:{...S.sealAdjacentCounts}};
+  return {level:p24kLevel(),tiles:p24kAlive().map(t=>({...t})),nextUid:P24K.nextUid,pairs:S.pairs,idCounts:{...S.targetCounts}};
 }
 
 /* Live-state solver backing the Hint booster (p24kUseHint above). Unlike p24kRunSolution
    (which replays level.solution from a FRESH model), this snapshots the board exactly as
    the player left it — so the hint stays correct even after boosters/deviation from the
-   authored solution path. p24kLegalMoves() itself always reads S.sealAdjacentCounts, which is
+   authored solution path. p24kLegalMoves() itself always reads S.targetCounts, which is
    wrong for a cloned hypothetical model mid-search, so this needs its own model-aware variant
    (mirrors the level-editor's p24kLegalMoves, which already takes a full model). */
 function p24kLiveModelSnapshot(){
   return {
     level:p24kLevel(), tiles:p24kAlive().map(t=>({...t})), queueIndex:P24K.queueIndex,
     pieces:[p24kClonePiece(P24K.pieces[0]),p24kClonePiece(P24K.pieces[1])], nextUid:P24K.nextUid,
-    pairs:S.pairs, events:[], idCounts:{...S.targetCounts}, sealAdjacentCounts:{...S.sealAdjacentCounts},
+    pairs:S.pairs, events:[], idCounts:{...S.targetCounts},
   };
 }
 function p24kLegalMovesForModel(model){
   const out=[];
   for(let r=0;r<model.level.size;r++)for(let c=0;c<model.level.size;c++){
-    const sim=p24kSimulateDrop(r,c,0,model.tiles,model.pieces,model.level,model.sealAdjacentCounts,model.idCounts);
+    const sim=p24kSimulateDrop(r,c,0,model.tiles,model.pieces,model.level,model.idCounts,model.pairs);
     if(sim.legal)out.push({row:r,col:c,willMatch:!!sim.willMatch});
   }
   // Move-ordering heuristic for the DFS below: try match-producing placements first. A
@@ -7646,7 +7002,6 @@ function p24kCloneLiveModel(model){
     tiles: model.tiles.map(t=>({...t})),
     pieces: model.pieces.map(p24kClonePiece),
     idCounts: {...model.idCounts},
-    sealAdjacentCounts: {...model.sealAdjacentCounts},
     events: [],
   };
 }
@@ -7715,14 +7070,17 @@ function p24mSelfTest(){
   checks.same_layer_roof_pair_matches=(()=>{const tiles=[{uid:1,id:'c1',r:0,c:0,z:0,alive:true},{uid:2,id:'w1',r:0,c:1,z:0,alive:true},{uid:3,id:'s1',r:0,c:0,z:1,alive:true},{uid:4,id:'s1',r:0,c:1,z:1,alive:true}];return p24kFindWavePairs(new Set([3,4]),tiles).length===1;})();
   // Seal / permanent mechanics (new for the 30-level design).
   checks.permanent_cell_blocks_placement=(()=>{const level={size:4,permanents:[[1,1]]};const sim=p24kSimulateDrop(1,0,0,[],[K_DOMINO_H('x','s1','c1')],level,false);return !sim.legal&&sim.reason==='blocked';})();
-  checks.sealed_cell_blocks_until_open=(()=>{const level={size:4,seals:[[1,1]]};const closed=p24kSimulateDrop(1,0,0,[],[K_DOMINO_H('x','s1','c1')],level,{});const open=p24kSimulateDrop(1,0,0,[],[K_DOMINO_H('x','s1','c1')],level,{0:{s1:1}});return !closed.legal&&closed.reason==='blocked'&&open.legal;})();
-  // Each seal on a level now needs its OWN distinct-face count (level.seals' optional 3rd
-  // tuple element, defaulting to 1) and tracks progress independently of every other seal on
-  // the same board -- meeting one seal's requirement must never open a DIFFERENT seal that
-  // hasn't separately earned it.
-  checks.seal_requires_its_own_distinct_count=(()=>{const level={seals:[[1,1,2]]};const oneMatched=p24kCellBlocked(level,{0:{s1:1}},1,1);const twoMatched=p24kCellBlocked(level,{0:{s1:1,s2:1}},1,1);return oneMatched&&!twoMatched;})();
-  checks.seals_open_independently=(()=>{const level={seals:[[1,1,1],[2,2,3]]};const counts={0:{s1:1}};return !p24kCellBlocked(level,counts,1,1)&&p24kCellBlocked(level,counts,2,2);})();
-  checks.every_seal_level_opens_in_its_own_solution=P24M_LEVELS.every((level,i)=>!level.seals||!level.seals.length||p24kSealsAllOpen(level,p24kRunSolution(i).model.sealAdjacentCounts));
+  checks.sealed_cell_blocks_until_open=(()=>{const level={size:4,seals:[[1,1]]};const closed=p24kSimulateDrop(1,0,0,[],[K_DOMINO_H('x','s1','c1')],level,{},0);const open=p24kSimulateDrop(1,0,0,[],[K_DOMINO_H('x','s1','c1')],level,{},1);return !closed.legal&&closed.reason==='blocked'&&open.legal;})();
+  // [Đổi luật 12/09/2026, lần 2] Each seal now needs its OWN count of TOTAL PAIRS matched
+  // anywhere on the board (level.seals' optional 3rd tuple element, defaulting to 1) -- no
+  // longer distinct faces, no spatial "must land next to it" requirement either. Re-matching
+  // the same face repeatedly counts every time now.
+  checks.seal_requires_its_own_distinct_count=(()=>{const level={seals:[[1,1,2]]};const oneMatched=p24kCellBlocked(level,1,1,{},1);const twoMatched=p24kCellBlocked(level,1,1,{},2);return oneMatched&&!twoMatched;})();
+  // Several seals sharing one board can have different required counts, so they open at
+  // different MILESTONES of that same shared pairs tally -- a seal needing fewer pairs opens
+  // before a stricter one, without either draining or resetting the other's progress.
+  checks.seals_open_at_their_own_threshold=(()=>{const level={seals:[[1,1,1],[2,2,3]]};return !p24kCellBlocked(level,1,1,{},1)&&p24kCellBlocked(level,2,2,{},1);})();
+  checks.every_seal_level_opens_in_its_own_solution=P24M_LEVELS.every((level,i)=>!level.seals||!level.seals.length||p24kSealsAllOpen(level,p24kRunSolution(i).model.pairs));
   checks.every_target_face_level_has_valid_required_count=P24M_LEVELS.every(level=>!level.targetRequiredCount||(level.winTargets&&level.targetRequiredCount<=level.winTargets.length));
   checks.every_move_limit_fits_its_solution=P24M_LEVELS.every(level=>!level.moveLimit||level.solution.length<=level.moveLimit);
   checks.all_solutions=P24M_LEVELS.every((_l,i)=>p24kRunSolution(i).ok);

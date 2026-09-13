@@ -1,6 +1,6 @@
 # Tổng Hợp AI Log Toàn Dự Án — Mahjong × Block
 
-**Phạm vi:** toàn bộ quá trình làm việc với AI từ lúc bắt đầu dự án đến hiện tại (11/09/2026).
+**Phạm vi:** toàn bộ quá trình làm việc với AI từ lúc bắt đầu dự án đến hiện tại (12/09/2026).
 **Mục đích:** một điểm đọc duy nhất, theo đúng trình tự thời gian, gộp lại nội dung đang nằm rải
 rác ở 8 tài liệu trong `Document/` (`01`–`06`, `08`, `09`), `Document/AILog_15082026.md`, 3 Weekly
 Log (W34/W35/W36), Retro 21/08, `PLAYTEST-AUDIT-50-LEVELS.md`, `Final Outputs/
@@ -330,6 +330,9 @@ Solitaire.md`.*
   `selfTest().ok===true` cũ **không đủ** để bắt lỗi "Seal không bao giờ thật sự mở dù goal khác
   của màn đó vẫn đạt" — phải verify riêng bằng `model.sealAdjacentCounts` (tách biệt khỏi
   `model.idCounts`/`S.targetCounts`) và `model.sealOpen===true` sau khi replay `solution`.
+  **Cập nhật (xem Giai đoạn 14): luật kề-sát này bị đảo ngược lại chỉ 1 ngày sau (12/09/2026),
+  theo yêu cầu người dùng** — đoạn trên vẫn đúng làm mốc lịch sử, nhưng không còn phản ánh luật
+  Seal hiện hành.
 - **Đảo thứ tự Chương 2/3** theo yêu cầu người dùng: **Ô Chắn (Permanent)** — cơ chế đơn giản
   hơn, chặn vĩnh viễn không điều kiện — nay dạy trước ở Ch2 (Lv11–20); **Phong Ấn (Seal)** — giờ
   có thêm ràng buộc kề-sát nên phức tạp hơn — dạy sau ở Ch3 (Lv21–30), ngược hẳn thứ tự cũ ở
@@ -360,9 +363,48 @@ Solitaire.md`.*
   giới Q1/2026, 70 triệu DAU/300 triệu MAU, đang mở rộng mạnh ở Việt Nam) và Mahjong Solitaire
   với core hook của Mahjong × Block; tài liệu tự nêu rõ giới hạn phương pháp luận ở mục 7.
 
+## Giai đoạn 14 — 12/09/2026: Đảo ngược luật Seal (kề-sát → đếm khắp bàn, mỗi ô Seal có ngưỡng riêng) + nhiều phiên AI chạy song song
+
+*Nguồn: `Document/08-GDD-LEVEL-DESIGN.md` mục "[Đổi luật 12/09/2026]" (đối chiếu code) · báo cáo
+qua cross-session message của phiên AI khác đang làm việc trên cùng repo (tên phiên
+`mahjong-x-block-b4`), tự xác nhận đã chạy `selfTest()` (33 check, xanh) + kiểm tra thật trên
+Level Editor (không lỗi console) trước khi báo hoàn tất.*
+
+- **Bối cảnh mới đáng chú ý**: kể từ khoảng 11–12/09/2026, dự án được nhiều **phiên Claude Code
+  chạy song song** (quan sát được ít nhất 5 phiên cùng lúc) cùng chỉnh sửa trực tiếp trên
+  `Final Outputs/index.html` và các tài liệu GDD — không phải 1 AI session tuyến tính duy nhất
+  như các Giai đoạn 0–13 phía trên. Hệ quả quan sát được: xung đột ghi-đè thoáng qua (đổi kiểu
+  dấu nháy, giá trị toạ độ Seal lệch giữa 2 lần đọc) do nhiều phiên đọc/ghi cùng 1 file lớn gần
+  như đồng thời — xem [[project_concurrent_session_editing_risk]]. Từ giai đoạn này trở đi, log
+  không còn đảm bảo phản ánh **một** trình tự làm việc duy nhất, mà là tổng hợp các báo cáo từ
+  nhiều phiên khác nhau khi chúng chủ động thông báo qua cross-session message.
+- **Đảo ngược luật Seal đã đổi ở Giai đoạn 13 (11/09/2026), theo yêu cầu người dùng**: bỏ hẳn yêu
+  cầu "match phải kề sát ô Seal" — Seal quay lại đếm số mặt **khác nhau đã match ở BẤT KỲ ĐÂU
+  trên bàn**, dùng chung bộ đếm với TARGET_FACE/Lock (`model.idCounts`); tên `model.
+  sealAdjacentCounts` bị xoá khỏi code.
+- **Nhưng KHÔNG quay lại y hệt bản gốc trước 11/09** — giữ lại 1 thay đổi cấu trúc mới:
+  `level.seals` nay là mảng bộ ba **`[r, c, required]`** (thay vì `[r, c]` dùng chung 1
+  `sealRequiredDistinct` cấp-màn) — **mỗi ô Seal có ngưỡng `required` riêng**, nên nhiều Seal
+  trên cùng 1 bàn có thể mở tại các mốc khác nhau của cùng 1 bộ đếm chung (ví dụ 1 Seal cần 1
+  mặt khác nhau đã mở, Seal khác trên cùng bàn cần 4 mặt mới mở). Thiếu phần tử thứ 3 mặc định
+  `required=1`. Hàm kiểm tra thắng đổi từ `model.sealOpen` (đã xoá) sang
+  `p24kSealsAllOpen(level, model.idCounts)`.
+- **UI**: mỗi ô Seal hiện thêm 1 badge nhỏ hiển thị ngưỡng riêng của chính nó, cộng 1 dòng tổng
+  hợp "đã mở/tổng số Seal" trên HUD.
+- **Phạm vi áp dụng**: cả 17 màn có Seal trong `Final Outputs/index.html`; đồng bộ lại
+  `Document/04-GDD-FINAL-CORE-MASTER.md` và `Document/08-GDD-LEVEL-DESIGN.md`; cập nhật
+  `Final Prototype/level-editor.html` (giao diện soạn Seal đổi từ 1 ô nhập `sealRequiredDistinct`
+  chung sang danh sách Seal từng-ô-một, hàm engine mirror lại đúng logic mới, export/schema
+  dùng cho AI-gen level cũng cập nhật theo) — phiên báo cáo xác nhận thay đổi trong
+  `level-editor.html` chỉ chạm phần code liên quan Seal, không đụng tới các sửa lock/dragstart/
+  faceEmoji mà phiên khác đang làm cùng lúc.
+- **Ghi chú lưu ý khi đọc lại Giai đoạn 11/13 phía trên**: mô tả `sealRequiredDistinct` dùng
+  chung cấp-màn và luật "kề sát" ở các giai đoạn đó **không còn đúng với code hiện hành** — chỉ
+  còn giá trị lịch sử, giải thích vì sao 2 quyết định đó từng được đưa ra và sau đó bị đảo ngược.
+
 ---
 
-## Trạng thái hiện tại — tóm tắt kỹ thuật (tính đến 11/09/2026)
+## Trạng thái hiện tại — tóm tắt kỹ thuật (tính đến 12/09/2026)
 
 *Chi tiết đầy đủ nằm ở `Final Outputs/GAME_DESIGN_DOCUMENT.md` (4 phần theo vai trò) và
 `Document/08-GDD-LEVEL-DESIGN.md`; đây chỉ là gạch đầu dòng để tra nhanh.*
@@ -372,9 +414,11 @@ Solitaire.md`.*
   cùng lúc (nhóm, không chỉ cặp); support mất → quân trên rơi → cascade nhiều wave.
 - **Goal type**: `TILE_QUOTA` (5 màn), `TARGET_FACE` (32), `OPEN_SEAL` (6), `BURIED_TARGET` (7).
 - **Blocker**: Ô Chắn/Permanent (vĩnh viễn, ~28 màn dùng, **nay dạy trước ở Ch2**), Phong Ấn/Seal
-  (N mặt khác nhau + **giờ đòi hỏi match kề sát ô Seal**, ~17 màn, **nay dạy sau ở Ch3**),
-  Khóa/Lock (N quân 1 mặt cụ thể theo từng nhóm ô, ~16 màn). Wild/Joker và Nứt/Crack đã bị gỡ bỏ
-  hoàn toàn (07/09/2026, xem Giai đoạn 10).
+  (đếm số mặt khác nhau đã match **ở bất kỳ đâu trên bàn** — luật "kề sát" của 11/09/2026 đã bị
+  đảo ngược lại 12/09/2026; mỗi ô Seal nay có ngưỡng `required` riêng qua `level.seals=[r,c,
+  required]`, không còn 1 `sealRequiredDistinct` dùng chung cho cả màn — 17 màn, **nay dạy sau ở
+  Ch3**), Khóa/Lock (N quân 1 mặt cụ thể theo từng nhóm ô, ~16 màn). Wild/Joker và Nứt/Crack đã
+  bị gỡ bỏ hoàn toàn (07/09/2026, xem Giai đoạn 10).
 - **Nội dung**: 50 level (5 chương × 10, **thứ tự Ch2/Ch3 đã đảo so với bản trước 11/09/2026**),
   mỗi level có solution giải sẵn + verify tự động; chỉ Lv1 còn giữ `guideMoves` (auto-guide).
 - **Booster**: Đổi khối + Hint, kho dùng chung toàn game (không theo từng level), nạp thêm qua
@@ -436,6 +480,15 @@ Solitaire.md`.*
 `Document/09-TONG-HOP-AI-LOG-TOAN-DU-AN.md` (bản 09/09/2026, tiền thân trực tiếp của tài liệu
 này) · `Final Outputs/GAME_DESIGN_DOCUMENT.md` (thay thế `07-GDD-TONG-HOP-TU-INDEX.md` cũ) ·
 `Document/Market-Research-Block-Puzzle-va-Mahjong-Solitaire.md` · git log của repo (`6772a7d`,
-`132aa50`, `348eb39`, `8b97d5e`) · danh sách file trong `Document/`, `Final Outputs/`,
-`Final Prototype/`, `Level Design Document/`, `Figma UI Export/` (đối chiếu timestamp để xác
-nhận hoạt động gần nhất, không suy diễn nội dung chưa có changelog).
+`132aa50`, `348eb39`, `8b97d5e`, `af089b5`) · `Document/08-GDD-LEVEL-DESIGN.md` mục
+"[Đổi luật 12/09/2026]" · cross-session message từ phiên AI khác (`mahjong-x-block-b4`) đang làm
+việc song song trên cùng repo, báo cáo đã tự verify bằng `selfTest()` + Level Editor trước khi
+xác nhận hoàn tất · danh sách file trong `Document/`, `Final Outputs/`, `Final Prototype/`,
+`Level Design Document/`, `Figma UI Export/` (đối chiếu timestamp để xác nhận hoạt động gần
+nhất, không suy diễn nội dung chưa có changelog).
+
+*Lưu ý về nguồn từ 12/09/2026 trở đi: một phần nội dung Giai đoạn 14 dựa trên báo cáo do chính
+phiên AI thực hiện thay đổi tự thuật lại qua cross-session message (không phải do phiên viết tài
+liệu này tự đọc code xác minh), đối chiếu với `08-GDD-LEVEL-DESIGN.md` để tăng độ tin cậy. Do
+nhiều phiên AI đang chạy song song trên cùng file (xem [[project_concurrent_session_editing_risk]]),
+các con số/tên hàm cụ thể ở Giai đoạn 14 có thể lệch nếu có thêm chỉnh sửa sau thời điểm viết.*

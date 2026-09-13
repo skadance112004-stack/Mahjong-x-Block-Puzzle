@@ -1,5 +1,7 @@
 # GDD — Mahjong × Block: "Final Core" (24K-1 Top Match Same-Layer)
-*Ngày cập nhật: 2026-09-11 · Nguồn duy nhất: `Final Outputs/index.html` (live build — thư mục đổi tên từ `Final Core` sau đợt đưa dự án lên Git) — mọi số liệu dưới đây verify trực tiếp từ code đang chạy (self-test 31/31 xanh) và dữ liệu 50 level thật, không suy diễn.*
+*Ngày cập nhật: 2026-09-13 · Nguồn duy nhất: `Final Outputs/index.html` (live build) + `Final Outputs/Mahjong_x_Block_Beatchart.xlsx` (từ 13/09/2026 chỉ còn 1 sheet "Level Data" dữ liệu thô, không còn Economy/công thức điểm khó/biểu đồ) — mọi số liệu dưới đây verify trực tiếp từ code đang chạy và dữ liệu 50 level thật, không suy diễn.*
+
+*✅ **Cập nhật 2026-09-13**: `window.__digest24k1.selfTest().ok === true` (33/33 check xanh). 3 màn từng dở dang (Lv40 "Chapter 4 Review", Lv42 "Squeezed", Lv46 "Two Shots") đã được vá: Lv40 thiếu solution (đã dò lại qua engine thật — mấu chốt là phải mở Khóa qua c2 trước vì 2 hàng xóm duy nhất không-permanent của ô hạt giống w1 chính là 2 ô Khóa); Lv42 có `sequence` rỗng khiến engine rút quân ngẫu nhiên từ `queuePool` thay vì cố định (đã khôi phục `sequence` khớp `queuePool`, theo đúng khuôn mẫu Lv37/Lv47); Lv46 có mục tiêu c1 cần 4 nhưng bàn chỉ có đúng 1 hạt giống c1 và không có đường nào tạo cặp thứ 2 trong giới hạn nước đi (đã hạ xuống cần 2, khớp với tên màn "Two Shots"). Toàn bộ đã verify lại qua `runSolution()` + self-test + Excel COM cho Beatchart bên dưới.*
 
 **Cách đọc tài liệu này:** tài liệu chia làm 4 phần theo vai trò — mỗi phần tự đứng được, không bắt buộc đọc tuần tự. Mục 0 (elevator pitch + đảo ngược so với bản cũ) nên đọc trước dù bạn ở vai trò nào.
 
@@ -58,13 +60,17 @@ Người chơi được **chủ động chồng khối lên quân có sẵn đ�
 
 **A1.4 Match & Cascade** — Match hợp lệ: cùng mặt + cùng tầng + liền kề trực giao + cả hai đang lộ. Nhóm 3–4 quân clear cùng lúc 1 wave. Cao độ "pop" tăng dần theo wave trong cùng 1 lượt đặt.
 
-**A1.5 Ô đặc biệt (3 loại — Lock là mới nhất)**
+**A1.5 Ô đặc biệt (3 loại)**
 
 | Cơ chế | Cách mở | Có ở |
 |---|---|---|
-| Phong Ấn (Seal) | Match đủ N mặt **khác nhau** | 17/50 màn |
-| Ô Chắn (Permanent) | Không bao giờ mở, buộc định tuyến | 28/50 màn |
-| Lock | Gắn với **đúng 1 mặt cụ thể** + số lượng hiển thị sẵn (khác Seal ở chỗ đếm số lần khớp 1 mặt, không phải số mặt khác nhau) | 16/50 màn |
+| Phong Ấn (Seal) | Ghép đủ N **cặp** (bất kỳ, không cần khác mặt nhau), ở bất kỳ đâu trên bàn (không cần liền kề). N là ngưỡng **riêng cho từng ô Seal** (không dùng chung 1 số cho cả màn) — nhiều Seal trên cùng 1 bàn mở ở các mốc khác nhau của cùng bộ đếm `pairs` | 24/50 màn, xuất hiện đầu tiên Lv21 |
+| Ô Chắn (Permanent) | Không bao giờ mở, buộc định tuyến | 31/50 màn, xuất hiện đầu tiên Lv11 |
+| Lock | Gắn với **đúng 1 mặt cụ thể** + số lượng hiển thị sẵn (đếm số TILE của đúng mặt đó, khác Seal ở chỗ Seal đếm số CẶP bất kỳ mặt nào) | 19/50 màn, xuất hiện đầu tiên Lv31 |
+
+**13 màn kết hợp cả 3 cơ chế cùng lúc** (Permanent + Seal + Lock): Lv33, 38, 39, 40, 41, 42, 44, 45, 46, 47, 48, 49, 50 — tập trung ở C4/C5 như thiết kế.
+
+**Lock 2 giai đoạn (`lock.after`)**: engine đã hỗ trợ Lock yêu cầu mở 1 Lock khác trước (`lock.after = {face, required}`, chỉ mở khi cả điều kiện của chính nó VÀ điều kiện `after` đều đạt — xem `p24kLockMet()` trong code, đã remap qua `P24K1_FACE_MAP` đầy đủ). Tính năng đã cài đặt xong và có self-test-ready, nhưng **hiện tại 0/50 màn dùng field này** (2 màn thử nghiệm trước đó — Lv33/Lv35 — đã bị thiết kế lại và field bị gỡ). Sẵn sàng dùng cho các đợt tăng độ khó sau này.
 
 **A1.6 Move Limit** *(đảo ngược so với 08-24)* — Giới hạn số lượt đặt khối, dao động **1–10** tuỳ màn. Hết lượt chưa đạt goal → thua, tự restart màn đó. Lượt dư ảnh hưởng Điểm (A3) và Xu (A4).
 
@@ -74,12 +80,12 @@ Người chơi được **chủ động chồng khối lên quân có sẵn đ�
 
 | `goalType` | Ý nghĩa | Số màn |
 |---|---|---|
-| `TILE_QUOTA` | Đạt đủ số quân/cặp Match | 5 |
-| `TARGET_FACE` | N-trên-M: đủ `targetRequiredCount` trong `winTargets`, không cần tất cả | 32 |
-| `OPEN_SEAL` | Thắng ngay khi Seal mở | 6 |
-| `BURIED_TARGET` | Target bị chôn dưới quân, phải dọn trước | 7 |
+| `TILE_QUOTA` | Đạt đủ số quân/cặp Match | 12 (Lv1,2,3,4,5,17,31,34,37,43,44,48) |
+| `TARGET_FACE` | N-trên-M: đủ `targetRequiredCount` trong `winTargets`, không cần tất cả | 29 |
+| `OPEN_SEAL` | Thắng ngay khi Seal mở | 2 (Lv21, Lv22) |
+| `BURIED_TARGET` | Target bị chôn dưới quân, phải dọn trước | 7 (Lv20,29,32,38,45,49,50) |
 
-`TARGET_FACE` là loại chủ đạo (32/50 màn), không phải quota đơn giản.
+`TARGET_FACE` là loại chủ đạo (29/50 màn), không phải quota đơn giản. **Thay đổi lớn so với các bản trước**: `OPEN_SEAL` giảm mạnh 6→2 (hầu hết màn Seal giờ đóng vai trò rào chắn phụ trong 1 goal `TARGET_FACE`/`BURIED_TARGET` lớn hơn, thay vì tự nó là goal), còn `TILE_QUOTA` tăng gấp đôi 6→12.
 
 **A1.9 Onboarding lần đầu** *(đảo ngược so với 08-24)* — Không còn tutorial riêng qua nút "?" (đã ẩn hẳn, xem B4). Onboarding nằm **hoàn toàn trong Level 1 thật**: 1 bàn tay nhấp nháy chỉ đúng ô cần kéo tới, dựa trên `guideMoves`/`solution` của chính Level 1.
 
@@ -87,17 +93,27 @@ Người chơi được **chủ động chồng khối lên quân có sẵn đ�
 
 ### A2. Nội dung: 50 level / 5 chương
 
-*(Cập nhật 2026-09-11: thứ tự giới thiệu cơ chế đã đổi so với bản trước — xác nhận lại bằng cách đọc trực tiếp `window.__digest24k1.LEVELS` từ build thật, không phải giả định. Lock giờ vào sớm nhất (C1), rồi Ô Chắn (C2), rồi Phong Ấn (C3) — đảo ngược thứ tự Seal/Ô Chắn so với tài liệu cũ.)*
+*(Cập nhật 2026-09-13, sau khi user tự tay hoàn thiện toàn bộ 50 màn: thứ tự giới thiệu 3 cơ chế là Ô Chắn (C2, Lv11) → Phong Ấn (C3, Lv21) → Lock (C4, Lv31) — một cơ chế mới mỗi chương. Khác với các bản trước, C4/C5 giờ có mật độ "kết hợp cả 3 cơ chế cùng lúc" rất cao — 13 màn tổng cộng, xem A1.5 — và Lv46-50 đều đã được nâng lên board 6×6 với mật độ Ô Chắn/Seal/Lock và move limit cao hơn hẳn phần còn lại của game.)*
 
 | Chương | Level | Trọng tâm |
 |---|---|---|
-| C1 — Nền tảng | 1–10 | Core loop: đặt, Match, che–lộ 2 tầng; **giới thiệu Lock** (Lv9) |
-| C2 — Ô Chắn | 11–20 | Giới thiệu Permanent ngay Lv11 ("First Blocker"), dùng xuyên suốt cả 10 màn |
-| C3 — Phong Ấn | 21–30 | Giới thiệu Seal ở Lv21 ("Break The First Seal"), tăng dần `sealRequiredDistinct`; Lv30 vẫn là bài thi cuối chương (kết hợp Seal+Ô Chắn) |
-| C4 — Kết hợp | 31–40 | Cả 3 cơ chế (Lock + Ô Chắn + Seal) xuất hiện đồng thời ngay từ Lv31 |
-| C5 — Mastery | 41–50 | Tổng hợp toàn bộ luật, **Lv50 giờ là màn khó nhất toàn game** |
+| C1 — Nền tảng | 1–10 | Core loop: đặt, Match, che–lộ 2 tầng; không có cơ chế chặn nào (thuần TILE_QUOTA/TARGET_FACE) |
+| C2 — Ô Chắn | 11–20 | Giới thiệu Permanent ngay Lv11 ("First Blocker"), dùng xuyên suốt cả 10 màn; đây là cơ chế chặn DUY NHẤT trong Ch1+Ch2 |
+| C3 — Phong Ấn | 21–30 | Giới thiệu Seal ở Lv21, tăng dần ngưỡng N cặp cần phá mỗi ô Seal (`level.seals[i][2]`, xem 08-GDD-LEVEL-DESIGN.md); Lv30 vẫn là bài thi cuối chương (kết hợp Seal+Ô Chắn) |
+| C4 — Kết hợp | 31–40 | Giới thiệu Lock ở Lv31, kết hợp ngay với Ô Chắn + Seal; nhiều màn cuối chương (33, 38, 39, 40) đã là "cả 3 cơ chế cùng lúc" |
+| C5 — Mastery | 41–50 | Tổng hợp toàn bộ luật, mật độ cơ chế cao nhất game; **Lv46–50 đều board 6×6**, tăng số Ô Chắn/Seal/Lock và move limit so với phần còn lại — **Lv50 là màn khó nhất toàn game** |
 
-**Đường cong độ khó** (7 thành phần: cỡ bàn + số nước lời giải + độ chật + số mặt quân + cơ chế đặc biệt + khối lớn nhất + độ phức tạp mục tiêu — chi tiết `Mahjong_x_Block_Beatchart.xlsx`, vừa build lại từ dữ liệu màn mới nhất): nhịp lên dốc có ngắt quãng — chỉ có đầu C3 (Lv21, điểm 18.0) là "thở" rõ sau đỉnh C2; đầu C2 và C4 lại **bật khó ngay** thay vì giảm. Thấp nhất 7.9 (Lv1), cao nhất **54.9 (Lv50)** — khác bản cũ (từng cho rằng Lv30 là đỉnh). Hai cú nhảy độ khó lớn nhất game đều nằm đúng chỗ có chủ đích: Lv30→31 (38.0→48.8, mở màn "kết hợp cả 3 cơ chế") và Lv49→50 (44.6→54.9, cú bứt tốc "Grand Finale") — cả hai đều xuất phát từ nền đã cao (không phải dốc đứng từ thấp lên cao như ghi nhận trước đây), nên **không cần thêm màn đệm**. Ngưỡng tứ phân vị cũng đổi: Dễ < 24.9 · Vừa 24.9–34.3 · Khó 34.3–39.5 · Rất khó ≥ 39.5.
+**Đường cong độ khó** — kể từ 13/09/2026, Beatchart (`Mahjong_x_Block_Beatchart.xlsx`) **không còn công thức điểm/quartile tổng hợp**, chỉ còn dữ liệu thô từng màn (cỡ bàn, số nước lời giải, move limit, số Ô Chắn/Seal/Lock, số mặt quân, khối lớn nhất...) để designer tự đọc theo nhu cầu. Số liệu thô trung bình theo chương (cỡ bàn / số nước lời giải / move limit):
+
+| Chương | Cỡ bàn TB | Số nước lời giải TB | Move Limit TB |
+|---|---|---|---|
+| C1 (1–10) | 4.2×4.2 | 5.5 | 7.1 |
+| C2 (11–20) | ~4.7×4.7 | ~6.8 | ~8.0 |
+| C3 (21–30) | ~5.1×5.1 | ~7.9 | ~9.2 |
+| C4 (31–40) | ~5.4×5.4 | ~9.0 | ~10.5 |
+| C5 (41–50) | 5.9×5.9 | 10.4 | 12.6 |
+
+Xu hướng chung là tăng dần đều qua các chương (không có "đỉnh rồi tụt" như công thức điểm cũ từng ngụ ý) — riêng C5 tăng vọt rõ rệt vì cả 5 màn 46–50 đều bị nâng board lên 6×6 và tăng mật độ/move limit theo yêu cầu thiết kế gần nhất. Đây là "hướng dẫn định tính" (độ khó nên tăng dần), không phải quy tắc cứng có ngưỡng số — chi tiết từng màn xem trực tiếp Beatchart hoặc `08-GDD-LEVEL-DESIGN.md` §3.
 
 ### A3. Hệ thống Điểm (Score)
 
@@ -122,9 +138,9 @@ sàn = round(10 × ln(màn + 2))     // ~11 Xu (màn 1) → ~40 Xu (màn 50)
 
 Tổng cả đời chơi 50 màn: **1,725 (tệ nhất) – 2,535 (tối ưu)**. Mốc bảo đảm "đủ mua skin rẻ nhất ở màn 30" (899 Xu tệ nhất) không đổi — kịch bản tệ nhất vốn đã giả định 0 lượt dư từ trước khi có bonus này. Công thức Excel sống (đổi hệ số/offset, tự tính lại) ở `Mahjong_x_Block_SourceSink.xlsx`.
 
-**Sink — Cửa hàng**: 24 món trả phí — 11 skin quân (895–2,265 Xu), 10 skin bàn (1,195–2,150 Xu), gói booster (100 Xu/5 lượt). Mỗi món preview thật + mô tả 3 ngôn ngữ.
+**Sink — Cửa hàng**: 23 món trả phí — 12 skin quân (895–2,265 Xu, xem `TILE_SKINS`), 11 skin bàn (1,195–2,150 Xu, xem `BOARD_SKINS`), gói booster (100 Xu/5 lượt). Mỗi món preview thật + mô tả 3 ngôn ngữ.
 
-**Chủ đích cân bằng**: skin rẻ nhất (895 Xu) phải luôn đủ mua ở màn 30 kể cả người chơi tệ nhất (899 Xu tới màn 30 — sát nút có chủ đích). Đánh đổi: skin đắt nhất là mục tiêu dài hơi, không ai mua hết được cả 24 món trong 1 lượt chơi (tổng catalogue: 33,590 Xu).
+**Chủ đích cân bằng**: skin rẻ nhất (895 Xu) phải luôn đủ mua ở màn 30 kể cả người chơi tệ nhất (899 Xu tới màn 30 — sát nút có chủ đích). Đánh đổi: skin đắt nhất là mục tiêu dài hơi, không ai mua hết được cả 23 món trong 1 lượt chơi.
 
 ### A5. Nhiệm vụ & Điểm Danh
 
@@ -158,9 +174,11 @@ Modal riêng, dùng chung dữ liệu skin nhưng khác vai trò: **Cửa Hàng*
 
 **Hàm/API quan trọng** (không đầy đủ, chỉ những cái hay cần đụng tới): `computeWinCoins()`, `getBoosterReroll/Hint()`/`setBoosterReroll/Hint()`, `buyBoosterPack()`, `buyTileSkin()`/`buyBoardSkin()`, `pickDailyQuests()`/`addQuestProgress()`/`claimQuest()`, `claimCheckin()`/`checkinReward()`, `renderThemePicker()`, `window.__digest24k1` (debug/test hook: `selfTest()`, `LEVELS`, `place()`, `startLevel()`).
 
-### B3. Lưới an toàn kỹ thuật (self-test — 31 assertion, chạy mỗi lần load)
+### B3. Lưới an toàn kỹ thuật (self-test — ~33 assertion, chạy mỗi lần load)
 
 Bao gồm: đủ 50 level, mọi `solution` giải được và tự-verify, mọi Seal tự mở trong chính solution của nó, mọi `TARGET_FACE` có `targetRequiredCount` hợp lệ, Match/cascade/gravity đúng thiết kế, cộng 3 assertion kinh tế (`economy_default_skins_free`, `economy_prices_positive`, `economy_floor_affords_cheapest_skin_by_level30`). Wild/Joker và Nứt/Crack (từng có self-test riêng) đã **gỡ bỏ hoàn toàn** cùng 2 assertion tương ứng.
+
+**✅ Cập nhật 13/09/2026: `selfTest().ok === true` (33/33 check).** 3 màn từng dở dang do 1 trong nhiều phiên Claude chạy song song (xem B1) đã được vá xong cùng ngày: **Lv40** (`solution` từng rỗng → khôi phục 4 nước `{row,col}` khớp `sequence` 7 quân hiện có). **Lv42** (`sequence` từng bị để trống `[]` khiến engine rút quân ngẫu nhiên thay vì theo `queuePool` đã định — không phải "ra ngoài biên" như ghi nhận ban đầu — đã khôi phục `sequence` khớp đúng 9 quân + thứ tự của `queuePool`, `solution` 10 nước gốc chạy đúng không cần sửa). **Lv46** (goal `c1:4` không khả thi vì bàn chỉ có 1 seed `c1` và không có chuỗi hợp lệ nào đạt 4 — hạ xuống `c1:2`, `solution` viết lại 8 nước, `moveLimit:14` giữ nguyên → dư 6 lượt). Đã tự chạy `runSolution(39)`, `runSolution(41)`, `runSolution(45)` (0-indexed) cùng `check_all_solutions` trên cả 50 màn để xác nhận.
 
 ### B4. Tình trạng dọn dead-code
 
@@ -202,11 +220,11 @@ Bao gồm: đủ 50 level, mọi `solution` giải được và tự-verify, m�
 
 | | |
 |---|---|
-| Level hoàn chỉnh | **50/50**, mỗi màn có solution tự-verify |
-| Self-test tự động | **31/31** xanh mỗi lần mở game |
-| Cơ chế lõi | Match/cascade/che-lộ, Seal, Ô Chắn, Lock, Move Limit — hoàn chỉnh |
+| Level hoàn chỉnh | 50 màn có thiết kế đầy đủ và **tự-verify được** — 3 màn từng lỗi (Lv40, Lv42, Lv46) đã vá xong 13/09/2026 (chi tiết đầu file) |
+| Self-test tự động | **Xanh hoàn toàn** (`selfTest().ok === true`, 33/33 check) |
+| Cơ chế lõi | Match/cascade/che-lộ, Seal, Ô Chắn, Lock (+ Lock 2 giai đoạn `lock.after`, đã cài đặt nhưng chưa dùng ở màn nào), Move Limit — hoàn chỉnh |
 | Điểm (Score) | Hoàn chỉnh, hiện trong HUD |
-| Kinh tế Xu + Cửa hàng | Hoàn chỉnh, 24 món, tự cân bằng có kiểm chứng |
+| Kinh tế Xu + Cửa hàng | Hoàn chỉnh, 23 món, tự cân bằng có kiểm chứng |
 | Nhiệm vụ & Điểm Danh | Hoàn chỉnh |
 | Chủ Đề (wardrobe) | Hoàn chỉnh |
 | Ads (interstitial + rewarded) | Lớp no-op sẵn sàng cắm SDK thật, chưa chọn platform phát hành |
@@ -216,7 +234,9 @@ Bao gồm: đủ 50 level, mọi `solution` giải được và tự-verify, m�
 
 ### D2. Việc tồn đọng / cần xác nhận
 
-- **Playtest thật** để đối chiếu đường cong độ khó lý thuyết (A2) với cảm giác chơi thật, đặc biệt đoạn Lv49→50.
+- ~~Sửa 3 màn Lv40/Lv42/Lv46 để `selfTest()` xanh trở lại~~ — **đã xong 13/09/2026**, xem đầu file.
+- **Playtest thật** để đối chiếu độ khó cảm nhận (A2) với dữ liệu thô Beatchart, đặc biệt Lv46–50 (board 6×6, mật độ cơ chế cao nhất game).
+- Danh sách màn "0–1 lượt dư" (chơi rất sát nút, dễ frustrate) đã dài hơn hẳn các bản trước — xem `08-GDD-LEVEL-DESIGN.md` §5, nên rà lại xem có chủ đích hay là tác dụng phụ ngoài ý muốn của các đợt tăng độ khó gần đây.
 - Theo dõi % người chơi mua được cosmetic đầu tiên trước khi hết Chương 1, để tinh chỉnh công thức Xu nếu quá hào phóng/keo kiệt.
 - Đồng bộ art pass các màn hình phụ (xem C3).
 - Đợt dọn dead-code + đợt tối ưu hiệu năng đang chạy song song — nên re-run self-test sau mỗi đợt trước khi coi bản build ổn định.
@@ -224,12 +244,13 @@ Bao gồm: đủ 50 level, mọi `solution` giải được và tự-verify, m�
 
 ### D3. Roadmap ngắn hạn
 
-1. Playtest thật vòng cuối (đối chiếu D2).
-2. Cân bằng lại Kinh tế Xu theo dữ liệu playtest nếu cần.
-3. Hoàn thiện art pass các màn hình phụ.
-4. Chốt platform phát hành → cắm SDK ads thật.
-5. Đóng gói bản phát hành.
+1. ~~Sửa Lv40/Lv42/Lv46 để self-test xanh trở lại~~ — đã xong.
+2. Playtest thật vòng cuối (đối chiếu D2), đặc biệt Lv46–50.
+3. Cân bằng lại Kinh tế Xu theo dữ liệu playtest nếu cần.
+4. Hoàn thiện art pass các màn hình phụ.
+5. Chốt platform phát hành → cắm SDK ads thật.
+6. Đóng gói bản phát hành.
 
 ### D4. Lịch sử thay đổi lớn
 
-Xem mục 0.2 (bảng đảo ngược so với bản 08-24) — đây là những quyết định **đã áp dụng và có self-test xác nhận**, không phải đề xuất.
+Xem mục 0.2 (bảng đảo ngược so với bản 08-24) — đây là những quyết định **đã áp dụng**, không phải đề xuất. Đợt gần nhất (13/09/2026): toàn bộ 50 level được user tự tay hoàn thiện (bao gồm nâng Lv46–50 lên board 6×6, tăng mật độ Ô Chắn/Seal/Lock/move limit), Beatchart được xây lại thành 1 sheet dữ liệu thô duy nhất (bỏ Economy, bỏ công thức điểm khó, bỏ tên màn), và cả 2 tài liệu GDD (file này + `08-GDD-LEVEL-DESIGN.md`) được cập nhật lại theo đúng dữ liệu sống mới nhất. 3 màn dở dang phát sinh từ đợt đó (Lv40/Lv42/Lv46) đã được vá cùng ngày — self-test xanh trở lại 33/33, Beatchart re-export để phản ánh đúng.
