@@ -185,6 +185,11 @@ body{
      bàn cờ LUÔN vừa đúng phần còn lại, không bao giờ cần cuộn/đè nữa. */
   width:min(100%, calc(100svh - 320px)); flex:none;
   display:grid; gap:3px; padding:6px; border-radius:14px;
+  /* [Tối ưu hiệu năng 13/09/2026] contain:layout+paint khoanh vùng reflow/repaint vào riêng
+     bàn cờ -- renderBoard() build lại toàn bộ innerHTML bàn cờ mỗi lượt/mỗi wave cascade,
+     nếu không có contain thì mỗi lần đó trình duyệt phải cân nhắc ảnh hưởng layout lên CẢ
+     TRANG, không chỉ vùng bàn. Không đổi hình ảnh hiển thị, chỉ giảm việc tính toán. */
+  contain:layout paint;
   background:var(--tex-wood), linear-gradient(160deg,var(--panel),var(--panel2));
   border:1px solid rgba(232,182,76,.22);
   box-shadow:inset 0 2px 10px rgba(0,0,0,.5), 0 6px 18px rgba(0,0,0,.35);
@@ -305,6 +310,7 @@ body{
 @keyframes floatup{0%{transform:translate(-50%,0) scale(.7); opacity:0}25%{transform:translate(-50%,-12px) scale(1.15); opacity:1}100%{transform:translate(-50%,-46px) scale(1); opacity:0}}
 .spark{position:fixed; z-index:75; width:6px; height:6px; border-radius:50%; pointer-events:none;}
 .shard{position:fixed; z-index:76; width:7px; height:9px; border-radius:2px; pointer-events:none; box-shadow:0 1px 3px rgba(0,0,0,.4);}
+.dust{position:fixed; z-index:76; border-radius:50%; pointer-events:none; filter:blur(.4px);}
 
 /* ---------- OVERLAY ---------- */
 /* display:none/flex trước đây KHÔNG animate được (display không phải thuộc
@@ -892,6 +898,11 @@ body{
      bàn cờ LUÔN vừa đúng phần còn lại, không bao giờ cần cuộn/đè nữa. */
   width:min(100%, calc(100svh - 320px)); flex:none;
   display:grid; gap:3px; padding:6px; border-radius:14px;
+  /* [Tối ưu hiệu năng 13/09/2026] contain:layout+paint khoanh vùng reflow/repaint vào riêng
+     bàn cờ -- renderBoard() build lại toàn bộ innerHTML bàn cờ mỗi lượt/mỗi wave cascade,
+     nếu không có contain thì mỗi lần đó trình duyệt phải cân nhắc ảnh hưởng layout lên CẢ
+     TRANG, không chỉ vùng bàn. Không đổi hình ảnh hiển thị, chỉ giảm việc tính toán. */
+  contain:layout paint;
   background:var(--tex-wood), linear-gradient(160deg,var(--felt),var(--felt2));
   border:1px solid rgba(232,182,76,.22);
   box-shadow:inset 0 2px 10px rgba(0,0,0,.5), 0 6px 18px rgba(0,0,0,.35);
@@ -1018,6 +1029,7 @@ body{
 @keyframes floatup{0%{transform:translate(-50%,0) scale(.7); opacity:0}25%{transform:translate(-50%,-12px) scale(1.15); opacity:1}100%{transform:translate(-50%,-46px) scale(1); opacity:0}}
 .spark{position:fixed; z-index:75; width:6px; height:6px; border-radius:50%; pointer-events:none;}
 .shard{position:fixed; z-index:76; width:7px; height:9px; border-radius:2px; pointer-events:none; box-shadow:0 1px 3px rgba(0,0,0,.4);}
+.dust{position:fixed; z-index:76; border-radius:50%; pointer-events:none; filter:blur(.4px);}
 
 /* ---------- OVERLAY ---------- */
 /* display:none/flex trước đây KHÔNG animate được (display không phải thuộc
@@ -3192,6 +3204,33 @@ function shatter(x,y,color){
     setTimeout(()=>s.remove(),dur+50);
   }
 }
+/* Soft round motes drifting UP and fading — the organic counterpart to shatter()'s angular
+   debris falling DOWN. Used for Seal (bamboo plank) breaking: bamboo doesn't shatter into
+   hard shards, it crumbles into dust/pollen that rises and dissolves. Lock (icy plate) keeps
+   shatter() instead, since ice cracking into flying fragments is the right material read. */
+function dustRise(x,y,color){
+  if(S.fast) return;
+  const n=14;
+  for(let i=0;i<n;i++){
+    const d=document.createElement('div'); d.className='dust';
+    const size=3+Math.random()*4;
+    d.style.width=size+'px'; d.style.height=size+'px';
+    d.style.left=x+'px'; d.style.top=y+'px';
+    d.style.background=color||'#e8b64c';
+    d.style.boxShadow=`0 0 6px ${color||'#e8b64c'}`;
+    document.body.appendChild(d);
+    const spreadX=(Math.random()*2-1)*46;
+    const riseY=-(60+Math.random()*70);
+    const midX=spreadX*.4, midY=riseY*.35;
+    const dur=650+Math.random()*420;
+    d.animate([
+      {transform:'translate(-50%,-50%) scale(.6)',opacity:0,offset:0},
+      {transform:`translate(${midX}px,${midY}px) scale(1.15)`,opacity:.95,offset:.3},
+      {transform:`translate(${spreadX}px,${riseY}px) scale(.2)`,opacity:0,offset:1}
+    ],{duration:dur, easing:'cubic-bezier(.2,.6,.3,1)'});
+    setTimeout(()=>d.remove(),dur+50);
+  }
+}
 const PRAISE_WORDS=['NICE!','GREAT!','AWESOME!'];
 const PRAISE_COLORS=['#8fbf52','#ffd670','#ff9d4d'];
 /* ------------------------------ TURN ------------------------------------ */
@@ -4231,7 +4270,7 @@ const P24M_LEVELS=[
   goalType: "TILE_QUOTA",
   tileGoal: 6,
   guideMoves: 0,
-  moveLimit: 6,
+  moveLimit: 15, // [Beatchart sync 2026-09-13] 6->15
   lesson: "ONE PIECE PER TURN · READ THE NEXT QUEUE",
   teach: "",
   tiles: [
@@ -4256,7 +4295,7 @@ const P24M_LEVELS=[
   goalType: "TILE_QUOTA",
   tileGoal: 6,
   guideMoves: 0,
-  moveLimit: 7,
+  moveLimit: 15, // [Beatchart sync 2026-09-13] 7->15
   boosterReroll: 1,
   boosterHint: 1,
   lesson: "MIXED HEIGHT LANDING PER CELL",
@@ -4292,7 +4331,7 @@ const P24M_LEVELS=[
   goalType: "TILE_QUOTA",
   tileGoal: 8,
   guideMoves: 0,
-  moveLimit: 7,
+  moveLimit: 15, // [Beatchart sync 2026-09-13] 7->15
   boosterReroll: 1,
   boosterHint: 1,
   lesson: "SAME FACE DIFFERENT TIER NO MATCH",
@@ -4323,7 +4362,7 @@ const P24M_LEVELS=[
     goalType: 'TILE_QUOTA',
     tileGoal: 10,
     guideMoves: 0, // auto-guide highlight removed from every level except Lv1
-    moveLimit: 6,
+    moveLimit: 15, // [Beatchart sync 2026-09-13] 6->15
     boosterReroll: 1,
     boosterHint: 1,
     lesson: 'ROOF MATCH REVEALS FLOOR WAVE TWO',
@@ -4366,7 +4405,7 @@ const P24M_LEVELS=[
     // puzzle-design-6-muc-tieu.md §3). A 4th mandatory target was added (goal total was 6,
     // dipping below Lv2's quota of 8). Auto-guide highlight removed from every level except Lv1.
     guideMoves: 0,
-    moveLimit: 8,
+    moveLimit: 15, // [Beatchart sync 2026-09-13] 8->15
     boosterReroll: 1,
     boosterHint: 1,
     lesson: 'FOURTH FACE OPEN BOARD',
@@ -4419,7 +4458,7 @@ const P24M_LEVELS=[
     // feedback, even for a "peak" level -- still the local difficulty peak, just not a
     // literal zero-margin-for-error one anymore.
     guideMoves: 0,
-    moveLimit: 9,
+    moveLimit: 15, // [Beatchart sync 2026-09-13] 9->15
     boosterReroll: 1,
     boosterHint: 1,
     lesson: 'PEAK 1 OF 3 — THREE FACES, ONE 3-TILE CASCADE',
@@ -4456,7 +4495,7 @@ const P24M_LEVELS=[
   goalType: "TARGET_FACE",
   winTargets: [{id:"s1",need:2}, {id:"w1",need:2}, {id:"s2",need:2}, {id:"c1",need:2}],
   guideMoves: 0,
-  moveLimit: 6,
+  moveLimit: 15, // [Beatchart sync 2026-09-13] 6->15
   boosterReroll: 1,
   boosterHint: 1,
   lesson: "ONE TRIOMINO SPANS TWO HEIGHTS",
@@ -4498,7 +4537,7 @@ const P24M_LEVELS=[
     // Auto-guide highlight removed from every level except Lv1.
     // 5th target (h1) + move 5 added for the game-wide +1-move scale-up pass.
     guideMoves: 0,
-    moveLimit: 8,
+    moveLimit: 15, // [Beatchart sync 2026-09-13] 8->15
     boosterReroll: 1,
     boosterHint: 1,
     lesson: 'MATCH C1/W1 IN ONE WAVE, THEN S1/S2 IN THE NEXT',
@@ -4531,7 +4570,7 @@ const P24M_LEVELS=[
   goalType: "TARGET_FACE",
   winTargets: [{id:"w1",need:2}, {id:"s1",need:4}],
   guideMoves: 0,
-  moveLimit: 10,
+  moveLimit: 15, // [Beatchart sync 2026-09-13] 10->15
   boosterReroll: 1,
   boosterHint: 1,
   lesson: "CURRENT NEXT PREVIEW · MIXED HEIGHT · TWO WAVE CASCADE",
@@ -4602,7 +4641,7 @@ const P24M_LEVELS=[
   winTargets: [{id:"s1",need:3}, {id:"w1",need:3}, {id:"s2",need:3}],
   permanents: [[1,2], [2,2]],
   guideMoves: 0,
-  moveLimit: 7,
+  moveLimit: 12, // [Beatchart sync 2026-09-13] 7->12
   boosterHint: 1,
   lesson: "TWO BLOCKERS FORM A WIDE NOTCH — ROUTE TWO WAVES AROUND IT",
   teach: "",
@@ -4809,7 +4848,7 @@ const P24M_LEVELS=[
   winTargets: [{id:"s1",need:3}, {id:"c1",need:3}, {id:"w1",need:3}],
   permanents: [[5,0], [5,1], [5,2], [0,5], [1,5], [2,5]],
   guideMoves: 0,
-  moveLimit: 9,
+  moveLimit: 14, // [Beatchart sync 2026-09-13] 9->14
   boosterHint: 1,
   lesson: "ALL SIX FACES — SIXTH FACE (F) A FREE BONUS",
   teach: "",
@@ -4844,7 +4883,7 @@ const P24M_LEVELS=[
   winTargets: [{id:"s1",need:4}, {id:"c1",need:5}, {id:"w1",need:4}],
   permanents: [[4,4], [4,5], [5,4], [5,5], [1,4], [1,5], [2,4], [2,5]],
   guideMoves: 1,
-  moveLimit: 20,
+  moveLimit: 17, // [Beatchart sync 2026-09-13] 20->17
   boosterHint: 1,
   lesson: "THREE FACES · TWO PERMANENT BLOCKS",
   teach: "",
@@ -4878,7 +4917,7 @@ const P24M_LEVELS=[
   winTargets: [{id:"s1",need:2}, {id:"w2",need:1}, {id:"c1",need:4}],
   permanents: [[3,5], [4,4], [4,5], [5,4], [5,5], [5,1], [4,1], [4,0], [5,0]],
   guideMoves: 0,
-  moveLimit: 20,
+  moveLimit: 16, // [Beatchart sync 2026-09-13] 20->16
   boosterHint: 1,
   lesson: "FINAL EXAM · GRAVITY REVEAL · SAME LAYER · A BIGGER PERMANENT BLOCK",
   teach: "",
@@ -4917,7 +4956,7 @@ const P24M_LEVELS=[
   // is the same value the old level-wide sealRequiredDistinct used.
   seals: [[3,3,2]],
   guideMoves: 0,
-  moveLimit: 7,
+  moveLimit: 12, // [Beatchart sync 2026-09-13] 7->12
   boosterReroll: 1,
   boosterHint: 1,
   lesson: "TWO MATCHED FACES OPEN THE SEAL AT TURN END",
@@ -4975,7 +5014,7 @@ const P24M_LEVELS=[
   winTargets: [{id:"s1",need:4}, {id:"c1",need:4}, {id:"w1",need:3}],
   seals: [[3,2,1], [4,2,2], [4,3,3], [4,4,4], [1,2,1], [0,2,2], [0,1,3], [0,0,4]],
   guideMoves: 0,
-  moveLimit: 8,
+  moveLimit: 10, // [Beatchart sync 2026-09-13] 8->10
   boosterReroll: 1,
   boosterHint: 1,
   lesson: "PEAK 2 OF 3 — 11 TILES ACROSS THREE FACES",
@@ -5014,7 +5053,7 @@ const P24M_LEVELS=[
     winTargets: [{id:'s1',need:4}, {id:'c1',need:4}, {id:'w1',need:4}],
     seals: [[5,5,3],[0,5,5],[5,0,7],[0,0,9]],
     guideMoves: 0,
-    moveLimit: 9,
+    moveLimit: 11, // [Beatchart sync 2026-09-13] 9->11
     boosterReroll: 1,
     boosterHint: 1,
     lesson: 'HARDER PASS: DENSER SEALS + MIXED PIECES + TIGHTER MOVES, 24-28',
@@ -5038,115 +5077,108 @@ const P24M_LEVELS=[
     ],
   },
   {
-    // [24-28 pass 2] +1 seal vs Lv24; needs back to 4/4/4/4, piece mix mostly small.
-    title: "A Breather",
-    size: 6,
-    goalType: "TARGET_FACE",
-    // [24-28 pass 3] Fillers draw from the goal faces (s1/c1/w1/s2) -- see Lv24's note.
-    winTargets: [{id:'s1',need:4}, {id:'c1',need:4}, {id:'w1',need:4}, {id:'s2',need:4}],
-    seals: [[5,0,3],[0,5,5],[5,5,7],[0,0,9],[3,3,11]],
-    guideMoves: 0,
-    moveLimit: 11,
-    boosterReroll: 1,
-    boosterHint: 1,
-    lesson: 'HARDER PASS: DENSER SEALS + MIXED PIECES + TIGHTER MOVES, 24-28',
-    teach: '',
-    tiles: [
-      P24K_TILE('s1', 0, 1, 0), P24K_TILE('s1', 5, 2, 0),
-      P24K_TILE('c1', 1, 5, 0), P24K_TILE('c1', 2, 0, 0),
-      P24K_TILE('w1', 0, 3, 0), P24K_TILE('w1', 3, 5, 0),
-      P24K_TILE('s2', 4, 0, 0), P24K_TILE('s2', 1, 2, 0),
-    ],
-    sequence: [
-      P24M_L3('m1', 's1', 'c1', 's1'),
-      P24M_L5('m2', 's1', 'c1', 's1', 'w1', 's2'),
-      P24M_L3('m3', 'c1', 's1', 'c1'),
-      P24M_L3('m4', 'c1', 's1', 'c1'),
-      P24M_L5('m5', 's1', 'c1', 'w1', 's2', 'w1'),
-      P24M_L3('m6', 'w1', 's1', 'c1'),
-      P24M_L3('m7', 's2', 's1', 'c1'),
-      P24M_L3('m8', 's2', 's1', 'c1'),
-    ],
-    solution: [
-      { row: 1, col: 1 }, { row: 2, col: 1 }, { row: 1, col: 0 }, { row: 1, col: 1 },
-      { row: 1, col: 0 }, { row: 1, col: 3 }, { row: 4, col: 4 }, { row: 3, col: 2 },
-    ],
-  },
+  title: "A Breather",
+  size: 6,
+  goalType: "TARGET_FACE",
+  winTargets: [{id:"s1",need:4}, {id:"c1",need:4}, {id:"w1",need:4}, {id:"s2",need:4}],
+  seals: [[5,0,3], [0,5,5], [5,5,7], [0,0,9], [3,3,11]],
+  guideMoves: 0,
+  moveLimit: 12, // [Beatchart sync 2026-09-13] 14->12
+  boosterReroll: 1,
+  boosterHint: 1,
+  lesson: "HARDER PASS: DENSER SEALS + MIXED PIECES + TIGHTER MOVES, 24-28",
+  teach: "",
+  tiles: [
+    P24K_TILE("s1", 0, 1, 0),
+    P24K_TILE("s1", 5, 2, 0),
+    P24K_TILE("c1", 1, 5, 0),
+    P24K_TILE("c1", 2, 0, 0),
+    P24K_TILE("w1", 0, 3, 0),
+    P24K_TILE("w1", 3, 5, 0),
+    P24K_TILE("s2", 4, 0, 0),
+    P24K_TILE("s2", 1, 2, 0),
+  ],
+  sequence: [
+    P24M_L3("m1", "s1", "c1", "s1"),
+    P24M_L5("m2", "s1", "c1", "s1", "w1", "s2"),
+    P24M_L3("m3", "c1", "s1", "c1"),
+    P24M_L3("m4", "c1", "s1", "c1"),
+    P24M_L5("m5", "s1", "c1", "w1", "s2", "w1"),
+    P24M_L3("m6", "w1", "s1", "c1"),
+    P24M_L3("m7", "s2", "s1", "c1"),
+    P24M_L3("m8", "s2", "s1", "c1"),
+  ],
+  solution: [{ row: 1, col: 1 }, { row: 2, col: 1 }, { row: 1, col: 0 }, { row: 1, col: 1 }, { row: 1, col: 0 }, { row: 1, col: 3 }, { row: 4, col: 4 }, { row: 3, col: 2 }],
+},
   {
-    // [24-28 pass 2] +1 seal vs. Lv25; w1 stays the "heavier" face at need:6, others
-    // back to 4, piece mix mostly small.
-    title: "The Fifth Face",
-    size: 6,
-    goalType: "TARGET_FACE",
-    // [24-28 pass 3] Fillers draw from the goal faces (s1/c1/w1/s2) -- see Lv24's note.
-    winTargets: [{id:'s1',need:4}, {id:'c1',need:4}, {id:'w1',need:6}, {id:'s2',need:4}],
-    seals: [[0,0,3],[5,5,6],[0,5,9],[5,0,12],[3,3,15],[2,2,17]],
-    guideMoves: 0,
-    moveLimit: 12,
-    boosterReroll: 1,
-    boosterHint: 1,
-    lesson: 'HARDER PASS: DENSER SEALS + MIXED PIECES + TIGHTER MOVES, 24-28',
-    teach: '',
-    tiles: [
-      P24K_TILE('s1', 0, 2, 0), P24K_TILE('s1', 5, 3, 0),
-      P24K_TILE('c1', 2, 4, 0), P24K_TILE('c1', 3, 0, 0),
-      P24K_TILE('w1', 1, 0, 0), P24K_TILE('w1', 4, 5, 0), P24K_TILE('w1', 0, 5, 0),
-      P24K_TILE('s2', 0, 4, 0), P24K_TILE('s2', 3, 5, 0),
-    ],
-    sequence: [
-      P24M_L3('m1', 's1', 'c1', 's1'),
-      P24M_L5('m2', 's1', 'c1', 'w1', 's2', 's1'),
-      P24M_L3('m3', 'c1', 's1', 'c1'),
-      P24M_L3C('m4', 's1', 'c1', 'c1'),
-      P24M_L5('m5', 'w1', 's1', 'c1', 'w1', 's2'),
-      P24M_L3('m6', 'w1', 's1', 'c1'),
-      P24M_L3B('m7', 'w1', 's1', 'c1'),
-      P24M_L3('m8', 's2', 's1', 'c1'),
-      P24M_L3B('m9', 's2', 's1', 'c1'),
-    ],
-    solution: [
-      { row: 0, col: 1 }, { row: 2, col: 1 }, { row: 0, col: 3 }, { row: 0, col: 2 },
-      { row: 1, col: 0 }, { row: 4, col: 4 }, { row: 1, col: 4 }, { row: 3, col: 4 },
-      { row: 0, col: 4 },
-    ],
-  },
+  title: "The Fifth Face",
+  size: 6,
+  goalType: "TARGET_FACE",
+  winTargets: [{id:"s1",need:4}, {id:"c1",need:4}, {id:"w1",need:6}, {id:"s2",need:4}],
+  seals: [[0,0,3], [5,5,6], [0,5,9], [5,0,12], [3,3,15], [2,2,17]],
+  guideMoves: 0,
+  moveLimit: 12, // [Beatchart sync 2026-09-13] 15->12
+  boosterReroll: 1,
+  boosterHint: 1,
+  lesson: "HARDER PASS: DENSER SEALS + MIXED PIECES + TIGHTER MOVES, 24-28",
+  teach: "",
+  tiles: [
+    P24K_TILE("s1", 0, 2, 0),
+    P24K_TILE("s1", 5, 3, 0),
+    P24K_TILE("c1", 2, 4, 0),
+    P24K_TILE("c1", 3, 0, 0),
+    P24K_TILE("w1", 1, 0, 0),
+    P24K_TILE("w1", 4, 5, 0),
+    P24K_TILE("w1", 0, 5, 0),
+    P24K_TILE("s2", 0, 4, 0),
+    P24K_TILE("s2", 3, 5, 0),
+  ],
+  sequence: [
+    P24M_L3("m1", "s1", "c1", "s1"),
+    P24M_L5("m2", "s1", "c1", "w1", "s2", "s1"),
+    P24M_L3("m3", "c1", "s1", "c1"),
+    P24M_L3C("m4", "s1", "c1", "c1"),
+    P24M_L5("m5", "w1", "s1", "c1", "w1", "s2"),
+    P24M_L3("m6", "w1", "s1", "c1"),
+    P24M_L3B("m7", "w1", "s1", "c1"),
+    P24M_L3("m8", "s2", "s1", "c1"),
+    P24M_L3B("m9", "s2", "s1", "c1"),
+  ],
+  solution: [{ row: 0, col: 1 }, { row: 2, col: 1 }, { row: 0, col: 3 }, { row: 0, col: 2 }, { row: 1, col: 0 }, { row: 4, col: 4 }, { row: 1, col: 4 }, { row: 3, col: 4 }, { row: 0, col: 4 }],
+},
   {
-    // [24-28 pass 2] 6 seals (densest of the pure-Seal run), needs back to 4/4/4/3,
-    // piece mix mostly small with 2 heavier deliveries.
-    title: "Two Routes to Progress",
-    size: 6,
-    goalType: "TARGET_FACE",
-    // [24-28 pass 3] Fillers draw from the goal faces (s1/c1/w1/s2) -- see Lv24's note.
-    winTargets: [{id:'s1',need:4}, {id:'c1',need:4}, {id:'w1',need:4}, {id:'s2',need:2}],
-    seals: [[5,0,2],[0,5,3],[5,5,4],[0,0,5],[3,3,6],[2,2,7]],
-    guideMoves: 0,
-    moveLimit: 10,
-    boosterReroll: 1,
-    boosterHint: 1,
-    lesson: 'HARDER PASS: DENSER SEALS + MIXED PIECES + TIGHTER MOVES, 24-28',
-    teach: '',
-    tiles: [
-      // all seeds kept off the board edge (rows/cols 1-4 on this 6x6 board) so every seed
-      // always has 4 genuine neighbor cells to approach from.
-      P24K_TILE('s1', 1, 1, 0), P24K_TILE('s1', 4, 2, 0),
-      P24K_TILE('c1', 1, 4, 0), P24K_TILE('c1', 3, 1, 0),
-      P24K_TILE('w1', 1, 3, 0), P24K_TILE('w1', 3, 4, 0),
-      P24K_TILE('s2', 2, 1, 0), P24K_TILE('s2', 1, 2, 0),
-    ],
-    sequence: [
-      P24M_L3('m1', 's1', 'c1', 's1'),
-      P24M_L3('m2', 's1', 'c1', 's1'),
-      P24M_L5('m3', 'c1', 's1', 'c1', 'w1', 's2'),
-      P24M_L3('m4', 'c1', 's1', 'c1'),
-      P24M_L3('m5', 's1', 'w1', 'c1'),
-      P24M_L3B('m6', 's1', 'w1', 'c1'),
-      P24M_L3('m7', 's1', 'c1', 's2'),
-    ],
-    solution: [
-      { row: 3, col: 0 }, { row: 1, col: 0 }, { row: 3, col: 2 }, { row: 1, col: 3 },
-      { row: 1, col: 4 }, { row: 3, col: 3 }, { row: 0, col: 0 },
-    ],
-  },
+  title: "Two Routes to Progress",
+  size: 6,
+  goalType: "TARGET_FACE",
+  winTargets: [{id:"s1",need:4}, {id:"c1",need:4}, {id:"w1",need:4}, {id:"s2",need:2}],
+  seals: [[5,0,2], [0,5,3], [5,5,4], [0,0,5], [3,3,6], [2,2,7]],
+  guideMoves: 0,
+  moveLimit: 12, // [Beatchart sync 2026-09-13] 15->12
+  boosterReroll: 1,
+  boosterHint: 1,
+  lesson: "HARDER PASS: DENSER SEALS + MIXED PIECES + TIGHTER MOVES, 24-28",
+  teach: "",
+  tiles: [
+    P24K_TILE("s1", 1, 1, 0),
+    P24K_TILE("s1", 4, 2, 0),
+    P24K_TILE("c1", 1, 4, 0),
+    P24K_TILE("c1", 3, 1, 0),
+    P24K_TILE("w1", 1, 3, 0),
+    P24K_TILE("w1", 3, 4, 0),
+    P24K_TILE("s2", 2, 1, 0),
+    P24K_TILE("s2", 1, 2, 0),
+  ],
+  sequence: [
+    P24M_L3("m1", "s1", "c1", "s1"),
+    P24M_L3("m2", "s1", "c1", "s1"),
+    P24M_L5("m3", "c1", "s1", "c1", "w1", "s2"),
+    P24M_L3("m4", "c1", "s1", "c1"),
+    P24M_L3("m5", "s1", "w1", "c1"),
+    P24M_L3B("m6", "s1", "w1", "c1"),
+    P24M_L3("m7", "s1", "c1", "s2"),
+  ],
+  solution: [{ row: 3, col: 0 }, { row: 1, col: 0 }, { row: 3, col: 2 }, { row: 1, col: 3 }, { row: 1, col: 4 }, { row: 3, col: 3 }, { row: 0, col: 0 }],
+},
   {
   // [24-28 harder pass] Combine step: Ô Chắn joins Seal for the first time. Columns 5 and
   // row 5 (the board's right/bottom edge, 11 cells) are reserved entirely for seals/
@@ -5160,7 +5192,7 @@ const P24M_LEVELS=[
   seals: [[0,5,2], [1,5,4], [2,5,6], [3,5,8], [5,0,3], [5,1,7], [5,2,11]],
   permanents: [[4,5], [5,5], [5,3], [5,4]],
   guideMoves: 0,
-  moveLimit: 9,
+  moveLimit: 13, // [Beatchart sync 2026-09-13] 9->13
   boosterReroll: 1,
   boosterHint: 1,
   lesson: "COMBINE PASS: Ô CHẮN JOINS SEAL, MIXED PIECES, 28",
@@ -5191,7 +5223,7 @@ const P24M_LEVELS=[
   seals: [[5,0,3], [0,5,5], [5,5,7], [0,0,8]],
   permanents: [[2,2], [3,3], [2,3], [3,2]],
   guideMoves: 0,
-  moveLimit: 9,
+  moveLimit: 13, // [Beatchart sync 2026-09-13] 9->13
   boosterReroll: 1,
   boosterHint: 1,
   lesson: "COMBINE PASS: Ô CHẮN JOINS SEAL, DIFFICULTY STAYS HIGH, 28-30",
@@ -5227,7 +5259,7 @@ const P24M_LEVELS=[
   seals: [[5,0,2], [0,5,3], [5,5,5], [0,0,7], [3,3,9], [4,5,9]],
   permanents: [[1,4], [2,2], [3,2], [4,4], [5,3], [3,4]],
   guideMoves: 0,
-  moveLimit: 15,
+  moveLimit: 13, // [Beatchart sync 2026-09-13] 15->13
   boosterReroll: 1,
   boosterHint: 1,
   lesson: "CHAPTER FINALE: MOST SEALS + Ô CHẮN TOGETHER, 24-30 PEAK",
@@ -6079,7 +6111,7 @@ const P24M_LEVELS=[
   permanents: [[2,2], [2,3], [3,2], [3,3], [1,4], [1,5], [1,1], [1,2], [1,3], [3,5]],
   locks: [{ cells: [[1,0]], face: "s1", required: 2 }],
   guideMoves: 0,
-  moveLimit: 12,
+  moveLimit: 14, // [Beatchart sync 2026-09-13] 12->14
   boosterReroll: 1,
   boosterHint: 1,
   lesson: "EVERYTHING YOU'VE LEARNED, THREE FACES AT ONCE",
@@ -6332,8 +6364,11 @@ p24mStyle.textContent=`
    -- box-shadow animate = paint lại mỗi frame, tốn kém trên di động; đây lại
    chạy SUỐT lúc chơi 1 màn có seal, không phải chỉ ở menu). */
 @keyframes sealGlow{0%,100%{transform:scale(1);}50%{transform:scale(1.05);}}
-.cell-sealed.opening .seal-plank{animation:sealBreak .46s ease-in forwards;}
-@keyframes sealBreak{0%{transform:scale(1) rotate(0deg);opacity:1;filter:brightness(1);}40%{transform:scale(1.08) rotate(-3deg);opacity:1;filter:brightness(1.8);}100%{transform:scale(.4) rotate(14deg) translateY(30px);opacity:0;filter:brightness(2.2);}}
+/* Seal dissolves upward (bamboo crumbling to dust), paired with dustRise() particles fired
+   from p24kMaybeOpenSeal -- distinct from Lock's harder shatter below, since the two blockers
+   are different materials and shouldn't read as the same "poof". */
+.cell-sealed.opening .seal-plank{animation:sealDissolve .5s ease-out forwards;}
+@keyframes sealDissolve{0%{transform:scale(1) translateY(0);opacity:1;filter:brightness(1) blur(0px);}45%{transform:scale(1.05) translateY(-4px);opacity:.9;filter:brightness(1.7) blur(.3px);}100%{transform:scale(.82) translateY(-28px);opacity:0;filter:brightness(1.9) blur(2.5px);}}
 /* Khóa (Lock) — like Phong Ấn (blocks until a threshold is met) but shows the player
    EXACTLY which face and how many are still needed, right on the cell, instead of an
    opaque "some distinct count" gate. Icy blue so it never reads as the same blocker as
@@ -6357,7 +6392,10 @@ p24mStyle.textContent=`
 .lock-plate .lock-count{font-size:13px;font-weight:900;color:#eaf7ff;text-shadow:0 1px 2px rgba(0,0,0,.8);
   background:rgba(10,30,42,.7);padding:1px 6px;border-radius:20px;box-shadow:inset 0 0 0 1px rgba(191,230,255,.4);}
 @keyframes lockGlow{0%,100%{transform:scale(1);}50%{transform:scale(1.05);}}
-.cell-locked.opening .lock-plate{animation:sealBreak .46s ease-in forwards;}
+/* Lock cracks fast then flies apart, paired with shatter() ice shards fired from
+   p24kMaybeOpenLocks -- ice reads as a snap/crack, not a soft fade like Seal above. */
+.cell-locked.opening .lock-plate{animation:lockShatter .46s cubic-bezier(.3,.1,.4,1) forwards;}
+@keyframes lockShatter{0%{transform:scale(1) rotate(0deg);opacity:1;filter:brightness(1);}25%{transform:scale(1.08) rotate(-2deg);opacity:1;filter:brightness(2.4);}55%{transform:scale(.88) rotate(5deg);opacity:.85;filter:brightness(1.6);}100%{transform:scale(.25) rotate(-16deg) translateY(-4px);opacity:0;filter:brightness(2.6);}}
 @media(max-width:430px){#board.top-match-board .gravity-top .rk{font-size:13px}}
 /* Tray pieces (the piece you're about to drag) stay exactly as they were — the rounded-
    top-corner + gold-frame + extrusion treatment on the shared .tile rule was meant for the
@@ -6522,11 +6560,21 @@ async function p24kMaybeOpenSeal(){
   if(!justOpened.length)return;
   addQuestProgress('seal1',1);
   sfx.sealOpen();
+  // [Tối ưu 13/09/2026] hiếm khi nhiều seal mở CÙNG lúc, nhưng nếu có thì giới hạn số cụm
+  // hạt bụi (mỗi cụm 14 hạt) để không dồn hàng chục/trăm phần tử DOM animate cùng 1 khung
+  // hình — ô nào cũng vẫn mờ dần biến mất bình thường (class 'opening'), chỉ bớt hạt dư.
+  let dustBudget=6;
   justOpened.forEach(([sr,sc])=>{
     const el=boardEl.querySelector(`.cell-sealed[data-r="${sr}"][data-c="${sc}"]`);
-    if(el)el.classList.add('opening');
+    if(!el)return;
+    el.classList.add('opening');
+    if(dustBudget>0){
+      const rect=el.getBoundingClientRect();
+      dustRise(rect.left+rect.width/2,rect.top+rect.height/2,'#e8b64c');
+      dustBudget--;
+    }
   });
-  await sleep(460);
+  await sleep(500);
   renderAll();
 }
 /* Khóa (Lock) — each entry in level.locks is its own independent {cells,face,required}
@@ -6546,10 +6594,21 @@ async function p24kMaybeOpenLocks(){
   });
   if(!justOpened.length)return;
   sfx.sealOpen();
+  // [Tối ưu 13/09/2026] cùng lý do như Seal ở trên — giới hạn số cụm mảnh băng vỡ khi hiếm
+  // khi nhiều lock mở cùng lúc, tránh dồn quá nhiều phần tử DOM animate 1 lúc.
+  let shardBudget=6;
   justOpened.forEach(lock=>{
     lock.cells.forEach(([lr,lc])=>{
       const el=boardEl.querySelector(`.cell-locked[data-r="${lr}"][data-c="${lc}"]`);
-      if(el)el.classList.add('opening');
+      if(!el)return;
+      el.classList.add('opening');
+      if(shardBudget>0){
+        const rect=el.getBoundingClientRect();
+        const px=rect.left+rect.width/2,py=rect.top+rect.height/2;
+        shatter(px,py,'#bfe6ff');
+        sparks(px,py,'#eaffff',6);
+        shardBudget--;
+      }
     });
   });
   await sleep(460);
@@ -6643,10 +6702,15 @@ showPreview=function(r,c,index=0){
    radial "shockwave" burst at the group's centroid; size 4 also gives the board a
    micro-shake. All of this is meant to read as "how big was that clear" with zero text. */
 p24kMarkPairAnimation=function(groups,waveNo=1){
-  groups.forEach(group=>{
+  /* [Tối ưu hiệu năng 13/09/2026] Tách vòng GHI (classList/style, không gây reflow ngay)
+     khỏi vòng ĐỌC (getBoundingClientRect, buộc trình duyệt tính layout đồng bộ) — trước đây
+     2 việc này xen kẽ trong CÙNG 1 vòng lặp, mỗi ô lại ép 1 lần layout riêng ("layout
+     thrashing"), cascade nhiều ô/nhiều nhóm cùng lúc là chỗ giật rõ nhất. Gộp hết GHI trước,
+     ĐỌC sau giúp trình duyệt chỉ cần tính layout 1 lần cho cả wave. Không đổi gì hiển thị. */
+  const groupInfo=groups.map(group=>{
     const n=Math.max(0,Math.min(2,group.length-2));
     const ringColor=n>=1?'#ffd670':'#8fbf52',ringGlow=n>=1?'rgba(255,214,112,.92)':'rgba(143,191,82,.95)';
-    let cx=0,cy=0,count=0;
+    const cells=[];
     group.forEach((uid,idx)=>{
       const tile=P24K.tiles.find(t=>t.uid===uid);if(!tile)return;
       const layer=boardEl.querySelector(`.gravity-layer[data-uid="${uid}"]`);
@@ -6655,10 +6719,23 @@ p24kMarkPairAnimation=function(groups,waveNo=1){
       if(cell){
         cell.style.setProperty('--n',n);cell.style.setProperty('--ring-color',ringColor);cell.style.setProperty('--ring-glow',ringGlow);
         cell.classList.add('gravity-match','top-clearing');
-        const rect=cell.getBoundingClientRect();const px=rect.left+rect.width/2,py=rect.top+rect.height/2;
-        cx+=px;cy+=py;count++;
-        shatter(px,py,PRAISE_COLORS[n]);
+        cells.push(cell);
       }
+    });
+    return {group,n,cells};
+  });
+  /* Giới hạn tổng số lần nổ mảnh vỡ (shatter) trong 1 wave — combo lớn nhiều nhóm cùng lúc
+     trước đây gọi shatter() không giới hạn theo từng ô, cascade to có thể sinh cả trăm mảnh
+     DOM cùng lúc. Mọi ô vẫn có ring/pop CSS đầy đủ như cũ, chỉ bớt mảnh vỡ dư thừa khi combo
+     vượt ngưỡng này (combo thường gặp 2-4 ô/nhóm không bao giờ chạm ngưỡng). */
+  const SHATTER_CAP=10;
+  let shatterLeft=SHATTER_CAP;
+  groupInfo.forEach(({group,n,cells})=>{
+    let cx=0,cy=0,count=0;
+    cells.forEach(cell=>{
+      const rect=cell.getBoundingClientRect();const px=rect.left+rect.width/2,py=rect.top+rect.height/2;
+      cx+=px;cy+=py;count++;
+      if(shatterLeft>0){shatter(px,py,PRAISE_COLORS[n]);shatterLeft--;}
     });
     if(count){
       cx/=count;cy/=count;
@@ -6685,7 +6762,7 @@ p24kResolveAnimated=async function(activeUids){
     waves++;const maxSize=Math.max(...groups.map(g=>g.length)),waveTiles=groups.reduce((s,g)=>s+g.length,0);
     const maxN=Math.max(...groups.map(g=>Math.max(0,Math.min(2,g.length-2))));
     P24K.phase='match';renderKhay();p24kMarkPairAnimation(groups,waves);
-    const br=boardEl.getBoundingClientRect();sparks(br.left+br.width/2,br.top+br.height*.45,maxSize>=3?'#ffd670':PAIR_COLOR,12+maxSize*6);sfx.pop(waves-1);
+    const br=boardEl.getBoundingClientRect();sparks(br.left+br.width/2,br.top+br.height*.45,maxSize>=3?'#ffd670':PAIR_COLOR,Math.min(36,12+maxSize*6));sfx.pop(waves-1);
     if(typeof window.haptic==='function')window.haptic(maxSize>=3?window.HAPTIC.matchBig:window.HAPTIC.match);
     await sleep(340+maxN*50);
     const step=p24kApplyWave(groups,active);active=step.active;

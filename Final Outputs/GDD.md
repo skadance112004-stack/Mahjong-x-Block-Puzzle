@@ -190,10 +190,11 @@ ngày 13/09/2026:
 |Seal (Niêm phong)|24|Lv21|13 màn: 33, 38, 39, 40, 41, 42, 44, 45, 46, 47, 48, 49, 50|
 |Lock (Khoá)|19|Lv31|(bảng bên trái)|
 
-* **Độ khó biến thiên:** `moveLimit` dao động thực tế **4–20** (Lv1 thấp nhất với 4; Lv19, Lv20,
-Lv42 đồng cao nhất với 20 — xem bảng đầy đủ ở §5.2); kích thước bàn 2×2 đến 6×6 — **toàn bộ
-Lv46-50 đều là board 6×6** (đợt nâng cấp gần nhất, mật độ Ô Chắn/Seal/Lock và move limit cũng
-tăng theo cho cả 5 màn này so với phần còn lại của game).
+* **Độ khó biến thiên:** `moveLimit` dao động thực tế **8–20** trong số các màn có giới hạn nước
+(Lv32, Lv34 thấp nhất với 8; Lv42 cao nhất với 20 — Lv1 không có `moveLimit` nên không tính vào
+khoảng này, xem bảng đầy đủ ở §5.2); kích thước bàn 3×3 đến 6×6 — **toàn bộ Lv46-50 đều là board 6×6** (đợt
+nâng cấp gần nhất, mật độ Ô Chắn/Seal/Lock và move limit cũng tăng theo cho cả 5 màn này so với
+phần còn lại của game).
 
 ### 5.2 Bảng dữ liệu đầy đủ 50 màn
 
@@ -207,36 +208,36 @@ thật, xem mục 6 "Bộ máy sinh khối ngẫu nhiên" bên dưới).
 
 |Lv|Tên|Bàn|Goal|Chi tiết goal|MoveLimit|Lời giải|Dư|Ô Chắn|Seal|Lock|Khối lớn nhất|Số khối HĐ|Pool|
 |-|-|-|-|-|-|-|-|-|-|-|-|-|-|
-|1|A Single Spot|2×2|Quota|quota=7|4|2|2||||2|2||
-|2|Current and Next|3×3|Quota|quota=6|6|5|1||||2|3||
-|3|Every Cell Falls On Its Own|4×4|Quota|quota=6|7|6|1||||2|6||
-|4|Same Face, Different Floor|4×4|Quota|quota=8|7|7|0||||2|5||
-|5|Roof Opens the Floor|4×4|Quota|quota=10|6|4|2||||3|4||
-|6|The Fourth Face|4×4|Target|w3:2,s1:2,s4:2,c2:2|8|6|2||||2|6||
-|7|Pick The Target Face|6×6|Target|s1:4,c2:3,w3:2,c8:2|9|7|2||||2|7||
-|8|One Triomino, Two Heights|5×5|Target|s1:2,w3:2,s4:2,c2:2|6|4|2||||3|4||
-|9|Two Match Stations|5×5|Target|c2:2,w3:2,s1:2|8|6|2||||2|6||
-|10|Core Review|5×5|Target|w3:2,s1:4|10|8|2||||3|8||
+|1|A Single Spot|3×3|Quota|quota=10|—|4|—||||2|2||
+|2|Current and Next|3×3|Quota|quota=6|15|4|11||||2|3||
+|3|Every Cell Falls On Its Own|4×4|Quota|quota=6|15|6|9||||2|6||
+|4|Same Face, Different Floor|4×4|Quota|quota=8|15|7|8||||2|5||
+|5|Roof Opens the Floor|4×4|Quota|quota=10|15|4|11||||3|4||
+|6|The Fourth Face|4×4|Target|w3:2,s1:2,s4:2,c2:2|15|6|9||||2|6||
+|7|Pick The Target Face|6×6|Target|s1:4,c2:3,w3:2,c8:2|15|7|8||||2|7||
+|8|One Triomino, Two Heights|5×5|Target|s1:2,w3:2,s4:2,c2:2|15|4|11||||3|4||
+|9|Two Match Stations|5×5|Target|c2:2,w3:2,s1:2|15|6|9||||2|6||
+|10|Core Review|5×5|Target|w3:2,s1:4|15|8|7||||3|8||
 |11|First Blocker|5×5|Target|s1:2,c2:2,w3:2|12|9|3|3|||3|9||
-|12|Two-Cell Notch|4×4|Target|s1:3,w3:3,s4:3|7|6|1|2|||2|6||
+|12|Two-Cell Notch|4×4|Target|s1:3,w3:3,s4:3|12|6|6|2|||2|6||
 |13|Topology Fit|5×5|Target|w3:2,c2:2,s1:3|15|8|7|3|||3|8||
 |14|Detour Wall|6×6|Target|s1:3,c2:3,w3:2|16|9|7|6|||3|9||
 |15|Fork Around|6×6|Target|s1:3,c2:3,w3:3|15|8|7|5|||3|8||
 |16|Double Block|6×6|Target|s1:3,c2:3,w3:3|12|9|3|6|||3|9||
 |17|Open Route|6×6|Quota|quota=4|14|9|5|6|||3|9||
-|18|Sixth Face|6×6|Target|s1:3,c2:3,w3:3|9|8|1|6|||3|9||
-|19|Three Faces, Two Stations|6×6|Target|s1:4,c2:5,w3:4|20|10|10|8|||3|10||
-|20|Chapter Final Exam|6×6|Target|s1:2,w6:1,c2:4|20|9|11|9|||3|9||
-|21|Break The First Seal|4×4|Seal|seal x1|7|3|4||1||2|5||
+|18|Sixth Face|6×6|Target|s1:3,c2:3,w3:3|14|8|6|6|||3|9||
+|19|Three Faces, Two Stations|6×6|Target|s1:4,c2:5,w3:4|17|10|7|8|||3|10||
+|20|Chapter Final Exam|6×6|Target|s1:2,w6:1,c2:4|16|9|7|9|||3|9||
+|21|Break The First Seal|4×4|Seal|seal x1|12|3|9||1||2|5||
 |22|Two Different Faces|5×5|Seal|seal x4|11|10|1||4||3|11||
-|23|Use The Freed Cell|5×5|Target|s1:4,c2:4,w3:3|8|7|1||8||2|7||
-|24|One Meter, Many Cells|6×6|Target|s1:4,c2:4,w3:4|9|6|3||4||5|6||
-|25|A Breather|6×6|Target|s1:4,c2:4,w3:4,s4:4|11|8|3||5||5|8||
+|23|Use The Freed Cell|5×5|Target|s1:4,c2:4,w3:3|10|7|3||8||2|7||
+|24|One Meter, Many Cells|6×6|Target|s1:4,c2:4,w3:4|11|6|5||4||5|6||
+|25|A Breather|6×6|Target|s1:4,c2:4,w3:4,s4:4|12|8|4||5||5|8||
 |26|The Fifth Face|6×6|Target|s1:4,c2:4,w3:6,s4:4|12|9|3||6||5|9||
-|27|Two Routes to Progress|6×6|Target|s1:4,c2:4,w3:4,s4:2|10|7|3||6||5|7||
-|28|Three Faces Unlocked|6×6|Target|s1:4,c2:4,w3:4|9|6|3|4|7||5|6||
-|29|Buried Under Seal|6×6|Target|s1:4,c2:4,w3:6|9|8|1|4|4||3|8||
-|30|Twin Stations|6×6|Target|s1:4,c2:4,w3:6,s4:4|15|9|6|6|6||3|9||
+|27|Two Routes to Progress|6×6|Target|s1:4,c2:4,w3:4,s4:2|12|7|5||6||5|7||
+|28|Three Faces Unlocked|6×6|Target|s1:4,c2:4,w3:4|13|6|7|4|7||5|6||
+|29|Buried Under Seal|6×6|Target|s1:4,c2:4,w3:6|13|8|5|4|4||3|8||
+|30|Twin Stations|6×6|Target|s1:4,c2:4,w3:6,s4:4|13|9|4|6|6||3|9||
 |31|Seal and Stone|4×4|Quota|quota=8|9|6|3|||2|4|5||
 |32|Two Under One|5×5|Target|s1:6,c8:2|8|7|1|5||1|2|7||
 |33|Either Way Works|5×5|Target|s1:6,c2:2,c8:2|12|10|2|4|1|1|2|7||
@@ -255,8 +256,11 @@ thật, xem mục 6 "Bộ máy sinh khối ngẫu nhiên" bên dưới).
 |46|Two Shots|6×6|Target|c2:2,c8:4,s1:4|14|8|6|10|2|1|3|6||
 |47|Three Of Six|6×6|Target|s1:2,c2:2,w3:2|12|9|3|10|2|2|3|9|Có|
 |48|Two Seals|6×6|Quota|quota=16|12|11|1|13|1|5|4|9||
-|49|Penultimate|6×6|Target|s1:4,w3:4,s4:2|12|11|1|10|2|1|4|12|Có|
+|49|Penultimate|6×6|Target|s1:4,w3:4,s4:2|14|11|3|10|2|1|4|12|Có|
 |50|Grand Finale|6×6|Target|s1:6,c2:6|15|12|3|7|5|2|4|12||
+
+`—` ở cột MoveLimit/Dư (chỉ Lv1) nghĩa là màn không có `moveLimit` trong source (tutorial gốc,
+không giới hạn nước) — khác với ô trống ở các cột Ô Chắn/Seal/Lock (nghĩa là 0).
 
 ### 5.3 Nguyên tắc đường cong độ khó
 
@@ -286,23 +290,28 @@ TRUNG BÌNH thô theo chương (tính trực tiếp từ `window.__digest24k1.LE
 
 |Chương|Cỡ bàn TB|Số nước lời giải TB|Move Limit TB|
 |-|-|-|-|
-|C1 Nền tảng|4.2|5.5|7.1|
-|C2 Ô Chắn|5.6|8.5|14.0|
-|C3 Phong Ấn|5.6|7.3|10.1|
+|C1 Nền tảng|4.3|5.6|15.0*|
+|C2 Ô Chắn|5.6|8.5|14.3|
+|C3 Phong Ấn|5.6|7.3|11.9|
 |C4 Kết hợp|5.2|8.1|11.8|
-|C5 Mastery|5.9|10.2|14.6|
+|C5 Mastery|5.9|10.2|14.8|
+
+`*` C1 tính trên 9/10 màn — Lv1 không có `moveLimit` (không giới hạn nước) nên bị loại khỏi trung
+bình này, không tính là 0.
 
 **Đọc bảng này thế nào**: cỡ bàn và số nước lời giải tăng dần khá rõ từ C1→C5 (đúng hướng thiết
-kế). Move Limit TB không đơn điệu (C2 cao, 14.0, xấp xỉ C5) — hệ quả trực tiếp của việc C2 có
-`spare` (lượt dư) rộng rãi hơn theo chủ đích thiết kế ("Ô Chắn dạy nhẹ nhàng"), **không phải dấu
-hiệu C2 "dễ hơn"** — số nước lời giải TB của C2 (8.5) vẫn cao hơn C1 (5.5), C3 (7.3) và C4 (8.1),
-chỉ thấp hơn C5 (10.2). Không có 1 điểm số tổng hợp để xếp hạng "màn nào khó nhất" một cách khách
-quan tuyệt đối — muốn so sánh 2 màn cụ thể, đọc trực tiếp bảng §5.2 (cỡ bàn, số nước, lượt dư, số
-cơ chế, khối lớn nhất) thay vì 1 con số.
+kế). Move Limit TB không đơn điệu và không còn tăng dần theo chương: C1 cao nhất (15.0, nhưng chỉ
+tính trên 9 màn có giới hạn nước — Lv2-10 đều được đặt phẳng ở mức 15), C2 và C5 xấp xỉ nhau
+(14.3 / 14.8), còn C3/C4 thấp hơn hẳn (11.9 / 11.8) — **không phải dấu hiệu C1 "khó nhất"**, vì
+số nước lời giải TB của C1 (5.6) vẫn thấp nhất trong 5 chương; move limit rộng rãi ở C1 phản ánh
+chủ đích thiết kế "dạy nhẹ nhàng" (nhiều lượt dư) hơn là độ khó thật. Không có 1 điểm số tổng hợp
+để xếp hạng "màn nào khó nhất" một cách khách quan tuyệt đối — muốn so sánh 2 màn cụ thể, đọc trực
+tiếp bảng §5.2 (cỡ bàn, số nước, lượt dư, số cơ chế, khối lớn nhất) thay vì 1 con số.
 
-**Phân bố cỡ bàn toàn game**: 2×2×1, 3×3×1, 4×4×7, 5×5×14, 6×6×27. Hơn một nửa số màn (27/50)
-đã là 6×6 — bao gồm toàn bộ C5 gần như 100% và phần lớn C4 (các đợt "tăng mật độ" và "kết hợp 3
-cơ chế" gần đây đều mở rộng board để có chỗ thêm nội dung thay vì nén vào board cũ).
+**Phân bố cỡ bàn toàn game**: 3×3×2, 4×4×7, 5×5×14, 6×6×27 (không còn màn nào 2×2 — Lv1 đã lên
+3×3). Hơn một nửa số màn (27/50) đã là 6×6 — bao gồm toàn bộ C5 gần như 100% và phần lớn C4 (các
+đợt "tăng mật độ" và "kết hợp 3 cơ chế" gần đây đều mở rộng board để có chỗ thêm nội dung thay vì
+nén vào board cũ).
 
 **Phân bố khối lớn nhất trong hàng đợi**: domino (2 ô, khối lớn nhất trong màn) — 12 màn;
 tromino (3 ô) — 22 màn; tetromino (4 ô) — 11 màn; pentomino (5 ô) — 5 màn. Đa dạng hình khối đã
@@ -331,23 +340,22 @@ kiện thắng.
 
 `Lượt dư = Move Limit − Nước lời giải`. Quy tắc chuẩn: **mọi màn nên có ít nhất 2 nước dư**.
 
-**Tình trạng thực tế (13/09/2026, sau đợt `moveLimit+4` cho Lv40-50)** — đọc trực tiếp từ bảng
-§5.2:
+**Tình trạng thực tế (13/09/2026, sau lần sync moveLimit mới nhất từ beatchart)** — đọc trực tiếp
+từ bảng §5.2:
 
-* **Lv1**: không đụng vào — màn tutorial gốc, quy tắc không áp dụng.
-* **Lv4**: `0 lượt dư` (moveLimit 7 = đúng 7 nước lời giải) — màn DUY NHẤT toàn game ở mức 0
-lượt dư. Không có ghi chú thiết kế đặc biệt nào cho màn này — ứng viên rà lại nếu muốn áp dụng
+* **Lv1**: không đụng vào — màn tutorial gốc, không có `moveLimit`, quy tắc không áp dụng.
+* **Không còn màn nào ở mức `0 lượt dư`** — Lv4 (trước đây là màn duy nhất 0-lượt-dư) nay có 8
+lượt dư sau lần sync này.
+* **Lv22, 32, 39, 48**: `1 lượt dư` — 4 màn duy nhất còn dưới mức khuyến nghị "≥2", nằm rải rác ở
+3 chương khác nhau (Lv22 thuộc C3, Lv32/39 thuộc C4, Lv48 thuộc C5), không phải chỉ ở Lv1-39. Không
+có ghi chú thiết kế nào xác nhận đây là "có chủ đích" — nên coi là ứng viên rà lại nếu muốn áp dụng
 nghiêm quy tắc "≥2" trong 1 đợt cân bằng sau này.
-* **Lv2, 3, 12, 18, 22, 23, 29, 32, 39, 48, 49**: `1 lượt dư` — không nằm trong phạm vi Lv40-50
-nên không được đợt `moveLimit+4` chạm tới, vẫn giữ nguyên mức dư hẹp như trước. Không có
-exception note nào ghi nhận các màn này là "có chủ đích" — nên coi đây là ứng viên cần rà lại
-nếu muốn áp dụng nghiêm quy tắc "≥2" trong 1 đợt cân bằng sau này.
 
-> **Khuyến nghị cho game designer**: danh sách "0-1 lượt dư" hiện còn 12/50 màn (1 màn 0-lượt-dư
-> + 11 màn 1-lượt-dư, toàn bộ đều ở Lv1-39, không còn màn nào thuộc Lv40-50 vì đã qua đợt
-> `moveLimit+4`). Đây là dấu hiệu cho thấy các đợt cân bằng độ khó Lv1-39 trước đó chưa được rà
-> theo cùng tiêu chuẩn "≥2 lượt dư" đang áp dụng cho Lv40-50 — nên rà lại có chủ đích trong đợt
-> cân bằng tiếp theo cho phần Ch1-4, thay vì giả định tất cả đều "được thiết kế đúng như vậy".
+> **Khuyến nghị cho game designer**: danh sách "dưới 2 lượt dư" hiện còn 4/50 màn (22, 32, 39, 48),
+> giảm đáng kể so với trước (từng có 1 màn 0-lượt-dư và 11 màn 1-lượt-dư). Các màn còn lại đều đã
+> đạt tối thiểu 2 lượt dư. 4 màn còn lại trải đều C3-C5 chứ không gom riêng vào 1 chương — nên rà
+> lại có chủ đích cho từng màn này trong đợt cân bằng tiếp theo, thay vì giả định tất cả đều "được
+> thiết kế đúng như vậy".
 
 ### 5.7 Mật độ trực quan — tránh "rối mắt"
 
@@ -579,7 +587,7 @@ Trước đây việc GIẢI MÃ (`decodeAudioData`) file nhạc chỉ bắt đ�
 
 ### 10.2 Haptic (rung)
 
-* `window.HAPTIC = {place:12, match:22, matchBig:[18,25,22]}` (đơn vị ms, dùng `navigator.vibrate`), công tắc bật/tắt riêng, độc lập với công tắc Âm thanh. Hàm `haptic()` kiểm tra `navigator.vibrate` tồn tại + bọc `try/catch` trước khi gọi.
+* `window.HAPTIC = {place:25, match:35, matchBig:[30,30,35]}` (đơn vị ms, dùng `navigator.vibrate`), công tắc bật/tắt riêng, độc lập với công tắc Âm thanh. Hàm `haptic()` kiểm tra `navigator.vibrate` tồn tại + bọc `try/catch` trước khi gọi.
  KHÔNG hoạt động trên iPhone (Safari/WKWebView) — đây là giới hạn nền tảng của Apple, không phải bug trong code.** Safari trên iOS chưa bao giờ implement Vibration API (`navigator.vibrate` không tồn tại trên iOS ở bất kỳ phiên bản nào tới nay), khác hẳn Chrome/WebView trên Android (có hỗ trợ). Code hiện tại đã xử lý đúng bằng feature-detect (`if(navigator.vibrate)`) nên trên iPhone chỉ lặng lẽ không rung — không lỗi, không crash — nhưng kết quả cuối người chơi iOS vẫn là "bấm công tắc Haptic ON mà không thấy rung gì". Vì game là 1 file HTML thuần web (không đóng gói qua Capacitor/Cordova), **không có cách nào gọi được Taptic Engine thật của iPhone từ JavaScript** trong kiến trúc hiện tại — muốn có rung thật trên iOS bắt buộc phải bọc game trong 1 native app wrapper kèm plugin haptics gọi `UIImpactFeedbackGenerator` (native API), là thay đổi kiến trúc lớn ngoài phạm vi "1 file HTML tự chứa" hiện tại. Xem thêm §13.
 
 ### 10.3 Đa ngôn ngữ (i18n)
