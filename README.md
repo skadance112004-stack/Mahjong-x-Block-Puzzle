@@ -1,3 +1,4 @@
+```
 Mahjong x Block/
 ├── Assets/                          # Art & audio references
 │   ├── Art-References/              # Reference images (jpg/png)
@@ -39,3 +40,4 @@ Mahjong x Block/
     ├── seal-check/ ├── seal-data/ ├── seal-pairs/
     ├── ui-audit/
     └── verify-btn2/ ├── verify-current-level-btn/
+```
